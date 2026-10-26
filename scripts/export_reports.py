@@ -38,7 +38,7 @@ DOCS = ROOT / "docs"
 def reports_to_export(paths: list[str]) -> list[Path]:
     """The reports to export — the given ones, or every report under ``docs/``.
 
-    Source-only example scripts (``# mini:source-only``, e.g. ``docs/gpt.py``) are skipped even when named explicitly: the site links to their GitHub source rather than running them, so exporting one (which re-runs its inline compute) is never intended.
+    Source-only example scripts (``# mini:source-only``, e.g. ``docs/gpt.py``) are skipped even when named explicitly: the site links to their GitHub source rather than running them, so exporting one (which re-runs its inline compute) is never intended. So is a Markdown page, which has no bundle: the site build renders it from source.
     """
     if not paths:
         return reports(DOCS)
@@ -47,6 +47,8 @@ def reports_to_export(paths: list[str]) -> list[Path]:
         path = Path(p).resolve()
         if is_report(path):
             keep.append(path)
+        elif path.suffix == ".md":
+            print(f"  skip {path.name}: a Markdown page has no bundle; the site build renders it from source")
         else:
             print(f"  skip {path.name}: source-only example, not a rendered report — see `./go render`")
     return keep

@@ -943,7 +943,7 @@ _LIGHTBOX_JS = r"""
 def lightbox_chrome() -> str:
     """The ``<style>`` and ``<script>`` that make a :data:`ZOOM_ATTR` figure open full-size in an overlay.
 
-    One snippet, inlined by both page builders — the report pages through :func:`set_lightbox`, the Markdown pages by ``scripts/build_site.py`` — rather than a file the site links, because externalize mode puts a ``<base href>`` at the bucket that would repoint a relative stylesheet URL, and because the two would otherwise drift apart.
+    One snippet, inlined into a page by :func:`set_lightbox` (a report's figures, and a Markdown page's figure strips) rather than a file the site links, because externalize mode puts a ``<base href>`` at the bucket that would repoint a relative stylesheet URL.
     """
     return f"<style>{_lightbox_css().strip()}</style>\n<script>{_LIGHTBOX_JS.strip()}</script>"
 
@@ -1012,12 +1012,13 @@ def mark_verdicts(html: str) -> str:
 
 
 def report_styles(doc: Path | str) -> str:
-    """The shared report stylesheet for *doc*'s project — ``docs/report.css`` beside the report tree — or ``""`` when there is none.
+    """The shared report stylesheet for *doc*'s project — ``docs/report.css`` beside the report tree — or ``""`` when there is none; for a Markdown page, its prose sheet ``docs/md-prose.css`` after it.
 
     One lookup for everything that renders a report (``mini.lit`` for a render, the live server and the export; the site build re-inlines the current source on top), so a report page carries the same sheet however it was made.
     """
-    css = _project_root(Path(doc)) / "docs" / "report.css"
-    return css.read_text("utf-8") if css.exists() else ""
+    docs = _project_root(Path(doc)) / "docs"
+    sheets = [docs / "report.css", *([docs / "md-prose.css"] if Path(doc).suffix == ".md" else [])]
+    return "\n".join(css.read_text("utf-8") for css in sheets if css.exists())
 
 
 def report_glossary(doc: Path | str) -> Path:

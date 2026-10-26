@@ -9,13 +9,14 @@ A Markdown page under ``docs/`` (a design doc, a proposal) renders the same way,
 """
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-from build_site import MD_PROSE_CSS, REPORT_CSS, Bundle, LinkResolver, printable
+from build_site import Bundle, LinkResolver, open_details, print_css, printable
 from export_reports import export_one
 from review_base import export_at, render_md_at, resolve
 
@@ -70,14 +71,15 @@ class Review:
 
 def review_page(report: Path, bundle: Path, review: Review, links: LinkResolver) -> str:
     """The page a review print is made from: the exported page as the site prints it, then stamped (and marked) by *review*."""
-    from_dir = report.parent.relative_to(DOCS).as_posix()
+    # Where author links resolve. A page outside docs/ (a plan drafted elsewhere) climbs out
+    # of it, and its links to repo files resolve to their GitHub source as a report's do.
+    from_dir = PurePosixPath(os.path.relpath(report.parent, DOCS)).as_posix()
     from_dir = "" if from_dir == "." else from_dir
     key = export_key(report)
-    report_css = REPORT_CSS.read_text("utf-8") if REPORT_CSS.exists() else ""
-    if report.suffix == ".md":  # its prose prints the way the site shows it, on top of the report frame
-        report_css += "\n" + MD_PROSE_CSS.read_text("utf-8")
     html = mark_verdicts((bundle / "index.html").read_text("utf-8"))
-    page = printable(Bundle(html), links, from_dir=from_dir, key=key, report_css=report_css)
+    if report.suffix == ".md":
+        html = open_details(html)
+    page = printable(Bundle(html), links, from_dir=from_dir, key=key, report_css=print_css(report))
     return review.mark(page, key, root=bundle)
 
 

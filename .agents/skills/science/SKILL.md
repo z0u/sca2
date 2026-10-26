@@ -44,7 +44,7 @@ flowchart TD
   merge --> stop(( ))
 ```
 
-**Inception.** Discuss the question with the human until they say to go ahead. Before proposing a plan, read the design doc of the deliverable (for D2.2, the Scoring section of `docs/m2/d2.2/design.md`): it holds the scoring rules every experiment follows, which can be newer than the experiment you build on. When there is more to discuss than a chat reply holds (a plan with alternatives, a method to argue over), put the plan in a Claude Doc and have the discussion in its comments; it is optional, at the lead's and the human's discretion, and the report itself stays a literate script in the repo. Then fill in the template from `sci-report` as a plan, with the results left as `TODO` and the cost in the PR description. If you are proposing a preregistration, fill in `template-prereg.py` with the hypotheses, so that the assumptions review sees them. If the review finds the plan unsound, take that back to the discussion. Otherwise the human OKs the plan and confirms the shape.
+**Inception.** Discuss the question with the human until they say to go ahead. Before proposing a plan, read the design doc of the deliverable (for D2.2, the Scoring section of `docs/m2/d2.2/design.md`): it holds the scoring rules every experiment follows, which can be newer than the experiment you build on. When there is more to discuss than a chat reply holds (a plan with alternatives, a method to argue over), write the plan down for the human to mark up. By default that is a print: write the plan as Markdown and print it like a report (see "The paper round" below), which reads on a phone or tablet as well as on paper. Put it under `docs/` if it will stay, as a deliverable's design doc does, or under `.mini/plans/` if it is only for this discussion. A Claude Doc, discussed in its comments, suits a human at a desktop who asks for one; its comments are awkward on a phone. Either way it is optional, and the report itself stays a literate script in the repo. Then fill in the template from `sci-report` as a plan, with the results left as `TODO` and the cost in the PR description. If you are proposing a preregistration, fill in `template-prereg.py` with the hypotheses, so that the assumptions review sees them. If the review finds the plan unsound, take that back to the discussion. Otherwise the human OKs the plan and confirms the shape.
 
 **Preregistration**, only when the shape calls for it (a survey takes this branch too). The inception review has already checked the assumptions, so the skeleton goes to the style review and then to the human on paper. If they ask for changes, the update goes back through the assumptions review. Their OK freezes the hypotheses.
 
@@ -119,6 +119,14 @@ The human reviews on a reMarkable. Commit, then print:
 ./go render docs/<key>/report.py -o .mini/prints/<name>.pdf --since <commit>
 ```
 
-Name the PDF for the report, so it needs no renaming on the tablet. From the second round on, `--since` names the commit the last print came from, and the PDF bars every line that changed. When the marked-up PDF comes back, the `pdf-annotations` skill turns the ink into a transcript.
+Name the PDF for the report, so it needs no renaming on the tablet. From the second round on, `--since` names the commit the last print came from, and the PDF bars every line that changed. When the marked-up PDF comes back, the `pdf-annotations` skill turns the ink into a transcript. In a project thread, print under `/mnt/project-files/prints/` and attach the PDF to your reply, since that folder is the one the human can open.
+
+A Markdown page goes the same way, and its print is the review copy by default: a design doc, a pivot, or a plan is sent as a PDF, the same as a report, rather than as a link or the raw file.
+
+```bash
+./go render docs/m2/d2.2/design.md -o .mini/prints/d2.2-design.pdf --since <commit>
+```
+
+The print has the same page, stylesheets and change bars as a report's, mermaid diagrams drawn, and every `<details>` fold opened.
 
 When you hand the report to the human, tell them what changed across the rounds, with `git diff --stat`, and list the `REVIEW` notes added since their last look, so they can overrule any of them.

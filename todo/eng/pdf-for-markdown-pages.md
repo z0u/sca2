@@ -1,8 +1,8 @@
 ---
-status: partial
-priority: high
+status: done
 tags: [publishing, reports]
 opened: 2026-09-23
+closed: 2026-10-26
 ---
 # Markdown pages that look and print like reports
 
@@ -17,3 +17,5 @@ What a proper version needs: `convert_markdown` pulling in the print sheet, a na
 **2026-09-24, third review of the D2.2 pivot** — From review of the second print: plain `.md` pages should look just like `lit` reports. That print came out with much looser line spacing than a report's (the first print, without the `main.lit` wrapper, did not), so the stopgap's mix of `md.css` and the report sheets does not match a report. The proper version should render a Markdown page through the same page shell and stylesheets a report uses, on the site as well as in print.
 
 **2026-10-05, the print half** — `./go render <page>.md -o <name>.pdf [--since REF]` now goes through `mini.lit`: `parse` reads a `.md` as one piece of static prose, so a Markdown page gets the page shell, `base.css`, `lit.css`, and `report.css` a report gets, and prints through `review_page` with links resolved to the site. Its `--since` baseline is the old text woven by today's code (`review_base.render_md_at`), with no checkout, since the page has no cells. The `mini.lit` dialect gained `def_list` (no report used the syntax, so their output is unchanged); its heading slugs already match `github_slug` on every heading under `docs/`. Still to do, the site half: `convert_markdown` rendering through the same path, so the site and the print look alike. That needs the site-only pieces of `md.css` (`.tags`, `.fig-strip`, `pre.mermaid`) carried into the lit page, the `mini:figures` strips and mermaid applied to the lit page body, `./go preview` and `./go serve` accepting a `.md` path, and the build print memo covering Markdown pages. A print of `docs/index.md` today shows tags as plain code spans and no strips, for that reason.
+
+**2026-10-26, the site half** — The site renders each Markdown page through `mini.lit` (`build_site.markdown_page`), the page a review print is made from, so the site page, its PDF and a review print agree. The page gets the nav chip (index, source, PDF) and a `<name>.pdf` beside it, printed through the same memo as the reports, keyed by the page's docs-relative path. `md-prose.css` moved to `docs/` and `mini.reports.report_styles` adds it to every Markdown page, so `./go serve` shows it too; `scripts/md.css` keeps only the figure strips. Mermaid is part of the `mini.lit` dialect now: a fence becomes `<pre class="mermaid">`, the page loads the library only when it has one, labels are SVG text (an HTML label sized under the screen styles was clipped in print), and the print waits for the diagrams to draw. A Markdown page's print opens every `<details>` fold and leaves the figure strips out. `./go preview` takes a `.md` path without exporting anything, and `./go render` prints a page outside `docs/`, such as a plan drafted under `.mini/plans/`. The `science` and `report-render` skills and `AGENTS.md` now send a Markdown document for review as a PDF, and a plan for discussion as one too unless the human is at a desktop and asks for a Claude Doc.

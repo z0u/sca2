@@ -1,7 +1,8 @@
-/* A Markdown page's prose, wherever it is shown: concatenated into the site's md.css
- * (scripts/build_site.py) and inlined into its print after docs/report.css
- * (scripts/render_report.py). The `.github-markdown-body` selectors are for VS Code's
- * Markdown preview (.vscode/settings.json). */
+/* A Markdown page's prose, wherever it is shown: mini.lit inlines it after report.css into
+ * every Markdown page it renders (mini.reports.report_styles), so a render, the live
+ * server, the site page and its PDF, and a review print all carry it. The
+ * `.github-markdown-body` selectors are for VS Code's Markdown preview
+ * (.vscode/settings.json). */
 
 details summary,
 .github-markdown-body details summary {

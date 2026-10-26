@@ -1,16 +1,17 @@
 /* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
  *
  * Where the rest of the CSS lives, and how each reaches a page:
- *   base.css (beside this)     shared with the site's Markdown pages; mini.lit.page inlines
+ *   base.css (beside this)     tokens, type, code, tables; mini.lit.page inlines
  *                              base + this + the Pygments styles into every page it renders
  *   docs/report.css            report polish and the print block; inlined after this at
  *                              render, export and site build (mini.reports.set_report_styles),
  *                              so an edit there reaches published reports without a re-export
- *   scripts/md-prose.css       a Markdown page's prose: on the site (below), and inlined
- *                              after report.css when the page is printed
- *   scripts/md.css             the site's Markdown pages only (base + md-prose + md,
- *                              concatenated by scripts/build_site.py; VS Code's preview
- *                              reads all three files)
+ *   docs/md-prose.css          a Markdown page's prose: inlined after report.css into a
+ *                              Markdown page (mini.reports.report_styles), so a render, the
+ *                              live server, the site and every print show it
+ *   scripts/md.css             the site's Markdown pages only (the figure strips), inlined
+ *                              by scripts/build_site.py; VS Code's preview reads it with
+ *                              base.css and md-prose.css
  *   mini/chips.css             the nav and provenance chips the site build injects
  *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
  *   subline/theme.css          inside each subline SVG, reading this page's tokens

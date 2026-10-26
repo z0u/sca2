@@ -65,12 +65,15 @@ show_help() {
 		                       since REF (the round last reviewed; the baseline is
 		                       exported from a checkout of REF, reading the store)
 		  serve   <report> [--port N]:
-		                       serve one report with live reload while you edit it
+		                       serve one report or Markdown page with live reload while
+		                       you edit it
 		  preview [...reports] [--no-serve] [--force] [--port N]:
 		                       export stale reports (or just the named ones), assemble
 		                       the site with local assets (never touches the network;
-		                       each report printed to _site/<key>/report.pdf, unchanged
-		                       ones reused from .mini/pdfs/), and serve it
+		                       each report printed to _site/<key>/report.pdf and each
+		                       Markdown page to _site/<name>.pdf, unchanged ones reused
+		                       from .mini/pdfs/), and serve it. Naming only Markdown
+		                       pages exports nothing: the build renders them from source
 		  publish <reports|--all>:
 		                       export reports and sync their bundles to the publish tier
 		  site:                assemble the public site from *published* bundles into _site/
@@ -173,7 +176,13 @@ case "${1:-}" in
             esac
             shift
         done
-        ( set -x; uv run "$SCRIPT_DIR/export_reports.py" ${stale:+"$stale"} "${paths[@]}" )
+        # A Markdown page has no bundle to export: the site build renders every one from source.
+        # So a preview of Markdown pages alone exports nothing (no paths would export them all).
+        reports=()
+        for p in "${paths[@]}"; do [[ $p == *.md ]] || reports+=("$p"); done
+        if [[ ${#paths[@]} -eq 0 || ${#reports[@]} -gt 0 ]]; then
+            ( set -x; uv run "$SCRIPT_DIR/export_reports.py" ${stale:+"$stale"} "${reports[@]}" )
+        fi
         ( set -x; uv run "$SCRIPT_DIR/build_site.py" --localize )
         if [[ $serve -eq 1 ]]; then
             ( set -x; uv run "$SCRIPT_DIR/preview_server.py" "$PROJECT_ROOT/_site" "$port" )

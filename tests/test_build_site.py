@@ -12,6 +12,19 @@ from tests.conftest import load_script
 build_site = load_script("build_site")
 
 
+@pytest.fixture
+def render_markdown(tmp_path: Path):
+    """A Markdown page's body as the site renders it (:func:`build_site.markdown_page`), from its text."""
+
+    def render(text: str) -> str:
+        page = tmp_path / "page.md"
+        page.write_text(text)
+        html = build_site.markdown_page(page)
+        return html[html.index('<main class="lit">') + len('<main class="lit">') : html.rindex("</main>")].strip()
+
+    return render
+
+
 @pytest.mark.parametrize(
     "url, want",
     [
@@ -35,49 +48,50 @@ def test_strip_index(url, want):
         "Keeps_underscores",
     ],
 )
-def test_rendered_heading_ids_are_github_slugs(heading):
+def test_rendered_heading_ids_are_github_slugs(heading, render_markdown):
     """A `#fragment` is checked against GitHub's slugs, so the published page has to use them too.
 
     Python-Markdown's own slugify collapses a run of separators — it would render "Provenance & cost" as `provenance-cost` where GitHub and the check both say `provenance--cost`, and the link would resolve everywhere except the site it was written for.
     """
-    html = build_site.render_markdown(f"## {heading}\n")
+    html = render_markdown(f"## {heading}\n")
 
     assert f'id="{github_slug(heading)}"' in html
 
 
-def test_a_heading_inside_a_details_block_is_given_an_id():
+def test_a_heading_inside_a_details_block_is_given_an_id(render_markdown):
     """The index collapses its older sections, and a fragment into one has to land."""
-    html = build_site.render_markdown(
+    html = render_markdown(
         '<details markdown="1"><summary><h3>Iteration 0 (prep)</h3></summary>\n\nbody\n\n</details>\n'
     )
 
     assert 'id="iteration-0-prep"' in html
 
 
-def test_a_toc_marker_links_the_github_slugs():
+def test_a_toc_marker_links_the_github_slugs(render_markdown):
     """The site's ToC has to link the ids this renderer gives its headings, which are GitHub's."""
-    html = build_site.render_markdown("<!-- toc -->\n\n## D2.1: anchoring\n\n### Removing *red*\n")
+    html = render_markdown("<!-- toc -->\n\n## D2.1: anchoring\n\n### Removing *red*\n")
 
     toc = html[: html.index("</nav>")]
     assert f'href="#{github_slug("D2.1: anchoring")}"' in toc
     assert 'href="#removing-red"' in toc
 
 
-def test_a_mermaid_fence_becomes_the_element_the_library_renders_into():
-    """Python-Markdown nests every fence in a `<code>`, which mermaid walks straight past."""
-    html, has_mermaid = build_site.promote_mermaid(
-        build_site.render_markdown('```mermaid\nflowchart LR\na(["suppress red"]) & b --> c\n```\n')
-    )
+def test_a_mermaid_fence_becomes_the_element_the_library_renders_into(tmp_path: Path):
+    """Python-Markdown nests every fence in a `<code>`, which mermaid walks straight past; the page loads the library only when it has a diagram."""
+    page = tmp_path / "page.md"
+    page.write_text('# Plan\n\n```mermaid\nflowchart LR\na(["suppress red"]) & b --> c\n```\n')
+    html = build_site.markdown_page(page)
 
-    assert has_mermaid
-    assert html == '<pre class="mermaid">flowchart LR\na([&quot;suppress red&quot;]) &amp; b --&gt; c\n</pre>'
+    assert '<pre class="mermaid">flowchart LR\na([&quot;suppress red&quot;]) &amp; b --&gt; c</pre>' in html
+    assert "mermaid.esm.min.mjs" in html
 
 
-def test_an_ordinary_fence_is_left_as_code():
-    html, has_mermaid = build_site.promote_mermaid(build_site.render_markdown("```python\nx = 1\n```\n"))
+def test_an_ordinary_fence_is_left_as_code(tmp_path: Path):
+    page = tmp_path / "page.md"
+    page.write_text("# Code\n\n```python\nx = 1\n```\n")
+    html = build_site.markdown_page(page)
 
-    assert not has_mermaid
-    assert 'class="mermaid"' not in html
+    assert 'class="mermaid"' not in html and "mermaid.esm" not in html
 
 
 @pytest.fixture
@@ -120,11 +134,9 @@ def strips() -> dict[str, "build_site.FigureStrip"]:
     }
 
 
-def test_figures_marker_survives_markdown_and_expands_to_pinned_cdn_thumbnails(resolver, strips):
+def test_figures_marker_survives_markdown_and_expands_to_pinned_cdn_thumbnails(resolver, strips, render_markdown):
     """The marker rides inside a list item as a comment; expansion happens on the rendered HTML, after Python-Markdown (which would read a raw <div> indented in a list as code)."""
-    body = build_site.render_markdown(
-        "- [probe](./probe/report.py)\n\n    Lede.\n\n    <!-- mini:figures ./probe/report.py -->\n"
-    )
+    body = render_markdown("- [probe](./probe/report.py)\n\n    Lede.\n\n    <!-- mini:figures ./probe/report.py -->\n")
     assert "mini:figures" in body  # the comment came through rendering intact
 
     out, has_strip = build_site.expand_figure_strips(body, strips, resolver, from_dir="", externalizing=True)
@@ -637,3 +649,48 @@ def test_the_site_prints_no_review_stamp(tmp_path: Path, monkeypatch):
 
     assert len(printer.calls) == 1 and "rv-note" not in printer.calls[0]
     assert [f.name for f in (tmp_path / "_site" / "ex-1").glob("*.pdf")] == ["report.pdf"]
+
+
+def test_a_markdown_page_is_a_lit_page_with_its_pdf_beside_it(tmp_path: Path, monkeypatch):
+    """A Markdown page gets what a report gets on the site: the lit page shell, the nav chip, and a PDF through the shared memo, which keeps both kinds of entry."""
+    monkeypatch.setattr(build_site, "WORKSPACE_ROOT", tmp_path)
+    monkeypatch.setattr(build_site, "DOCS_DIR", docs := tmp_path / "docs")
+    monkeypatch.setattr(build_site, "SITE_DIR", site := tmp_path / "_site")
+    monkeypatch.setattr(build_site, "REPORT_CSS", docs / "report.css")
+    (tmp_path / "pyproject.toml").write_text("")
+    (docs / "m2").mkdir(parents=True)
+    (docs / "md-prose.css").write_text(".tags{color:gray}")
+    (docs / "index.md").write_text(
+        "# Index\n\n- [Design](./m2/design.md)\n\n    <!-- mini:figures ./m2/design.md -->\n"
+    )
+    (docs / "m2" / "design.md").write_text(
+        '# Design\n\n<details markdown="1"><summary>More</summary>\n\nFolded.\n\n</details>\n\n[Index](../index.md)\n'
+    )
+    links = build_site.LinkResolver(
+        render_map={"index.md": "index.html", "m2/design.md": "m2/design.html"},
+        source_files=frozenset(),
+        site_base="https://o.github.io/r/",
+        source_base="https://github.com/o/r/blob/main/",
+        production_base="https://o.github.io/r/",
+    )
+    printer = _Printer()
+    memo = build_site.PdfMemo(tmp_path / "pdfs", stamp="t", printer=printer)
+    memo.current["ex-1"] = "a report's entry"
+    site.mkdir()
+    build_site.convert_markdown(links, externalizing=True, memo=memo)
+    build_site.save_pdfs(memo)
+
+    design = (site / "m2" / "design.html").read_text()
+    assert '<main class="lit">' in design and ".tags{color:gray}" in design
+    assert '<a href="../">&larr; Index</a>' in design and '<a href="design.pdf">PDF</a>' in design
+    assert 'href="https://github.com/o/r/blob/main/docs/m2/design.md"' in design
+    assert 'href="../"' in design  # the author link to the index, as the site serves it
+    assert "&larr; Index" not in (site / "index.html").read_text()  # the index needs no way back to itself
+    assert (site / "m2" / "design.pdf").is_file() and (site / "index.pdf").is_file()
+    assert not (site / ".md-print").exists()
+
+    printed = next(html for html in printer.calls if "Folded." in html)
+    assert "<details open" in printed  # a fold cannot be opened on paper
+    assert 'href="https://o.github.io/r/"' in printed  # the PDF links production
+    assert not any("mini:figures" in html for html in printer.calls)
+    assert set(json.loads((site / "pdfs.json").read_text())) == {"ex-1", "index.md", "m2/design.md"}

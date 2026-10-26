@@ -1,12 +1,11 @@
-/* The site's Markdown pages, on top of src/mini/lit/base.css (tokens, type, code,
- * tables) and scripts/md-prose.css (what a Markdown page's prose looks like, on the site
- * and in print): scripts/build_site.py concatenates base + md-prose + this into the md.css
- * it serves, and VS Code's Markdown preview lists all three (.vscode/settings.json). This
- * sheet holds the site's page chrome, which a print has its own of. The fonts come from
- * the same Google Fonts <link> as the report pages (mini.lit.page.FONTS). */
+/* The site's Markdown pages, on top of the mini.lit page each is rendered into (the same
+ * page shell and stylesheets as a report, plus docs/md-prose.css): scripts/build_site.py
+ * inlines this into every Markdown page. It holds the site-only rules, which a print has
+ * no use for. VS Code's Markdown preview lists base + md-prose + this
+ * (.vscode/settings.json), so the column below is scoped to its body. */
 
-/* One reading column, a little wider than a report's measure. */
-body {
+/* One reading column in VS Code's preview, a little wider than a report's measure. */
+body.vscode-body {
   max-width: 50rem;
   margin-inline: auto;
   padding-inline: 1.5rem;
@@ -56,19 +55,4 @@ body {
 .fig-strip-pdf:focus-visible {
   color: var(--fg);
   border-color: var(--fg-muted);
-}
-
-/* A ```mermaid fence, promoted by the build to the <pre class="mermaid"> the library
- * renders into (see scripts/build_site.py). It holds a diagram rather than code, so it
- * drops the code-block frame; until the script has run it shows the diagram source. */
-pre.mermaid {
-  background: none;
-  border-left: none;
-  padding: 0;
-  text-align: center;
-}
-
-pre.mermaid svg {
-  max-width: 100%;
-  height: auto;
 }

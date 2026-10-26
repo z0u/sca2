@@ -1,9 +1,8 @@
-/* The base sheet: what a woven report page and the site's Markdown pages share —
- * tokens, type, code, tables, images, quotes, heading anchors. It reaches a page three
- * ways: mini.lit.page inlines it ahead of lit.css (the report frame); scripts/build_site.py
- * concatenates it ahead of scripts/md-prose.css and scripts/md.css into the md.css the
- * site serves; and VS Code's Markdown preview lists them all (.vscode/settings.json). A value changed here
- * changes every page, so the report-only and site-only rules live in those two sheets. */
+/* The base sheet: tokens, type, code, tables, images, quotes, heading anchors. It reaches
+ * a page two ways: mini.lit.page inlines it ahead of lit.css (the page frame) into every
+ * page it renders, a report or a Markdown page; and VS Code's Markdown preview lists it
+ * with docs/md-prose.css and scripts/md.css (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and Markdown-only rules live in other sheets. */
 
 :root {
   color-scheme: light dark;
@@ -110,6 +109,19 @@ pre code {
   padding: 0;
   border-radius: 0;
   font-size: 1em;
+}
+
+/* A ```mermaid fence (mini.lit.page): it holds a diagram rather than code, so it drops the
+ * code-block frame; until the script has run it shows the diagram source. */
+pre.mermaid {
+  background: none;
+  border-left: none;
+  padding: 0;
+  text-align: center;
+}
+pre.mermaid svg {
+  max-width: 100%;
+  height: auto;
 }
 
 /* Anchor links on headings. */

@@ -21,9 +21,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 
-import markdown as md_lib
-
-from mini.lit.page import BASE_CSS_PATH, FONTS, expand_toc, is_lit_page
+from mini.lit.page import is_lit_page
 from mini.report_print import print_bundle, print_stamp
 from mini.reports import (
     PDF_LEAF,
@@ -33,9 +31,7 @@ from mini.reports import (
     alternates,
     export_dir,
     export_key,
-    github_slug,
     insert_base,
-    lightbox_chrome,
     load_pins,
     mark_figures,
     publish_lock,
@@ -46,6 +42,7 @@ from mini.reports import (
     set_banner,
     set_lightbox,
     mark_verdicts,
+    report_styles,
     set_report_styles,
     stray_links,
 )
@@ -58,26 +55,11 @@ DOCS_DIR = WORKSPACE_ROOT / "docs"
 # mini.reports.set_report_styles). Read from source each build, so editing it restyles
 # every published report with no re-export.
 REPORT_CSS = DOCS_DIR / "report.css"
-MD_PROSE_CSS = WORKSPACE_ROOT / "scripts" / "md-prose.css"  # a Markdown page's prose, on the site and in print
+MD_SITE_CSS = WORKSPACE_ROOT / "scripts" / "md.css"  # a Markdown page's site-only rules (the figure strips)
 
 # The relative dir, beside each report's index.html, holding its externalized assets
 # (figures, data blobs) written by mini.reports.Publisher.
 ASSET_LINK = "_assets"
-
-# Mermaid for Markdown pages, pinned so a diagram renders the same on every build.
-MERMAID_VERSION = "11.12.3"
-MERMAID_URL = f"https://cdn.jsdelivr.net/npm/mermaid@{MERMAID_VERSION}/dist/mermaid.esm.min.mjs"
-
-# Loaded only by a page that holds a diagram, since the bundle is a few MB. Mermaid picks
-# up the reader's colour scheme the way md.css does; a scheme changed after load lands on
-# the next reload.
-MERMAID_SCRIPT = f"""<script type="module">
-import mermaid from "{MERMAID_URL}";
-const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-mermaid.initialize({{ startOnLoad: false, theme: dark ? "dark" : "default" }});
-await mermaid.run();
-</script>
-"""
 
 # Source suffixes that the build renders into a report page (so an author link to one
 # resolves to the rendered result, not the dead source file).
@@ -426,6 +408,19 @@ class PdfMemo:
         (self.root / self.MANIFEST).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", "utf-8")
 
 
+def print_css(source: Path | None) -> str:
+    """The shared sheets a page prints with, from source, on top of its own: the current ``report.css``, and for a Markdown page (*source* a ``.md``) its prose sheet after it (:func:`mini.reports.report_styles`)."""
+    return report_styles(source or REPORT_CSS)
+
+
+_CLOSED_DETAILS = re.compile(r"<details(?![^>]*\bopen\b)")
+
+
+def open_details(html: str) -> str:
+    """*html* with every ``<details>`` open, for a Markdown page's print: on paper a fold cannot be opened, and the index keeps its report lists in one."""
+    return _CLOSED_DETAILS.sub("<details open", html)
+
+
 _ASSET_REF = re.compile(r"""(?<=["'(])_assets/""")
 
 
@@ -450,14 +445,14 @@ def build_reports(
 
     Externalize: read the synced HTML from the bucket, insert one ``<base>`` at ``exports/<key>/`` so its relative ``_assets/`` resolve there, and write only the HTML into ``_site`` (the bytes stay on the bucket CDN). Localize: read the bundle from ``.mini/exports`` and copy its ``_assets/`` beside the HTML so it works offline. Author links are resolved to absolute/relative targets either way.
 
-    The PDF (``report.pdf``, for reading on paper or e-ink) is printed here from the assembled page, through *memo* (:class:`PdfMemo`, opened from the environment when not given) so an unchanged report is not printed again. The page links it from the nav chip and declares it as an alternate rendition; when nothing can print (no browser), the page carries neither. A print for review, stamped with its commit and marked against an earlier round, is ``scripts/render_report.py``'s, and never the site's: its stamp would change the memo key on every commit.
+    The PDF (``report.pdf``, for reading on paper or e-ink) is printed here from the assembled page, through *memo* (:class:`PdfMemo`, opened from the environment when not given, and closed by :func:`save_pdfs` once the Markdown pages have printed too) so an unchanged report is not printed again. The page links it from the nav chip and declares it as an alternate rendition; when nothing can print (no browser), the page carries neither. A print for review, stamped with its commit and marked against an earlier round, is ``scripts/render_report.py``'s, and never the site's: its stamp would change the memo key on every commit.
 
     Returns each built report's :class:`FigureStrip` by key, so :func:`convert_markdown` can expand ``mini:figures`` markers from the HTML this pass already fetched.
     """
     print("Building reports...")
     pins = load_pins(WORKSPACE_ROOT) if externalizing else {}
     memo = memo or PdfMemo.open()
-    report_css = REPORT_CSS.read_text("utf-8") if REPORT_CSS.exists() else ""
+    report_css = print_css(None)
     nbs = reports(DOCS_DIR)
     # Externalized, each read is a round trip to the bucket and the reports don't depend
     # on each other — so read them in one wave and the build waits for the slowest report
@@ -515,9 +510,13 @@ def build_reports(
         for rendition in bundle.renditions:  # a script's Markdown: served beside the page, as on the bucket
             shutil.copy2(rendition, dest.parent / rendition.name)
         print(f"  {key} -> _site/{key}/index.html{' [+base]' if bundle.base_href else ''}")
-    memo.save()
-    shutil.copy2(memo.root / PdfMemo.MANIFEST, SITE_DIR / PdfMemo.MANIFEST)  # so the deployed site is the next memo
     return strips
+
+
+def save_pdfs(memo: PdfMemo) -> None:
+    """Close *memo* once every page is printed, the reports' and the Markdown pages', and put its manifest in the site, so the deployed site is the next build's memo."""
+    memo.save()
+    shutil.copy2(memo.root / PdfMemo.MANIFEST, SITE_DIR / PdfMemo.MANIFEST)
 
 
 def _nav_urls(links: LinkResolver, *, key: str, nb_rel: str, externalizing: bool) -> tuple[str | None, str | None]:
@@ -584,48 +583,44 @@ def site_root(dest: Path) -> str:
     return "../" * depth
 
 
-def copy_md_stylesheet():
-    """Write the Markdown pages' stylesheet to ``_site/md.css``: ``mini.lit``'s base sheet, then :data:`MD_PROSE_CSS`, then ``scripts/md.css`` on top.
+def markdown_pages() -> list[Path]:
+    """Every Markdown page the site serves: each ``.md`` under ``docs/`` but its ``README.md``."""
+    return sorted(p for p in DOCS_DIR.rglob("*.md") if p.name != "README.md")
 
-    The base sheet (tokens, type, code, tables) is what the reports use too, so a Markdown page and a report page agree on it by construction; ``md-prose.css`` is what a Markdown page's prose looks like, which its print shares; ``md.css`` holds only the site's page chrome.
+
+def markdown_page(md_file: Path) -> str:
+    """*md_file* as ``mini.lit`` renders it: the page shell, stylesheets and glossary notes a report gets, with its author links as written.
+
+    The same page a review print is made from (``scripts/render_report.py``), so the site, the site's PDF and the review print of a Markdown page agree.
     """
-    print("Copying Markdown stylesheet...")
-    sheets = [BASE_CSS_PATH, MD_PROSE_CSS, WORKSPACE_ROOT / "scripts" / "md.css"]
-    css_dest = SITE_DIR / "md.css"
-    css_dest.write_text("\n".join(s.read_text("utf-8") for s in sheets), "utf-8")
-    print(
-        f"  {' + '.join(str(s.relative_to(WORKSPACE_ROOT)) for s in sheets)} -> {css_dest.relative_to(WORKSPACE_ROOT)}"
-    )
+    from mini.lit.document import Runner, parse
+    from mini.lit.render import compose
+
+    html, _ = compose(Runner(md_file).weave(parse(md_file)))
+    return html
 
 
-def _rewrite_md_links(text: str, links: LinkResolver, *, from_dir: str, pretty: bool) -> str:
-    """Resolve relative Markdown link targets (``](./experiment.py)``) before conversion.
+def _resolve_md_links(html: str, links: LinkResolver, *, from_dir: str, pretty: bool) -> str:
+    """Rewrite the author links in a Markdown page's HTML; warn on the ones left dangling.
 
-    Markdown pages never carry an asset ``<base>``, so they're resolved in *localize* mode: a rendered target stays a relative link (clickable offline), a source file becomes an absolute GitHub link, and anything else is left untouched. When publishing (``pretty``), a report link drops its ``index.html`` so it reads ``<key>/``; offline builds keep the explicit file so ``file://`` navigation still works.
+    A Markdown page never carries an asset ``<base>``, so its links are resolved in *localize* mode: a rendered target stays a relative link (clickable offline), a source file becomes an absolute GitHub link. When publishing (``pretty``), a report link drops its ``index.html`` so it reads ``<key>/``; offline builds keep the explicit file so ``file://`` navigation still works.
     """
-
-    def repl(m: re.Match) -> str:
-        token = m.group(1)
+    mapping: dict[str, str] = {}
+    for token in stray_links(html, link=ASSET_LINK):
         target = links.resolve(token, from_dir=from_dir, out_dir=from_dir, externalizing=False)
-        if target is None:
-            return m.group(0)
-        return f"]({_strip_index(target) if pretty else target})"
+        if target is not None:
+            mapping[token] = _strip_index(target) if pretty else target
+        else:
+            print(f"  ! {from_dir or '.'}: unresolved relative link {token!r}")
+    return rewrite_links(html, mapping) if mapping else html
 
-    return re.sub(r"\]\(([^)\s]+)\)", repl, text)
 
-
-def render_markdown(text: str) -> str:
-    """A Markdown page's HTML body, with a GitHub-compatible ``id`` on every heading.
-
-    A ``<!-- toc -->`` marker becomes a list of the h2 and h3 headings (:func:`mini.lit.page.expand_toc`).
-
-    ``toc`` is what puts the ids there — without it a heading renders bare, so a ``#fragment`` into a page works on GitHub and scrolls nowhere here, which no link check can see from the source alone. Its own slugify collapses a run of separators, so it has to be handed :func:`github_slug` instead or the site would speak a third dialect: ``check_md_links`` validates a fragment against GitHub's slugs, and a link that resolves there has to resolve here.
-    """
-    md = md_lib.Markdown(
-        extensions=["extra", "md_in_html", "toc"],
-        extension_configs={"toc": {"slugify": lambda value, separator: github_slug(value)}},
-    )
-    return expand_toc(md.convert(text), md.toc_tokens)  # ty: ignore[unresolved-attribute]
+def _md_index_url(rel: str, *, pretty: bool) -> str | None:
+    """The nav chip's link from Markdown page *rel* back to the index, relative; ``None`` on the index itself."""
+    if rel == "index.md":
+        return None
+    url = PurePosixPath(os.path.relpath("index.html", PurePosixPath(rel).parent.as_posix() or ".")).as_posix()
+    return (_strip_index(url) or "./") if pretty else url
 
 
 # A figure-strip marker in a Markdown page: `<!-- mini:figures ./m2/ex-2.1.6/report.py -->`
@@ -710,53 +705,59 @@ def expand_figure_strips(
     return _FIGURES_MARKER.sub(repl, body), shown
 
 
-_MERMAID_FENCE = re.compile(r'<pre><code class="language-mermaid">(.*?)</code></pre>', re.DOTALL)
+def convert_markdown(
+    links: LinkResolver,
+    externalizing: bool,
+    strips: dict[str, FigureStrip] | None = None,
+    memo: PdfMemo | None = None,
+):
+    """Render each Markdown page under ``docs/`` (but ``README.md``) to ``_site/<name>.html``, with its PDF beside it as ``<name>.pdf``.
 
-
-def promote_mermaid(html: str) -> tuple[str, bool]:
-    """Rewrite a ```mermaid fence into the ``<pre class="mermaid">`` the library renders into, and say whether the page has one.
-
-    Python-Markdown renders any fence as a nested ``<pre><code>``, which mermaid walks straight past; the flag then keeps its script off every page that holds no diagram. The escaping the fence applied (``&quot;`` for a node label, ``&amp;`` for a fan-out edge) is left in place — the parser reads the element's text, which the browser has already decoded.
+    A Markdown page goes through ``mini.lit`` like a report (:func:`markdown_page`), then gets what the site adds to a report: resolved links, the nav chip (index, source, PDF), and the PDF printed through *memo* (:class:`PdfMemo`, keyed by the page's docs-relative path, which no report key ends with). The site-only pieces go on top (``docs/md-prose.css`` is the page's already): ``mini:figures`` strips (with the lightbox, on a page that has one) and ``scripts/md.css``. The print leaves the strips out: a thumbnail row is for scanning on screen, and every entry it sits under links its report already.
     """
-    html, count = _MERMAID_FENCE.subn(r'<pre class="mermaid">\1</pre>', html)
-    return html, bool(count)
-
-
-def convert_markdown(links: LinkResolver, externalizing: bool, strips: dict[str, FigureStrip] | None = None):
-    """Convert all .md files in docs/ (except README.md) to .html in _site/."""
     print("Converting Markdown...")
-    skip = {"README.md"}
-    for md_file in sorted(DOCS_DIR.rglob("*.md")):
-        if md_file.name in skip:
-            continue
-        rel = md_file.relative_to(DOCS_DIR).with_suffix(".html")
-        dest = SITE_DIR / rel
+    memo = memo or PdfMemo.open()
+    site_css = MD_SITE_CSS.read_text("utf-8")
+    # The print serves a page alone (its figures are site files, linked absolute), from a
+    # throwaway root beside this empty dir, inside the site, and removed below.
+    serve_from = SITE_DIR / ".md-print"
+    serve_from.mkdir(parents=True, exist_ok=True)
+    for md_file in markdown_pages():
+        rel = md_file.relative_to(DOCS_DIR).as_posix()
+        dest = SITE_DIR / PurePosixPath(rel).with_suffix(".html")
         dest.parent.mkdir(parents=True, exist_ok=True)
-        from_dir = md_file.parent.relative_to(DOCS_DIR).as_posix()
+        from_dir = PurePosixPath(rel).parent.as_posix()
         from_dir = "" if from_dir == "." else from_dir
-        text = _rewrite_md_links(md_file.read_text("utf-8"), links, from_dir=from_dir, pretty=externalizing)
-        body, has_mermaid = promote_mermaid(render_markdown(text))
-        body, has_strip = expand_figure_strips(
-            body, strips or {}, links, from_dir=from_dir, externalizing=externalizing
+        page_html = markdown_page(md_file)
+
+        to_print = printable(
+            Bundle(open_details(_FIGURES_MARKER.sub("", page_html))),
+            links,
+            from_dir=from_dir,
+            key=from_dir,
+            report_css=print_css(md_file),
         )
-        title_match = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
-        title = title_match.group(1).strip() if title_match else md_file.stem
-        root = site_root(dest)
-        html = (
-            "<!DOCTYPE html>\n"
-            '<html lang="en">\n'
-            "<head>\n"
-            '<meta charset="utf-8">\n'
-            '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-            f"<title>{title}</title>\n"
-            f'{FONTS}\n<link rel="stylesheet" href="{root}md.css">\n'
-            + (MERMAID_SCRIPT if has_mermaid else "")
-            + (lightbox_chrome() if has_strip else "")
-            + "</head>\n"
-            "<body>\n" + body + "\n</body>\n</html>\n"
+        pdf = memo.pdf(rel, to_print, serve_from=serve_from)
+        pdf_url = None
+        if pdf is not None:
+            shutil.copy2(pdf, dest.with_suffix(".pdf"))
+            pdf_url = dest.with_suffix(".pdf").name
+
+        html = _resolve_md_links(page_html, links, from_dir=from_dir, pretty=externalizing)
+        html, has_strip = expand_figure_strips(
+            html, strips or {}, links, from_dir=from_dir, externalizing=externalizing
         )
+        if has_strip:
+            html = set_lightbox(html)
+        html = set_alternate(html, type=PDF_TYPE, href=pdf_url)
+        source_url = f"{links.source_base}docs/{rel}" if links.source_base else None
+        html = set_banner(
+            html, index_url=_md_index_url(rel, pretty=externalizing), source_url=source_url, pdf_url=pdf_url
+        )
+        html = set_report_styles(html, site_css)
         dest.write_text(html, "utf-8")
         print(f"  {md_file.relative_to(WORKSPACE_ROOT)} -> {dest.relative_to(WORKSPACE_ROOT)}")
+    serve_from.rmdir()
 
 
 def add_nojekyll():
@@ -784,10 +785,11 @@ def main():
         store = None
         print("  asset mode: localize (.mini/exports/)")
     links = prepare_dirs_and_resolver()
-    strips = build_reports(links, store, args.externalize)
+    memo = PdfMemo.open()
+    strips = build_reports(links, store, args.externalize, memo=memo)
     copy_assets()
-    copy_md_stylesheet()
-    convert_markdown(links, args.externalize, strips)
+    convert_markdown(links, args.externalize, strips, memo=memo)
+    save_pdfs(memo)
     add_nojekyll()
     print(f"\nSite written to {SITE_DIR.relative_to(WORKSPACE_ROOT)}/")
 

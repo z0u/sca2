@@ -10,6 +10,7 @@ import html
 import re
 from functools import cache
 from pathlib import Path
+from typing import Any
 
 import markdown
 from pygments.formatters.html import HtmlFormatter
@@ -43,8 +44,16 @@ EXTENSIONS = [
     "pymdownx.blocks.caption",
     "pymdownx.magiclink",
 ]
+
+
+def _mermaid_fence(source: str, language: str, css_class: str, options: Any, md: Any, **kwargs: Any) -> str:
+    """A ```mermaid fence as the ``<pre class="mermaid">`` the library renders into; until its script runs, the page shows the diagram source."""
+    return f'<pre class="mermaid">{html.escape(source)}</pre>'
+
+
 EXTENSION_CONFIGS = {
     "pymdownx.arithmatex": {"generic": True, "smart_dollar": False},
+    "pymdownx.superfences": {"custom_fences": [{"name": "mermaid", "class": "mermaid", "format": _mermaid_fence}]},
     "pymdownx.highlight": {"css_class": "highlight", "guess_lang": False},
     "footnotes": {"BACKLINK_TITLE": "Back to text"},
     "toc": {
@@ -143,6 +152,22 @@ _KATEX = """
   onload="renderMathInElement(document.body, {delimiters: [{left: '\\\\(', right: '\\\\)', display: false}, {left: '\\\\[', right: '\\\\]', display: true}]})"></script>
 """
 
+# Mermaid, pinned so a diagram renders the same on every build. Loaded only by a page that
+# holds a diagram, since the bundle is a few MB. It picks up the reader's colour scheme the
+# way the stylesheet does (a scheme changed after load lands on the next reload), and a
+# print, which asks for the light scheme before the page loads, gets the light theme.
+# Labels are SVG text: an HTML label is sized under the screen styles, and the print
+# styles' larger line height then clips it.
+MERMAID_VERSION = "11.12.3"
+MERMAID_URL = f"https://cdn.jsdelivr.net/npm/mermaid@{MERMAID_VERSION}/dist/mermaid.esm.min.mjs"
+_MERMAID = f"""<script type="module">
+import mermaid from "{MERMAID_URL}";
+const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+mermaid.initialize({{ startOnLoad: false, theme: dark ? "dark" : "default", htmlLabels: false, flowchart: {{ htmlLabels: false }} }});
+await mermaid.run();
+</script>
+"""
+
 # One <link> shared with the site's Markdown pages (scripts/build_site.py), so every page loads the same faces from the same place.
 FONTS = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">'
 
@@ -159,13 +184,15 @@ def is_lit_page(html: str) -> bool:
 
 def page(body_html: str, *, title: str, extra_head: str = "", extra_body: str = "") -> str:
     """Wrap a rendered body in a complete, self-styled HTML page."""
-    katex = _KATEX if 'class="arithmatex"' in body_html else ""
+    scripts = (_KATEX if 'class="arithmatex"' in body_html else "") + (
+        _MERMAID if '<pre class="mermaid">' in body_html else ""
+    )
     return (
         "<!doctype html>\n"
         '<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"<title>{html.escape(title)}</title>\n"
-        f"{FONTS}\n<style>\n{stylesheet()}</style>\n{katex}{extra_head}</head>\n"
+        f"{FONTS}\n<style>\n{stylesheet()}</style>\n{scripts}{extra_head}</head>\n"
         f"<body>\n{MAIN_OPEN}\n{body_html}\n</main>\n{extra_body}</body>\n</html>\n"
     )
 

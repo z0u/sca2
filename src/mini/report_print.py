@@ -33,6 +33,7 @@ __all__ = [
     "print_stamp",
     "print_page",
     "wait_for_figures",
+    "wait_for_diagrams",
     "route_remote",
     "ink_extents",
     "normalize_pdf",
@@ -421,6 +422,24 @@ def wait_for_figures(page: Any, timeout: float) -> list[str]:
     return missing
 
 
+def wait_for_diagrams(page: Any, timeout: float) -> None:
+    """Wait up to *timeout* seconds for every mermaid diagram on the page to be drawn; one not drawn by then prints as its source, with a warning.
+
+    The library comes from a CDN through :func:`route_remote`, a few dozen modules on a first print and from the cache after, so this is usually quick; like the other waits it never raises.
+    """
+    from playwright.sync_api import Error as PlaywrightError
+
+    if not page.locator("pre.mermaid").count():
+        return
+    try:
+        page.wait_for_function(
+            "[...document.querySelectorAll('pre.mermaid')].every(e => e.querySelector('svg'))",
+            timeout=timeout * 1000,
+        )
+    except PlaywrightError:
+        log.warning("print: the page has a mermaid diagram that did not render; the PDF shows its source")
+
+
 def print_bundle(
     bundle: Path,
     out: Path,
@@ -454,6 +473,7 @@ def print_bundle(
             # navigator.language; pin one so nothing on the page has to guess.
             page = browser.new_page(viewport={"width": 1100, "height": 1400}, locale="en-US")
             route_remote(page)
+            page.emulate_media(color_scheme="light")  # before load, so a diagram's script picks its light theme
             try:
                 # The page comes from loopback, so it is quick; its figures may not be,
                 # and they are waited for separately, with a bound of their own.
@@ -468,6 +488,7 @@ def print_bundle(
             wait_for_figures(page, figures)
             if page.locator(".arithmatex").count() and not page.locator(".katex").count():
                 log.warning("print: the page has math but KaTeX did not render it; the PDF shows the source")
+            wait_for_diagrams(page, figures)
             return print_page(page, out, settle=settle)
         finally:
             browser.close()
