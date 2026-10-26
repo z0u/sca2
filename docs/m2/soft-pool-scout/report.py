@@ -936,7 +936,7 @@ def finished_draw(data: dict, alt_text: str) -> str:
 
 
 def finished_table() -> str:
-    rows = []
+    first, second = [], []
     for n in FINISHED:
         pair = []
         for key in ("removal", "spill"):
@@ -948,42 +948,38 @@ def finished_table() -> str:
                 pair.append("—")
         t = TASK[n]
         worst = np.unravel_index(int(t.argmin()), t.shape)
-        rows.append(
+        name = f"`{FIN_SHOWN[n]}`" + (" (base)" if n == ex.STORED else "")
+        first.append([name, fmt(REMOVAL[n]), pair[0], fmt(FIN_SPILL[n], ".3f"), pair[1]])
+        second.append(
             [
-                f"`{FIN_SHOWN[n]}`" + (" (base)" if n == ex.STORED else ""),
-                fmt(REMOVAL[n]),
-                pair[0],
-                fmt(FIN_SPILL[n], ".3f"),
-                pair[1],
+                name,
                 f"{FIN_OVER[n]} of {len(SEEDS)}",
                 f"{CTRL_OVER[n]} of {len(SEEDS)}",
                 fmt(t.mean(axis=1), ".3f"),
                 f"{num(float(t.min()), '.3f')} (`{OPS[worst[1]]}`, {SEEDS[worst[0]]})",
             ]
         )
-    return table_html(
-        [
-            "condition",
-            "removal ↑",
-            "removal less base, paired",
-            "spill ↓",
-            "spill less base, paired",
-            "over criterion ↓",
-            "over, control median ↓",
-            "task change ↑",
-            "worst op change ↑",
-        ],  # fmt: skip
-        rows,
+    a = table_html(
+        ["condition", "removal ↑", "removal less base, paired", "spill ↓", "spill less base, paired"],
+        first,
         f"""
-        **Removal, spill, and task at epoch {ex.EPOCHS}**, seed mean and range over {len(SEEDS)} runs. Removal and
-        spill are net of the median drop over the other 63 coordinate axes of the run, and "over, control median"
-        counts the runs over the criterion with the median taken in the control at the seed instead. The paired
-        columns are the condition less the base at the same seed, with the count of seeds on each side of zero. The
-        task change is the mean over ops of the clean score less that of the control at the seed; the worst op change
-        is the largest loss on one op at any seed. The rows for `falloff`, `step, soft τ` and the base are those of
-        recipe-compare.
+        **Removal and spill at epoch {ex.EPOCHS}**, seed mean and range over {len(SEEDS)} runs, net of the median
+        drop over the other 63 coordinate axes of the run. The paired columns are the condition less the base at the
+        same seed, with the count of seeds on each side of zero. The rows for `falloff`, `step, soft τ` and the base
+        are those of recipe-compare.
         """,
     )
+    b = table_html(
+        ["condition", "over criterion ↓", "over, control median ↓", "task change ↑", "worst op change ↑"],
+        second,
+        """
+        **Runs over the criterion, and the task.** "Over, control median" counts the runs over the criterion with
+        the median taken over the other axes of the control at the seed instead of those of the run. The task change
+        is the mean over ops of the clean score less that of the control at the seed, seed mean and range; the worst
+        op change is the largest loss on one op at any seed.
+        """,
+    )
+    return a + "\n\n" + b
 
 
 def finished_seed_table() -> str:
@@ -1073,44 +1069,40 @@ def along_draw(data: dict, alt_text: str) -> str:
 
 
 def restricted_table() -> str:
-    cols = ("block 1", "blocks 2 to 4")
-    rows = []
+    removal_rows, spill_rows = [], []
     for n in FINISHED:
-        rows.append(
-            [
-                f"`{FIN_SHOWN[n]}`" + (" (base)" if n == ex.STORED else ""),
-                f"slice {int(np.median(FIN_PEAK[n]))}: {int((FIN_PEAK[n] == np.median(FIN_PEAK[n])).sum())}",
-            ]  # fmt: skip
-            + [fmt(SLICE_REMOVAL[n][e]) for e in cols]
-            + [
-                f"{fmt(SLICE_SPILL[n][e], '.3f')}; {int((SLICE_SPILL[n][e] > CRITERION).sum())} over"
-                for e in ("embedding", "block 1", "blocks 1 to 4", "every slice")
-            ]  # fmt: skip
-            + [fmt(LEAN_R[n])]
+        name = f"`{FIN_SHOWN[n]}`" + (" (base)" if n == ex.STORED else "")
+        peak = int(np.median(FIN_PEAK[n]))
+        removal_rows.append(
+            [name, f"slice {peak}: {int((FIN_PEAK[n] == peak).sum())}"]
+            + [fmt(SLICE_REMOVAL[n][e]) for e in ("block 1", "blocks 2 to 4")]
         )
-    rows.append(["control", ""] + [""] * 6 + [fmt(LEAN_R[CONTROL])])
-    return table_html(
-        [
-            "condition",
-            "peak α, seeds",
-            "removal, block 1 alone ↑",
-            "removal, blocks 2 to 4 ↑",
-            "spill, embedding alone ↓",
-            "spill, block 1 alone ↓",
-            "spill, blocks 1 to 4 ↓",
-            "spill, every slice ↓",
-            "lightness on e₁, embedding table",
-        ],  # fmt: skip
-        rows,
+        spill_rows.append(
+            [name]
+            + [
+                f"{fmt(SLICE_SPILL[n][e], '.3f')}, {int((SLICE_SPILL[n][e] > CRITERION).sum())}"
+                for e in ("embedding", "block 1", "blocks 1 to 4", "every slice")
+            ]
+        )
+    removal = table_html(
+        ["condition", "peak α, seeds", "removal, block 1 alone ↑", "removal, blocks 2 to 4 ↑"],
+        removal_rows,
         """
         **Where the evidence sits, and where the edit finds it.** The slice at which α at the example answers of
-        `difference` contexts peaks, with the count of seeds. Removal and spill under the full edit restricted to a
-        set of slices, at every position, net of the same edit on the control at the seed (the median baseline exists
-        only for the edit at every slice), with the count of runs over the criterion; seed mean and range. The last
-        column is the correlation, over the color embeddings, of the e₁ component with lightness (the lean of
-        embedding-lean). The first three rows are those of recipe-compare.
+        `difference` contexts peaks, with the count of seeds. Removal under the full edit restricted to a set of
+        slices, at every position, net of the same edit on the control at the seed (the median baseline exists only
+        for the edit at every slice); seed mean and range. The first three rows are those of recipe-compare.
         """,
     )
+    spill = table_html(
+        ["condition", "embedding alone ↓", "block 1 alone ↓", "blocks 1 to 4 ↓", "every slice ↓"],
+        spill_rows,
+        """
+        **Spill under the restricted edits**, net of the same edit on the control at the seed: seed mean and range,
+        then the count of runs over the criterion. The first three rows are those of recipe-compare.
+        """,
+    )
+    return removal + "\n\n" + spill
 
 
 def block1_figure() -> str:
@@ -1188,16 +1180,19 @@ def edit_table() -> str:
                 f"{ab[0]:.0f}°, {ab[1]:.0f}°",
                 fmt(SHARE[n]),
                 fmt(LANDING[n]),
+                fmt(LEAN_R[n]),
             ]
         )
+    rows.append(["control"] + [""] * 5 + [fmt(LEAN_R[CONTROL])])
     return table_html(
         [
             "condition",
-            "largest write over bound ↓",
-            "sites over 1.25×, all runs ↓",
-            "bound at example answers, emb and slice 1 ↓",
+            "largest write / bound ↓",
+            "sites over 1.25× ↓",
+            "bound at answers, emb, 1 ↓",
             "share removed ↑",
             "landing ↑",
+            "lean on e₁",
         ],  # fmt: skip
         rows,
         f"""
@@ -1206,8 +1201,9 @@ def edit_table() -> str:
         the bound there. The sites over {TOLERANCE}× count slice and position pairs over all {len(SEEDS)} runs, each
         run taken on its own, with the largest bound among them. The bound at the example answers is over those that
         do not fit `difference`. The share removed is over every `difference` context, net of the control at the
-        seed, and the landing is the share of the way to the target null in total variation; seed mean and range.
-        The first three rows are those of recipe-compare.
+        seed, and the landing is the share of the way to the target null in total variation. The lean is the
+        correlation, over the color embeddings, of the e₁ component with lightness (the lean of embedding-lean). Seed
+        mean and range; the first three rows are those of recipe-compare.
         """,
     )
 
@@ -1381,7 +1377,7 @@ As recipe-compare noted, the block-1 edit on its own overstates what the full ed
 
 With the edit at every slice, net of the control rather than of the median, `{SHOWN[LEADERS[0]]}` has three runs over the criterion and `{SHOWN[LEADERS[1]]}` none. Under this baseline `step, soft τ` has two over, so these counts are best compared with one another, and on them holding $\tau_\ell$ fixed is the quieter of the two.
 
-The embedding table moves with the slice pool as well. Under the base the e₁ components of the color embeddings follow lightness closely on every seed (the lean of [embedding-lean](/docs/m2/embedding-lean/report.py)). Under both finished conditions the lean is back at about the level of the step, and varies from seed to seed as it does there, which fits a pull that reaches slice 1 less.
+The embedding table moves with the slice pool as well. Under the base the e₁ components of the color embeddings follow lightness closely on every seed (the lean of [embedding-lean](/docs/m2/embedding-lean/report.py)). Under both finished conditions the lean (last column of the table below) is back at about the level of the step, and varies from seed to seed as it does there, which fits a pull that reaches slice 1 less.
 
 {edit_table()}
 
