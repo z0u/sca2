@@ -8,7 +8,7 @@ import json
 import re
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -152,7 +152,13 @@ QUIET_SHOWN = {"falloff": "falloff", "step-soft": "step, soft τ"}
 QUIET_TRAJ = fetch_json(ex.lr.TRAJ_REF)
 
 
-def quiet_alpha(arm: str) -> dict[str, np.ndarray]:
+class QuietAlpha(TypedDict):
+    ans: np.ndarray
+    q: np.ndarray
+    n: int
+
+
+def quiet_alpha(arm: str) -> QuietAlpha:
     """The seed-mean α by slice at the stop, at the example answers and at the query answer, over the screen runs."""
     maps = []
     for lab, r in QUIET_TRAJ.items():
