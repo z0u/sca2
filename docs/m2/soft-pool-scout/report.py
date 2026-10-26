@@ -148,6 +148,32 @@ QUIET_SPILL = {
     for arm in ("falloff", "step-soft")
 }
 QUIET_SHOWN = {"falloff": "falloff", "step-soft": "step, soft τ"}
+# α at the stop on the same checkpoints, from the loss-rate screen's trajectories.
+QUIET_TRAJ = fetch_json(ex.lr.TRAJ_REF)
+
+
+def quiet_alpha(arm: str) -> dict[str, np.ndarray]:
+    """The seed-mean α by slice at the stop, at the example answers and at the query answer, over the screen runs."""
+    maps = []
+    for lab, r in QUIET_TRAJ.items():
+        if lab.startswith(f"{arm}-s") and lab.endswith(f"-e{STOP}"):
+            maps.append(np.asarray(r["traj"]["alpha_anchored"])[at_stop(r["traj"])])
+    m = np.mean(maps, axis=0)
+    return {"ans": m[:, ANSWERS].mean(axis=1), "q": m[:, QUERY_ANSWER], "n": len(maps)}
+
+
+QUIET_ALPHA = {arm: quiet_alpha(arm) for arm in QUIET_SHOWN}
+
+
+def weight_at_stop(name: str) -> float:
+    """λ_a at the stop as a share of its peak."""
+    from sca.anchoring import AnchorSpec
+
+    spec = BY_NAME[name].anchor(ex.st.schedules()[0])
+    return float(AnchorSpec(**spec)(STOP) / spec["peak"])
+
+
+STRETCH_AT_STOP = weight_at_stop("stretch")
 
 # Ranking: no lost or uncertain call, then the least mean spill at the stop.
 RANKED = sorted(NAMES, key=lambda n: (N_LOST[n] > 0, float(SPILL[n].mean())))
@@ -229,20 +255,29 @@ def schedules_draw(data: dict, alt_text: str) -> str:
     @themed(
         name="soft-pool-scout-schedules",
         alt_text=alt_text,
-        caption="""
+        caption=f"""
             **The schedules the conditions change.** The anchor weight $\\lambda_a$, the position pool temperature
             $\\tau_p$ and the slice pool temperature $\\tau_\\ell$ (both on a log scale) over the first hundred
             epochs, one line per condition, in its ink and marker; where conditions share a schedule, the later line is
-            drawn over the earlier. After epoch 100 every condition is the same.
+            drawn over the earlier, with the markers staggered. The dotted line is the stop at epoch {STOP}. After
+            epoch 100 every condition is the same.
         """,
     )
     def _plot() -> plt.Figure:
-        fig, axes = plt.subplots(3, 1, figsize=(6.4, 4.6), layout="constrained", sharex=True)
+        fig, axes = plt.subplots(3, 1, figsize=(6.4, 5.6), layout="constrained", sharex=True)
         ep = np.asarray(data["epoch"])
-        for c in data["conditions"]:
+        handles = []
+        for i, c in enumerate(data["conditions"]):
             cond = BY_NAME[c["name"]]
+            # Markers staggered by condition, so the ones on a shared schedule stay apart.
+            every = (2 * i, 80)
             for a_, key in zip(axes, ("weight", "tau_p", "tau_l"), strict=True):
-                a_.plot(ep, c[key], color=ink(cond), lw=0.9, marker=marker(cond), ms=3, markevery=40, alpha=0.85)
+                (h,) = a_.plot(ep, c[key], color=ink(cond), lw=0.9, marker=marker(cond), ms=3, markevery=every,
+                               alpha=0.85, label=tex(SHOWN[c["name"]]))  # fmt: skip
+            handles.append(h)
+        for a_ in axes:
+            a_.axvline(STOP, color=RULE, lw=0.6, ls=":", zorder=0)
+        fig.legend(handles=handles, loc="outside lower center", ncols=4, frameon=False, fontsize=6)
         axes[0].set_ylabel("$\\lambda_a$", fontsize=8)
         axes[0].set_ylim(0, 0.11)
         for a_, label in zip(axes[1:], ("$\\tau_p$", "$\\tau_\\ell$"), strict=True):
@@ -283,6 +318,13 @@ def screen_figure() -> str:
     return screen_draw(data, alt)
 
 
+def hatch(ax, lo: float, hi: float, pattern: str) -> None:
+    """Hatch the band from *lo* to *hi* as the failing side of a line (style-fig): denser is worse."""
+    ax.axhspan(
+        lo, hi, facecolor="none", edgecolor=light_dark("#000", "#fff"), hatch=pattern, lw=0, alpha=0.12, zorder=0
+    )
+
+
 def _dots(ax, x: float, v, color, m: str, rng) -> None:
     v = np.asarray(v, float)
     ax.plot([x, x], [v.min(), v.max()], "-", color=color, lw=1.0, alpha=0.5, zorder=2, solid_capstyle="butt")
@@ -299,9 +341,10 @@ def screen_draw(data: dict, alt_text: str) -> str:
             **Each condition at epoch {STOP}.** One column per condition, one small dot per seed, the seed mean as
             the large mark and the seed range as a thin bar. Top: α at the example answers at slice
             {ex.lr.TRACK_SLICE}, averaged over epochs {ex.lr.WINDOW[0]} to {ex.lr.WINDOW[1]} (the loss-rate call);
-            below the dotted line a run is called lost, above the dashed line kept. Bottom: the spill at epoch
+            below the dotted line a run is called lost (cross-hatched), above the dashed line kept, and between
+            the two uncertain (lightly hatched). Bottom: the spill at epoch
             {STOP}, the largest drop on another op under the full edit less the median drop under eight reference
-            edits; the dashed line is the criterion. The gray columns at the right are the loss-rate screen's
+            edits; the dashed line is the criterion, with the side over it hatched. The gray columns at the right are the loss-rate screen's
             epoch-{STOP} checkpoints of the two quiet recipes, at {len(QUIET_SPILL["falloff"])} seeds each.
         """,
     )
@@ -318,6 +361,8 @@ def screen_draw(data: dict, alt_text: str) -> str:
         ax.axhline(data["lost_max"], color=RULE, lw=0.6, ls=":", zorder=1)
         ax.axhline(data["kept_min"], color=RULE, lw=0.6, ls="--", zorder=1)
         ax.set_ylim(0, 1)
+        hatch(ax, 0, data["lost_max"], "xx")
+        hatch(ax, data["lost_max"], data["kept_min"], "/")
         ax.set_ylabel("α, epochs 44–64", fontsize=8)
         bx.axhline(0, color=ZERO, lw=0.5, zorder=0)
         bx.axhline(data["criterion"], color=RULE, lw=0.7, ls="--", zorder=1)
@@ -331,6 +376,9 @@ def screen_draw(data: dict, alt_text: str) -> str:
             fontsize=6,
         )
         bx.set_xlim(-0.6, ticks[-1] + 0.6)
+        lo, hi = bx.get_ylim()
+        hatch(bx, data["criterion"], hi, "//")
+        bx.set_ylim(lo, hi)
         for a_ in (ax, bx):
             a_.tick_params(labelsize=7)
         return fig
@@ -423,6 +471,62 @@ def depth_draw(data: dict, alt_text: str) -> str:
     return _plot()
 
 
+def quiet_figure(names: list[str]) -> str:
+    data = {
+        "names": names,
+        "ghosts": [per_seed(n, "alpha_ans").mean(axis=0).tolist() for n in NAMES],
+        "ghosts_q": [per_seed(n, "alpha_q").mean(axis=0).tolist() for n in NAMES],
+        "ans": {n: per_seed(n, "alpha_ans").mean(axis=0).tolist() for n in names},
+        "q": {n: per_seed(n, "alpha_q").mean(axis=0).tolist() for n in names},
+        "quiet": {QUIET_SHOWN[a]: {"ans": v["ans"].tolist(), "q": v["q"].tolist()} for a, v in QUIET_ALPHA.items()},
+    }
+    alt = """
+        Two panels of seed-mean α against slice. Left, at the example answers: every line starts near zero at the
+        embedding. At slice 1 the two τ_ℓ 0.1 conditions and the two quiet recipes are together near 0.23, and the
+        base is at about 0.37. The pool conditions peak near 0.56 at slice 3 and fall to about 0.38 at slice 4;
+        falloff and step, soft τ level off near 0.5 from slice 3 to slice 4. Right, at the query answer: the same
+        ordering at slice 1 (about 0.27, 0.33 and 0.43), all near 0.85 at slice 3, then the pool falls to about 0.62
+        at slice 4 while the quiet recipes stay near 0.85.
+    """
+    return quiet_draw(data, alt)
+
+
+@memo
+def quiet_draw(data: dict, alt_text: str) -> str:
+    @themed(
+        name="soft-pool-scout-quiet",
+        alt_text=alt_text,
+        caption=f"""
+            **The pool beside the quiet recipes at epoch {STOP}.** Seed-mean α by slice at the example answers
+            (left) and at the query answer (right): the two stage-2 conditions and the base in their ink and
+            marker, and the loss-rate screen's `falloff` and `step, soft τ` at the same epoch
+            ({QUIET_ALPHA["falloff"]["n"]} seeds each) in gray. The hairlines are the other conditions.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(1, 2, figsize=(6.4, 2.8), layout="constrained", sharey=True)
+        x = np.arange(len(SLICE_TICK))
+        for ax, key, ghosts in zip(axes, ("ans", "q"), (data["ghosts"], data["ghosts_q"]), strict=True):
+            for g in ghosts:
+                ax.plot(x, g, color=GHOST, lw=0.4, zorder=0)
+            for n in data["names"]:
+                c = BY_NAME[n]
+                ax.plot(x, data[key][n], color=ink(c), marker=marker(c), lw=1.1, ms=4, label=tex(SHOWN[n]), zorder=2)
+            for (name, v), m, ls in zip(data["quiet"].items(), ("D", "v"), ("-", "--"), strict=True):
+                ax.plot(x, v[key], color=QUIET_INK, marker=m, ls=ls, lw=1.1, ms=4, label=name, zorder=1)
+            ax.set_xticks(x, SLICE_TICK, fontsize=7)
+            ax.tick_params(labelsize=7)
+            ax.set_ylim(-0.05, 1)
+        axes[0].set_title("example answers", fontsize=8)
+        axes[1].set_title("query answer", fontsize=8)
+        axes[0].set_ylabel("α", fontsize=8)
+        handles, labels = axes[0].get_legend_handles_labels()
+        fig.legend(handles, labels, loc="outside upper center", ncols=len(labels), frameon=False, fontsize=6)
+        return fig
+
+    return _plot()
+
+
 def slice1_figure() -> str:
     data = {
         "runs": [
@@ -478,7 +582,7 @@ We screened sixteen schedules of the pooled pull at epoch {STOP}, looking for on
 
 [Recipe-compare](/docs/m2/recipe-compare/report.py) left one thing between `pool 1–3, soft τ` and the recipe of record: two of its eight runs go over the spill criterion, and the spill enters at block 1, the one slice the pool pulls and the step leaves alone. [Spill-timing](/docs/m2/spill-timing/report.py) found that both of those runs spill early, while the pool sharpens, and that this early kind already shows at epoch {STOP}. So a schedule that keeps block 1 closed should show it at epoch {STOP}, at a sixth of the cost of a full run.
 
-This report trains sixteen conditions of the pool at its eight seeds ({SEEDS[0]} to {SEEDS[-1]}), each changing when the two pool temperatures sharpen, how sharp the pool over slices ends, or when the anchor weight warms up. Every run stops at epoch {STOP}, where we score whether it is keeping the anchor and how much the edit spills. This is stage 1; the leaders will be carried on to epoch 400 from where they stopped, in a second stage still to run.
+This report trains sixteen conditions of the pool at its eight seeds ({SEEDS[0]} to {SEEDS[-1]}), each changing when the two pool temperatures sharpen, how sharp the pool over slices ends, or when the anchor weight warms up. Every run stops at epoch {STOP}, where we score whether it is keeping the anchor and how much the edit spills. This is stage 1. In stage 2, the two conditions with $\tau_\ell$ ending at 0.1 that change least (sharpening by epoch 40 as the base does, and held at 0.1 from the start) are carried on to epoch 400 from where they stopped. TODO: stage 2 results.
 """
 
 # %%
@@ -488,11 +592,11 @@ rf"""
 
 - [Lost anchors (E1)](#lost-anchors-e1): no schedule lost the anchor. All {N_RUNS} runs, the base included, are called kept, the lowest well above the line, though the fixed temperatures and the stretched warm-up keep it a little less firmly.
 - [Spill at epoch {STOP} (E2)](#spill-at-epoch-{STOP}-e2): the slice temperature at the end decides the spill, and when the temperatures sharpen hardly matters. At τ_ℓ 0.1 no run is over the criterion, and the four conditions sit at or below the quiet recipes. At 0.4 (the base) about a quarter of the runs are over. The delayed and stretched warm-ups spill as much as the base, and fixing the temperatures from the start spills the most.
-- [Where the op is heading (E3)](#where-the-op-is-heading-e3): every condition peaks at slice 3, and none leans on the query answer. What changes is slice 1: a sharper pool over slices puts less of the anchor there, and the runs that spill are the ones with more of it at slice 1.
+- [Where the evidence is heading (E3)](#where-the-evidence-is-heading-e3): every condition peaks at slice 3, and none leans on the query answer. What changes is slice 1: a sharper pool over slices puts less of the anchor there, and the runs that spill are the ones with more of it at slice 1.
 
 ## Scope and method
 
-This is an exploratory study, with no preregistration and no gate. Every condition starts from `pool 1–3, soft τ` (the base): the pull is pooled over the slice and position pairs of slices 1 to 3, the position pool temperature $\tau_p$ sharpens from 1 to 0.1 and the slice pool temperature $\tau_\ell$ from 4 to 0.4 over the first forty epochs, and the anchor weight $\lambda_a$ warms up over the same forty epochs to its peak of 0.1. The anti weight is that of `falloff`, the recipe of record, and the rest of training is as in [soft-pool](/docs/m2/soft-pool/report.py).
+This is an exploratory study, with no preregistration and no gate. Every condition starts from `pool 1–3, soft τ` (the base, which is not the recipe of record): the pull is pooled over the slice and position pairs of slices 1 to 3, the position pool temperature $\tau_p$ sharpens from 1 to 0.1 and the slice pool temperature $\tau_\ell$ from 4 to 0.4 over the first forty epochs, and the anchor weight $\lambda_a$ warms up over the same forty epochs to its peak of 0.1. The anti weight is that of `falloff`, the recipe of record, and the rest of training is as in [soft-pool](/docs/m2/soft-pool/report.py).
 
 Twelve conditions cross two factors. One is $\tau_\ell$ at the end, with levels 0.1, 0.2 and 0.4 (the base), each starting from 4. The other is when the temperatures are sharp: by epoch 10, 20 or 40 (the base), both on the same window, or $\tau_\ell$ at its end value from epoch 0 while $\tau_p$ still sharpens by 40, which tells the two temperatures apart. Five more conditions move the $\lambda_a$ warm-up at the base temperatures: a delay (zero until epoch 20, then up by 60) and a stretch (up by 80), each with the soft temperatures and with both temperatures fixed at their end values from the start, and the fixed temperatures with the base warm-up. The fixed-temperature conditions might have lost the anchor, which is what they were there to show: if a delayed pull keeps it at a fixed τ, the soft start was a delay by other means. The schedules are drawn below.
 
@@ -506,7 +610,7 @@ A screen at epoch {STOP} can rank the conditions by the early kind of spill and 
 
 - The call: α (the cosine of the state with e₁) at the example answers at slice {ex.lr.TRACK_SLICE}, averaged over epochs {ex.lr.WINDOW[0]} to {ex.lr.WINDOW[1]}. As in the loss-rate screen, a run is called lost below {LOST_MAX:g}, kept from {KEPT_MIN:g}, and uncertain between.
 - Spill at epoch {STOP}: the largest drop on another op when e₁ is projected out at every position and slice, less the median drop under eight reference edits (each projecting out one other basis direction), over the whole held-out set, as in spill-timing. A drop is in expected exact match. Lower is better. The criterion is {CRITERION:g}, though at epoch {STOP} it is a guide only, since it is set for a finished run.
-- Where the op sits: α at the example answers and at the query answer, by slice, at epoch {STOP}.
+- Where the evidence for the op sits: α at the example answers and at the query answer, by slice, at epoch {STOP}.
 """
 
 # %%
@@ -514,13 +618,13 @@ A screen at epoch {STOP} can rank the conditions by the early kind of spill and 
 rf"""
 ## Lost anchors (E1)
 
-The fixed-temperature conditions were the ones most likely to lose the anchor, since a sharp pool from the first step is what let the pull settle on the query answer on one seed in slice-terms. Did any schedule lose it by epoch {STOP}?
+The fixed-temperature conditions were the ones most likely to lose the anchor, since a sharp pool from the first step is what let the pull latch onto the query answer on one seed in slice-terms. Did any schedule lose it by epoch {STOP}?
 
 None did. Every run is called kept, and the lowest call ({LOWEST_CALL:.2f}, on a stretched warm-up) is still above the line by a wide margin. The figure (top) shows the calls close together across all sixteen conditions. The fixed temperatures and the stretch sit a little lower than the rest, which fits a pull that has had less time at full strength by epoch {STOP}, but none comes near the uncertain band.
 
 {screen_figure()}
 
-So the soft start is not what keeps the anchor in this pool, at least to epoch {STOP} and at these seeds: the pull pooled over three slices holds the anchor at a fixed temperature too. Eight seeds would miss a loss rate of one in ten or so, and a run can still lose the anchor late, so the fixed temperatures are not cleared. But the soft start was added to the pool to keep the anchor, and at epoch {STOP} the pool keeps it without one.
+Two soft starts are in play: $\tau_p$ sharpening from 1, and $\tau_\ell$ sharpening from 4. The conditions with $\tau_\ell$ fixed drop the second, the fixed-τ conditions drop both, and all of them kept the anchor on every seed. So in this pool neither soft start is what keeps the anchor, at least to epoch {STOP} and at these seeds. The step may differ: in the loss-rate screen, the step at a fixed $\tau_p$ (`falloff`) lost the anchor on one seed of forty and the step with the soft start on none, which fits a soft $\tau_p$ that helps the step, though one loss is too few to show it. Eight seeds would miss a loss rate of one in ten or so, and a run can still lose the anchor late, so the fixed temperatures are not cleared for this pool either.
 """
 
 # %%
@@ -530,11 +634,13 @@ rf"""
 
 If spill enters through block 1 while the pool is soft, then sharpening sooner, sharpening the slice pool further, or holding the pull back until e₁ is cleared might each close it. Which of them lowers the spill at epoch {STOP}?
 
-The slice temperature at the end does, and the others barely move it. The figure (bottom) groups the crossing by $\tau_\ell$: at 0.1 the four timing levels all sit at or below the quiet recipes, with no run of 32 over the criterion; at 0.2 the spill is a little higher, with {LEVEL_OVER[0.2]} runs over; at 0.4, the base level, {LEVEL_OVER[0.4]} of 32 are over. Within each level, sharpening by epoch 10, 20 or 40, or holding $\tau_\ell$ fixed from the start, makes no difference we can see at eight seeds. So for the early spill, what matters is how sharp the slice pool ends, and how soon it gets there barely does.
+The slice temperature at the end does, and the others barely move it. The figure (bottom) groups the crossing by $\tau_\ell$: at 0.1 the four timing levels all sit at or below the quiet recipes, with no run of 32 over the criterion; at 0.2 the early spill is a little higher, with {LEVEL_OVER[0.2]} runs over; at 0.4, the base level, {LEVEL_OVER[0.4]} of 32 are over. Within each level, sharpening by epoch 10, 20 or 40, or holding $\tau_\ell$ fixed from the start, makes no difference we can see at eight seeds. So for the early spill, what matters is how sharp the slice pool ends, and how soon it gets there barely does. That also covers where the slice pool starts: at 0.1, sharpening from 4 and holding at 0.1 from epoch 0 spill about the same, so a start in between would be unlikely to differ.
+
+This is a stronger effect of $\tau_\ell$ than [slice-terms](/docs/m2/slice-terms/report.py) saw. Its E4 trained the pool over slices with $\tau_\ell$ from 0.1 to 1.6 and found no trend in removal, with the spill a little higher at the two softest levels. But that was one seed, chosen because its pull had settled on block 4, at a fixed $\tau_p$ and with the pool over blocks 1 to 4. Here the pool leaves block 4 out, and the spill is a per-seed event: at $\tau_\ell$ 0.4 most seeds stay quiet, and one seed would most likely have been one of those.
 
 {screen_table()}
 
-The $\lambda_a$ conditions all stay well above the $\tau_\ell$ 0.1 level. A twenty-epoch delay, which gives e₁ time to clear under the full learning rate, lowered the mean spill somewhat, at the soft temperatures and at the fixed ones. The stretched warm-up raised it, and so did fixing both temperatures with the base warm-up. Each of these means rests on one or two seeds that spill far more than the rest, so at eight seeds the differences among them could be chance. None of them comes near what sharpening the slice pool does.
+The $\lambda_a$ conditions all stay well above the $\tau_\ell$ 0.1 level. One of them is not on an equal footing: under the stretched warm-up, $\lambda_a$ is still at {STRETCH_AT_STOP:.0%} of its peak at the stop, so its spill at epoch {STOP} is of a pull not yet at full strength. A twenty-epoch delay, which gives e₁ time to clear under the full learning rate, lowered the mean spill somewhat, at the soft temperatures and at the fixed ones. The stretched warm-up raised it, and so did fixing both temperatures with the base warm-up. Each of these means rests on one or two seeds that spill far more than the rest, so at eight seeds the differences among them could be chance. None of them comes near what sharpening the slice pool does.
 
 Of the {N_OVER} runs over the criterion, {OVER_OPS[TOP_OP]} spill most on `{TOP_OP}`, the op on which the base spills early in spill-timing.
 
@@ -544,13 +650,17 @@ These are early numbers. A sharper slice pool could still spill late, on `value-
 # %%
 
 rf"""
-## Where the op is heading (E3)
+## Where the evidence is heading (E3)
 
-A sharper slice pool could lower the spill in a way we would not want: by settling the pull on one slice and one role, as the joint pool did in [slice-terms](/docs/m2/slice-terms/report.py), where one seed settled on the query answer and the op could not be removed. Where does the evidence for the op sit at epoch {STOP}?
+A sharper slice pool could lower the spill in a way we would not want: by settling the pull on one slice and one role, as the joint pool did in [slice-terms](/docs/m2/slice-terms/report.py), where one seed latched onto the query answer and the op could not be removed. Where does the evidence for the op sit at epoch {STOP}?
 
 In the same place in every condition. The seed-mean α at the example answers peaks at slice 3 in all seventeen conditions, and α at the query answer is about the same everywhere (the table above). The figure shows the three levels of $\tau_\ell$ at the base timing, beside the condition that spilled most: the shapes are nearly the same, with one difference at slice 1.
 
 {depth_figure(["lt0.1-by40", "lt0.2-by40", ex.STORED, "fixed-stretch"])}
+
+Beside the quiet recipes (below), the two conditions at $\tau_\ell$ 0.1 have about as much of the evidence at slice 1 as the step does, though the step pulls nothing there: some alignment reaches slice 1 from the pull on the slices after it. The base has half as much again. Past slice 1 the shapes differ as recipe-compare found at the end of training: the step holds the evidence level from slice 3 to slice 4, where the pool lets it fall back, at the example answers and at the query answer alike.
+
+{quiet_figure(["lt0.1-by40", "lt0.1-fixed-lt", ex.STORED])}
 
 That difference is the one that tracks the spill. At $\tau_\ell$ 0.1, α at the example answers at slice 1 averages {LEVEL_ALPHA1[0.1]:.2f}, against {LEVEL_ALPHA1[0.4]:.2f} at 0.4. Across all {N_RUNS} runs, the runs over the criterion are the ones with more of the anchor at slice 1, though at the same α some spill and some do not.
 
@@ -565,8 +675,4 @@ r"""
 ## Discussion
 
 TODO after stage 2.
-
-/// admonition | Open decision
-Which conditions go to stage 2. The plan finishes two or three leaders, ranked by no lost anchors and the lowest mean spill, preferring the fewest changes from the base when two are close. The four conditions at $\tau_\ell$ 0.1 are close together. A proposal: `τ_ℓ 0.1, by 40` (one change from the base) and `τ_ℓ 0.1, τ_ℓ fixed` (the simplest schedule, with only $\tau_p$ moving), and `τ_ℓ 0.2, by 40` as a middle step that would show whether 0.1 is needed or 0.2 is enough once the late kind is counted. To check: whether the finished runs keep their removal, since a sharper slice pool concentrates the pull.
-///
 """
