@@ -73,7 +73,8 @@ def compare(stopped: dict, resumed: dict, label: str) -> dict[str, Any]:
     workdir = get_data_dir() / "compare"
 
     def leaves(art, name: str) -> list[np.ndarray]:
-        model, _, _ = load_checkpoint(get(art, workdir / name / "model"))
+        get(art, workdir / name / "model")  # a `checkpoint` artifact is the `model` directory itself
+        model, _, _ = load_checkpoint(workdir / name)
         return [np.asarray(x) for x in jax.tree.leaves(eqx.filter(model, eqx.is_array))]
 
     def gap(a, b) -> float:
