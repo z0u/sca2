@@ -51,9 +51,12 @@ def _load_sibling(name: str, alias: str):
 
 
 spt = _load_sibling("spill-timing", "soft_pool_scout_spt")
+rb = _load_sibling("reference-baseline", "soft_pool_scout_rb")
+ee = _load_sibling("edit-effects", "soft_pool_scout_ee")
 lr = spt.lr
 sp = spt.sp
 st = sp.st
+lean = sp.lean
 ex2222 = sp.ex2222
 ex2221 = sp.ex2221
 
@@ -132,8 +135,9 @@ STORED = "lt0.4-by40"
 CONDITIONS = CROSSING + WARMUPS
 NEW = tuple(c for c in CONDITIONS if c.name != STORED)
 
-LEADERS: tuple[str, ...] = ()
-"""Stage 2: the conditions carried on to epoch 400, chosen after the stage-1 read."""
+LEADERS: tuple[str, ...] = ("lt0.1-by40", "lt0.1-fixed-lt")
+"""Stage 2: the conditions carried on to epoch 400, chosen after the stage-1 read: τ_ℓ ending at 0.1, sharpening
+by epoch 40 (one change from the base) and fixed from the start (the simplest schedule, with only τ_p moving)."""
 
 BUDGET_USD = 20
 """Soft-pool cost about \\$0.35 per 400-epoch run with its measurements. Stage 1 is 128 runs to epoch 64, about a sixth
@@ -154,6 +158,14 @@ SCREEN_REF = PREFIX + "/screen"
 CHECKPOINT_REF = PREFIX + "/checkpoints/{label}"
 RESUME_REF = PREFIX + "/resume/{label}"
 KEPT_REF = PREFIX + "/kept/{label}"
+FINISHED_TRAJ_REF = PREFIX + "/finished-trajectories"
+RESULTS_REF = PREFIX + "/results"
+DOSE_REF = PREFIX + "/dose"
+DOSE_ARRAYS_REF = PREFIX + "/dose-arrays/{label}"
+AXES_REF = PREFIX + "/axes"
+WRITE_REF = PREFIX + "/write"
+WRITE_ARRAYS_REF = PREFIX + "/write-arrays/{label}"
+ALONG_REF = PREFIX + "/along"
 
 
 def rows_of(meta, conditions: tuple[Condition, ...], stop: int | None, epochs: int = EPOCHS,
@@ -272,10 +284,100 @@ def publish_screen(rows: list[dict], trained: list[dict], scored: list[dict]) ->
     return {"n_screen": len(runs)}
 
 
+def score_kept(kept_checkpoints, checkpoint, holdout, label: str, epochs: tuple[int, ...]) -> list[dict]:
+    """Spill-timing's record scoring (the full edit, the reference edits and the probe) on each checkpoint a finished
+    run kept, and on its end checkpoint, in one task.
+    """
+    from sca.compute.model import load_checkpoint
+    from mini.store import get
+
+    workdir = ex2221.get_data_dir() / "soft-pool-scout" / label
+    out, score = [], None
+    for e in epochs:
+        model, config, _ = ex2221.kept_checkpoint(kept_checkpoints, e, workdir / "kept")
+        if score is None:
+            score = spt.record_scoring(config, OP_NAMES, K, holdout, workdir)
+        out.append({"label": label, "epoch": e} | score(model))
+    get(checkpoint, workdir / "model")
+    model, config, _ = load_checkpoint(workdir)
+    if score is None:
+        score = spt.record_scoring(config, OP_NAMES, K, holdout, workdir)
+    out.append({"label": label, "epoch": config.scheduler.epochs} | score(model))
+    return out
+
+
+def publish_finished(rows: list[dict], trained: list[dict], measured: list[dict], dosed: list[dict],
+                     axes: list[dict], written: list[dict], along: list[list[dict]]) -> dict:  # fmt: skip
+    """The finished runs: trajectories, checkpoints, measurements, dose scoring, the axis scoring, the write bound,
+    and the scoring of the kept checkpoints, under refs of their own.
+    """
+    import json
+
+    from mini.store import put, set_ref
+
+    meta = {r["label"]: {"condition": r["condition"]["name"], "model_seed": r["model_seed"]} for r in rows}
+    for t in trained:
+        set_ref(CHECKPOINT_REF.format(label=t["label"]), t["checkpoint"])
+        if "kept_checkpoints" in t:
+            set_ref(KEPT_REF.format(label=t["label"]), t["kept_checkpoints"])
+    traj = {t["label"]: meta[t["label"]] | {k: t[k] for k in ("traj", "val_loss", "train_loss")} for t in trained}
+    set_ref(FINISHED_TRAJ_REF, put(json.dumps(traj).encode(), name="soft-pool-scout-finished-trajectories.json"))
+
+    def body(runs: list[dict]) -> bytes:
+        return json.dumps({"design": design(), "runs": [meta[r["label"]] | r for r in runs]}).encode()
+
+    set_ref(RESULTS_REF, put(body(measured), name="soft-pool-scout-results.json"))
+    for d in dosed:
+        set_ref(DOSE_ARRAYS_REF.format(label=d["label"]), d["arrays"])
+    set_ref(DOSE_REF, put(body([{k: v for k, v in d.items() if k != "arrays"} for d in dosed]), name="soft-pool-scout-dose.json"))  # fmt: skip
+    set_ref(AXES_REF, put(body(axes), name="soft-pool-scout-axes.json"))
+    for w in written:
+        set_ref(WRITE_ARRAYS_REF.format(label=w["label"]), w["arrays"])
+    set_ref(WRITE_REF, put(body([{k: v for k, v in w.items() if k != "arrays"} for w in written]), name="soft-pool-scout-write.json"))  # fmt: skip
+    set_ref(ALONG_REF, put(body([r for a in along for r in a]), name="soft-pool-scout-along.json"))
+    return {"n_finished": len(trained)}
+
+
+def finish(ctx: Ctx, resolved: dict, stopped: list[dict], leaders: tuple[str, ...], epochs: int,
+           seeds: tuple[int, ...], publishes: bool, full: bool) -> dict:  # fmt: skip
+    """Stage 2: carry each leader on from its stop to the end, then measure and score it as recipe-compare did, and
+    score the checkpoints it kept along the way.
+    """
+    rows = rows_of(resolved["meta"], tuple(c for c in CONDITIONS if c.name in leaders), None, epochs, seeds)
+    by_label = {t["label"]: t for t in stopped}
+    stop = next(int(lab.rsplit("-e", 1)[1]) for lab in by_label)
+    resume = [by_label[label_of(r["condition"]["name"], r["model_seed"], stop)] for r in rows]
+    trained = train(ctx, resolved, rows, resume)
+    n = len(rows)
+    labels = [r["label"] for r in rows]
+    holdout = [resolved["holdout"]] * n
+    checkpoints = [t["checkpoint"] for t in trained]
+    measured = ctx.map(lean.measure_one, checkpoints, holdout, labels, [True] * n, role="measure")
+    dosed = ctx.map(ex2222.suppress_one, checkpoints, holdout, [OP_NAMES] * n, [K] * n, [True] * n, labels, role="measure")  # fmt: skip
+    along = ctx.map(
+        score_kept,
+        [t["kept_checkpoints"] for t in trained],
+        checkpoints,
+        holdout,
+        labels,
+        [tuple(t["kept_epochs"]) for t in trained],
+        role="measure",
+    )
+    if not full:  # a smoke run leaves out the two slow passes, which earlier experiments ran as they are here
+        return {"finished": labels, "along": [len(a) for a in along]}
+    axes = ctx.map(rb.axes_one, checkpoints, holdout, labels, [None] * n, role="measure")
+    written = ctx.map(ee.measure_one, checkpoints, holdout, labels, role="write")
+    if not publishes:
+        return {"finished": labels}
+    return ctx.run(publish_finished, rows, trained, measured, dosed, axes, written, along, role="prep")
+
+
 def run(ctx: Ctx, epochs: int = EPOCHS, stop: int = STOP_EPOCH, seeds: tuple[int, ...] = SEEDS,
-        conditions: tuple[Condition, ...] = NEW, publishes: bool = True) -> dict:  # fmt: skip
-    """Resolve ex-2.2.21's corpus condition, train every stage-1 run to *stop*, score each at the stop, and publish.
-    The arguments let a smoke run take the same path at a fraction of the size, and leave the refs alone.
+        conditions: tuple[Condition, ...] = NEW, leaders: tuple[str, ...] = LEADERS, publishes: bool = True,
+        full: bool = True) -> dict:  # fmt: skip
+    """Resolve ex-2.2.21's corpus condition, train every stage-1 run to *stop*, score each at the stop, and publish;
+    then carry the *leaders* on to the end (stage 2). The arguments let a smoke run take the same path at a fraction
+    of the size, and leave the refs alone.
     """
     resolved = ctx.run(ex2222.resolve_reused, [], role="prep")
     rows = rows_of(resolved["meta"], conditions, stop, epochs, seeds)
@@ -291,9 +393,12 @@ def run(ctx: Ctx, epochs: int = EPOCHS, stop: int = STOP_EPOCH, seeds: tuple[int
         role="measure",
     )
     screen = [r for chunk in scored for r in chunk]
-    if not publishes:
-        return {"labels": [t["label"] for t in trained], "resume": [("resume_state" in t) for t in trained]}
-    return ctx.run(publish_screen, rows, trained, screen, role="prep")
+    out = {"labels": [t["label"] for t in trained]}
+    if publishes:
+        out = ctx.run(publish_screen, rows, trained, screen, role="prep")
+    if not leaders:
+        return out
+    return out | finish(ctx, resolved, trained, leaders, epochs, seeds, publishes, full)
 
 
 def main(ctx: Ctx) -> dict:
@@ -301,11 +406,14 @@ def main(ctx: Ctx) -> dict:
 
 
 def smoke(ctx: Ctx) -> dict:
-    """One seed of two conditions (a delay, and fixed τ_ℓ) for eight epochs, stopped at six, through the screen."""
+    """One seed of two conditions (a delay, and fixed τ_ℓ) for eight epochs, stopped at six, through the screen, and
+    the second carried on to the end and measured.
+    """
     picked = tuple(c for c in NEW if c.name in ("fixed-delay", "lt0.1-fixed-lt"))
-    return run(ctx, epochs=8, stop=6, seeds=SEEDS[:1], conditions=picked, publishes=False)
+    return run(ctx, epochs=8, stop=6, seeds=SEEDS[:1], conditions=picked, leaders=("lt0.1-fixed-lt",),
+               publishes=False, full=False)  # fmt: skip
 
 
-COMPUTE = sp.COMPUTE
+COMPUTE = sp.COMPUTE | {"write": ee.COMPUTE["measure"]}
 
 experiment = Experiment(name="soft-pool-scout", main=main, roles=COMPUTE)
