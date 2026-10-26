@@ -134,6 +134,9 @@ class AnchorSpec:
     Needs a finite `slice_tau`."""
     tau_anneal_end: float | None = None
     """The epoch by which a scheduled temperature reaches its end value."""
+    warmup_start: float = 0.0
+    """The epoch the warm-up starts from: the weight holds at zero until then and reaches `peak` at
+    `warmup_epochs`, so the pull can wait while other terms act. Zero is the warm-up from the first step."""
 
     @property
     def scheduled_tau(self) -> bool:
@@ -163,6 +166,7 @@ class AnchorSpec:
             anneal_end=self.anneal_end,
             floor=self.floor,
             shape=self.shape,
+            warmup_start=self.warmup_start,
         )
 
 
@@ -175,16 +179,18 @@ def anchor_weight(
     anneal_end: float,
     floor: float,
     shape: Shape = "min-jerk",
+    warmup_start: float = 0.0,
 ) -> np.ndarray:
     """The anchor weight at (fractional) *epoch*: ramp, hold, anneal to a floor.
 
-    Under `shape="flat"` there is nothing to interpolate: the weight is `peak`
-    from step 0 to the end of training.
+    The ramp runs from *warmup_start* (zero before it) to *warmup_epochs*. Under
+    `shape="flat"` there is nothing to interpolate: the weight is `peak` from
+    step 0 to the end of training.
     """
     e = np.asarray(epoch, dtype=float)
     if shape == "flat":
         return peak * np.ones_like(e)
-    ramp = _interp(e / warmup_epochs, shape)
+    ramp = _interp((e - warmup_start) / (warmup_epochs - warmup_start), shape)
     anneal = _interp((e - anneal_start) / (anneal_end - anneal_start), shape)
     return peak * ramp * (1.0 - (1.0 - floor) * anneal)
 

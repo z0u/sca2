@@ -92,6 +92,15 @@ def test_anchor_schedule_ramps_holds_and_anneals_to_a_floor():
     assert star(90) < spec(90)
 
 
+def test_a_delayed_warmup_holds_at_zero_then_ramps_to_the_same_peak():
+    spec = AnchorSpec(peak=0.1, warmup_epochs=10, anneal_start=90, anneal_end=100, floor=0.1)
+    late = AnchorSpec(peak=0.1, warmup_epochs=30, anneal_start=90, anneal_end=100, floor=0.1, warmup_start=20)
+    np.testing.assert_allclose(late(np.array([0.0, 10.0, 20.0])), 0.0, rtol=0, atol=0)
+    # The same ramp, slid along by the delay.
+    np.testing.assert_allclose(late(np.array([23.0, 25.0, 30.0])), spec(np.array([3.0, 5.0, 10.0])), rtol=1e-12)
+    np.testing.assert_allclose(late(np.array([50.0, 100.0])), spec(np.array([50.0, 100.0])), rtol=1e-12)
+
+
 def test_schedule_shapes_flatten_or_straighten_the_same_keyframes():
     # Spelled out rather than unpacked from a shared dict: `AnchorSpec` mixes int
     # and float fields, and a `**dict` of keyframes widens to `int | float`.
