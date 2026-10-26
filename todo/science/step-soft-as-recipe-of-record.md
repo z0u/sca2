@@ -18,3 +18,7 @@ The question needs no training: a side-by-side of the two conditions on the stor
 The two conditions also differ in when the spill appears: [spill-timing](/docs/m2/spill-timing/report.py) found the early kind of spill only on the pool over slices 1 to 3, and at epoch 64 `falloff` and `step, soft τ` look alike.
 
 It is also the first step of [pool 1–3, soft τ as the recipe of record](./soft-pool-spill-follow-ups.md). Adding `pool 1–3, soft τ` to the side-by-side gives the pool a starting point measured like the other two, and the comparison names the strong recipe that the pool arms are scored against.
+
+## Notes
+
+**2026-10-26, recipe-compare** — Measured in [recipe-compare](/docs/m2/recipe-compare/report.py): on seeds 704 to 711 `step, soft τ` removes a couple of hundredths less than `falloff` on seven seeds of eight, has no run over the spill criterion, and costs the task about as little; the write, grading and landing are alike. One finished loss-rate run (732) is below the task gate against the mean of the controls, and `falloff` has one op past the per-op line (708). So the two look level, and the choice of recipe of record is open: the review leans toward `pool 1–3, soft τ` if its spill comes down ([its item](./soft-pool-spill-follow-ups.md)).

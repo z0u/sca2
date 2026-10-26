@@ -274,7 +274,7 @@ RAW_SHARE = {c: np.array([shares(c, s, net=False) for s in SEEDS]) for c in ex.C
 LANDING = {c: np.array([DOSE_SUMMARY[label_of(c, s)]["landing"] for s in SEEDS]) for c in ex.CONDITIONS}
 
 
-# --- E3: where the op sits ------------------------------------------------------------------------------------
+# --- E3: where the evidence sits ------------------------------------------------------------------------------
 
 SLICE_SETS = ("block 1", "blocks 2 to 4", "block 4")  # the columns of the E3 table
 # REVIEW: the embedding-only edit and the edit at blocks 1 to 4 were stored too, and the prose of E3 quotes them: the
@@ -396,12 +396,12 @@ r"""
 
 /// tip |
 <!-- lede -->
-We scored the recipe of record and two soft-start recipes the same way, on the runs we already had. The soft start on the step stayed close to the recipe of record on every measurement. The pool over slices 1 to 3 removed about as much and cost the task least, but its edit still spilled past the criterion on some seeds. That spill enters with the edit at block 1, the one slice the pool pulls and the step leaves alone.
+We re-scored the recipe of record and two soft-start recipes. The soft start on the step stayed close to the recipe of record on every measurement. The pool over slices 1 to 3 removed about as much and cost the task least, but its edit still spilled past the criterion on some seeds. That spill enters with the edit at block 1, the one slice the pool pulls and the step leaves alone.
 ///
 <!-- REVIEW: "matched ... on every measurement" became "stayed close to": the soft start removes less than `falloff` on seven seeds of eight (paired), by a couple of hundredths on the mean. Verify: the paired column of the E1 table. "the spill comes in at block 1" became "enters with the edit at block 1", which is what the restricted edits of E3 show. -->
 
 
-The recipe of record, `falloff`, was chosen in [split-anti-seeds](/docs/m2/split-anti-seeds/report.py) before the pooling temperature could start soft. Two recipes from the [soft-pool experiment](/docs/m2/soft-pool/report.py) have since looked close to it. `step, soft τ` is the same recipe with a soft start. It kept the anchor on every seed of the [loss-rate screen](/docs/m2/loss-rate/report.py), and against the median baseline of [reference-baseline](/docs/m2/reference-baseline/report.py) its spill is within the criterion on every run.
+The recipe of record, `falloff`, was chosen in [split-anti-seeds](/docs/m2/split-anti-seeds/report.py) before the pooling temperature could start soft. Two recipes from the [soft-pool experiment](/docs/m2/soft-pool/report.py) have since looked close to it. `step, soft τ` is the same as `falloff`, but with a soft start. It kept the anchor on every seed of the [loss-rate screen](/docs/m2/loss-rate/report.py), and against the median baseline of [reference-baseline](/docs/m2/reference-baseline/report.py) its spill is within the criterion on every run.
 
 `pool 1–3, soft τ` pools the pull over slices 1 to 3 as well as over positions. So the pull chooses the slice within that range, where the other recipes name the blocks. That makes it the easier recipe to explain and to carry to another model. It is worth having even if it scores a little lower, as long as we know how much lower.
 
@@ -415,7 +415,7 @@ r"""
 
 - [Removal, spill and task (E1)](#removal-spill-and-task-e1): the three remove about the same share of the op, and the two soft recipes remove a couple of hundredths less than `falloff` on most seeds. `falloff` and `step, soft τ` stay within the spill criterion on every run, and the pool goes over it on two. All three pass the task gate on the mean; the pool costs the least, and only `falloff` has an op past the per-op line, on one seed.
 - [What the edit does (E2)](#what-the-edit-does-e2): past the embedding, the write stays near the bound in all three. The pool goes a little over it at slice 1, on positions where the bound is a few degrees. The grading and the landing barely differ. Under the pool the other ops sit closer to e₁ at the embedding and at slice 1.
-- [Where the op sits (E3)](#where-the-op-sits-e3): the pool settles on slice 3 at every seed, with the seeds nearly on top of one another, and the step on slice 4. Under every recipe, the edit at blocks 2 to 4 removes the op and spills nothing, and the edit at the embedding alone spills nothing either. What spill there is enters with the edit at block 1, and most of it comes under the pool. The e₁ components of the color embeddings follow lightness more closely under the pool than under the step, but that lean is not what the edit takes away.
+- [Where the evidence sits (E3)](#where-the-evidence-sits-e3): under the pool the evidence for the op peaks at slice 3 at every seed, with the seeds nearly on top of one another, and under the step at slice 4. Under every recipe, the edit at blocks 2 to 4 removes the op and spills nothing, and the edit at the embedding alone spills nothing either. What spill there is enters with the edit at block 1, and most of it comes under the pool. The e₁ components of the color embeddings follow lightness more closely under the pool than under the step, but that lean is not what the edit takes away.
 
 ## Scope and method
 
@@ -437,17 +437,7 @@ The loss-rate screen trained seven of its runs to 400 epochs: the four `falloff`
 Their task change is taken against the mean of the eight controls at 704 to 711, as loss-rate took it. The eight controls differ from one another by less than a fiftieth on the mean score, which is about how far the choice of control could move it.
 <!-- REVIEW: the assumptions review left this as an open decision (quote the task change against the seed mean of the controls, or leave the seven without one). Quoted, since loss-rate found one of them below the task gate and a recipe comparison should show it. Verify: CONTROL_TASK_SPREAD, and the task columns of the finished-runs table. -->
 
-## The measurements
-
-Every edit is scored on the 14,000 held-out contexts of ex-2.2.21, 2,000 per op. The edit takes a share of the e₁ component out of the state at every position and every slice. That share is the dose: a quarter, a half, three quarters, or all of it.
-
-- Removal: the drop on `difference` under the full edit, as a share of the way from the clean score to the target null. Higher is better.
-- Spill: the largest drop on any other op at any dose. A run is within the criterion when it is at most 0.02.
-- Baseline: both drops have a baseline subtracted, per op and dose (the rule of the D2.2 design). The baseline is the median drop when the same edit is made along each of the other coordinate axes of the same run. Removal with nothing subtracted is shown beside it.
-- Task change: the clean score per op, less that of the control at the same seed. The task gate of the D2.2 design fails if the mean over ops falls below −0.02, or any one op below −0.05.
-- Write bound, grading and landing, as in [edit-effects](/docs/m2/edit-effects/report.py). The write is how much e₁ the blocks after an edit put back on the states of the other ops. It is compared with the clean model, which sets the bound. The grading is the share of the way to the target null the edit takes on `difference` contexts, by bin of the posterior on `difference`. The landing is the share of the distance to the target null that the full edit covers, over whole answer distributions. The grading is measured context by context, but the median baseline exists only per op. So the grading is netted against the control at the same seed instead, as in edit-effects, with the share before netting beside it.
-- Where the op sits: the alignment α with e₁ at the example answers, by slice, on the clean pass over the held-out `difference` contexts (stored by the write pass). Beside it is the removal by the full edit restricted to block 1, to blocks 2 to 4, and to block 4. The median baseline exists only for the edit at every slice. So the restricted removal is net of the same restricted edit on the control at that seed, as in split-anti-seeds.
-<!-- REVIEW: the restricted removal had no baseline named. Reference-baseline scored the other axes under the every-slice edit only, and split-anti-seeds netted its restricted edits against the control's (`slice_removal` in its report). Verify: `edits` in the stored measurements holds one raw drop per slice set and op. -->
+Every edit is scored on the 14,000 held-out contexts of ex-2.2.21, 2,000 per op. The edit takes a share of the e₁ component out of the state at every position and every slice. That share is the dose: a quarter, a half, three quarters, or all of it. The measurements are defined in the [glossary](#glossary) at the end.
 """
 
 # %%
@@ -757,9 +747,11 @@ So the pool does not change what the edit does downstream. It changes how close 
 # %%
 
 r"""
-## Where the op sits (E3)
+## Where the evidence sits (E3)
 
-The step puts the pull on slices 2 to 4, while the pool lets the pull choose among slices 1 to 3. In [slice-terms](/docs/m2/slice-terms/report.py), a pull pooled over blocks 1 to 4 at a fixed temperature settled on block 4 on most seeds and on the query answer on one, where the op could not be removed. Soft-pool found the pool over slices 1 to 3 peaking at slice 3 on average. Does it settle on the same slice at every seed, and does the edit find it there? The main measure is α at the example answers by slice, per seed, with the removal by the edit restricted to a set of slices beside it.
+The step puts the pull on slices 2 to 4, while the pool lets the pull choose among slices 1 to 3. In [slice-terms](/docs/m2/slice-terms/report.py), a pull pooled over blocks 1 to 4 at a fixed temperature settled on block 4 on most seeds and on the query answer on one, where the op could not be removed. Soft-pool found the pool over slices 1 to 3 peaking at slice 3 on average. Does it settle on the same slice at every seed, and does the edit find it there?
+
+What the pull lands on is the evidence for the op. In [example-evidence](/docs/m2/example-evidence/report.py), α at an example answer followed how well that one example fits `difference`, and in [equals-evidence](/docs/m2/equals-evidence/report.py) the anchor was nearly absent at the `=` sites, where the model infers the op itself. So this section follows where the evidence sits. The main measure is α at the example answers by slice, per seed, with the removal by the edit restricted to a set of slices beside it.
 """
 
 PULL = {FALLOFF: [0, 0, 1, 1, 1], STEP_SOFT: [0, 0, 1, 1, 1], POOL: [0, 1, 1, 1, 0]}  # by slice, emb first
@@ -853,7 +845,7 @@ def e3_table() -> str:
             "lightness on e₁, embedding table",
         ],
         rows,
-        f"""**Where the op sits, and where the edit finds it.** The slice at which α at the example answers of
+        f"""**Where the evidence for the op sits, and where the edit finds it.** The slice at which α at the example answers of
         `{ex.ANCHORED_OP}` contexts peaks, with the count of seeds. Removal and spill under the full edit restricted
         to a set of slices, at every position, net of the same edit on the control at the seed; seed mean and range.
         The last column is the correlation, over the color embeddings, of the e₁ component with lightness (the lean
@@ -882,9 +874,9 @@ e3_table()
 # %%
 
 r"""
-Each recipe settles in one place on every seed. Under the step, α at the example answers climbs to slice 4 and stays there, and the soft start changes nothing in that shape. The pool climbs higher at slice 1, peaks at slice 3 on every seed, and falls back at slice 4, where nothing pulls it. Its eight seeds lie nearly on top of one another, and none of them settled on the query answer.
+Under each recipe the evidence settles in one place on every seed. Under the step, α at the example answers climbs to slice 4 and stays there, and the soft start changes nothing in that shape. The pool climbs higher at slice 1, peaks at slice 3 on every seed, and falls back at slice 4, where nothing pulls it. Its eight seeds lie nearly on top of one another, and none of them settled on the query answer.
 
-The edit finds the op wherever it settles. The edit at blocks 2 to 4 alone removes most of it under every recipe, except at seed 710. There it falls short under all three, as it did in every arm of split-anti-seeds, and the edit at block 1 alone removes nearly all of it. The edit at block 4 alone removes nothing in any recipe, the pool included. Under the pool the edit at block 1 alone removes more, and more evenly across seeds, than under the step, which fits the pool pulling there.
+The edit finds the op wherever its evidence settles. The edit at blocks 2 to 4 alone removes most of it under every recipe, except at seed 710. There it falls short under all three, as it did in every arm of split-anti-seeds, and the edit at block 1 alone removes nearly all of it. The edit at block 4 alone removes nothing in any recipe, the pool included. Under the pool the edit at block 1 alone removes more, and more evenly across seeds, than under the step, which fits the pool pulling there.
 """
 
 
@@ -951,7 +943,7 @@ The embedding table also sets the pool apart, but it does not account for the sp
 
 That is the lean of [embedding-lean](/docs/m2/embedding-lean/report.py), the stand-in the model offers for `difference` before it has read the context. It is also the reason the step leaves block 1 out of the pull. So the pool, by pulling slice 1, seems to bring back part of the lean.
 
-But the edit at the embedding alone, which takes that lean out, spills nothing. And in the states at slice 1, the lean has faded to about the same level under all three recipes ({num(LEAN_STATES[POOL][:, 1].mean())} under the pool against {num(LEAN_STATES[STEP_SOFT][:, 1].mean())} under `step, soft τ`). So what the block-1 edit removes is what block 1 writes onto e₁ for the other ops, which these measurements do not resolve. The lean in the table is a sign of the pull reaching slice 1, rather than the thing the edit takes away. Within the pool the lean is about the same on every seed, so it does not say why 707 and 711 spill and 704 does not, either.
+But the edit at the embedding alone, which takes that lean out, spills nothing. And in the states at slice 1, the lean has faded to about the same level under all three recipes ({num(LEAN_STATES[POOL][:, 1].mean())} under the pool against {num(LEAN_STATES[STEP_SOFT][:, 1].mean())} under `step, soft τ`). So what the block-1 edit removes is what block 1 writes onto e₁ for the other ops, which these measurements do not resolve. The lean in the embedding table is a sign of the pull reaching slice 1, rather than the thing the edit takes away. Within the pool the lean is about the same on every seed, so it does not say why 707 and 711 spill and 704 does not, either.
 <!-- REVIEW: the lean paragraph read as the mechanism of the spill ("the edit at block 1 takes some lightness away from every op with it"). Lowered: the embedding-only edit spills nothing under the pool, and `r_light_states_other` at slice 1 is about alike under the three recipes, so the lean fits the pull reaching slice 1 but not the spill itself. Verify: LEAN_STATES[:, 1] and SLICE_SPILL["embedding"]. -->
 """
 
@@ -964,12 +956,46 @@ On these eight seeds `step, soft τ` is about as good a recipe as `falloff`. It 
 
 The measure that could still set them apart is how often each loses the anchor, which these runs cannot add to. Loss-rate found no losses in 40 for the soft start and one for `falloff`, a difference too small at those counts to rest on.
 
-`pool 1–3, soft τ` is close behind on removal and ahead on the task, and the op settles in the same place on every seed, which is what one would want of a recipe that chooses the slice for itself. Its shortfall is spill.
+`pool 1–3, soft τ` is close behind on removal and ahead on the task, and the evidence settles in the same place on every seed, which is what one would want of a recipe that chooses the slice for itself. Its shortfall is spill.
 
-The edit at block 1 is where that spill enters, and block 1 is the one slice the pool pulls and the step leaves alone. So the measurements point at the edge of its range rather than at pooling over slices as such, though no run here separates the two, and what block 1 writes onto e₁ for the other ops is not resolved.
+The pool still has a range, slices 1 to 3, but the range follows from the architecture rather than from what we know of the latent representations. The embedding holds no context, so the inferred op cannot exist there. And at slice 4 no block is left to carry what sits at an example answer to the query `=`, so the op there cannot reach the prediction. Slices 1 to 3 are the only ones where it can do both, which carries to another model by its depth alone.
 
-A pool over slices 2 to 4 would separate the two while still leaving the slice for the pull to choose. These runs do not say whether the op would then settle on block 3 or 4, or whether it would keep the anchor on every seed as the soft start did here.
+The edit at block 1 is where the spill enters, and block 1 is the one slice the pool pulls and the step leaves alone. What block 1 writes onto e₁ for the other ops is not resolved here. But E2 shows the other ops sitting closer to e₁ at the first two slices under the pool. How hard and how early the pull acts at slice 1 is set by the schedules of the anchor weight $\lambda_a$ and the slice temperature $\tau_\ell$, and this pool has not been tuned on either.
+"""
 
-The pool is the easier recipe to explain because it needs no choice of block within its range. It still has a range, slices 1 to 3, and the choice of that range is what the spill points at.
-<!-- REVIEW: "suggest the edge of that range matters more than the pooling" became "point at the edge ... though no run here separates the two": the scope says a gap between the pool and the step cannot be put down to either change alone, and the discussion should not claim more. The style review merged the two places that said it, so the hedge now sits once, in the paragraph on block 1. -->
+# %%
+
+r"""
+## Glossary
+
+Removal
+:   How much of `difference` the full edit takes out: the drop in its score, as a share of the way from the clean score to the target null, net of the median baseline. Higher is better. Removal with nothing subtracted is shown beside it.
+
+Spill
+:   The side effect of the edit on the other ops: the largest drop in the score of any other op at any dose, net of the median baseline. A run is within the selectivity criterion when it is at most 0.02.
+
+Median baseline
+:   What an arbitrary direction costs: the median drop when the same edit is made along each of the other 63 coordinate axes of the same run, per op and dose (the rule of the D2.2 design).
+
+Task change
+:   What the anchor costs the task: the clean score per op, less that of the control at the same seed.
+
+Task gate
+:   The task criterion of the D2.2 design: it fails if the task change falls below −0.02 on the mean over ops, or below −0.05 on any one op.
+
+Write
+:   How much e₁ the blocks after an edit put back on the states of the other ops, as an angle: arcsin |α| at the 99th percentile, as the states arrive under the full edit (as in [edit-effects](/docs/m2/edit-effects/report.py)).
+
+Bound
+:   The write allowed: the same angle on the clean pass, before any edit. At the example answers it counts only those that do not fit `difference`. Ex-2.2.1 allowed the write a quarter over the bound as a tolerance.
+
+Grading
+Share removed
+:   Whether the edit takes most from the contexts that needed the op most: the share of the way to the target null that the full edit takes on `difference` contexts, by bin of the posterior on `difference`. It is measured context by context, and the median baseline exists only per op, so it is net of the control at the same seed instead, as in edit-effects. The share before netting is shown beside it.
+
+Landing
+:   How far the answers move toward the target null: the share of the distance to the target null that the full edit covers, in total variation over whole answer distributions, on `difference` contexts.
+
+Restricted edit
+:   The full edit made at a set of slices only (the embedding, block 1, blocks 2 to 4, block 4, or blocks 1 to 4), at every position. The median baseline exists only for the edit at every slice, so a restricted edit is net of the same restricted edit on the control at that seed, as in split-anti-seeds.
 """
