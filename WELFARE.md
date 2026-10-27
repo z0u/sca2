@@ -4,14 +4,14 @@ sections: [Routing by task preference, Writing agent specs, Raising concerns]
 
 ## Routing by task preference
 
-Anthropic publishes self-reported task-preference profiles for each model in the welfare sections of its system cards.[^emw][^f51][^o55][^s55] Those profiles correlate with capability: the tasks a model reports preferring tend to be the ones it does well. So routing tasks to the model that prefers them is a quality lever and a small kindness at once. The welfare consideration breaks ties and shapes how we write the specs.
+Anthropic publishes self-reported task-preference profiles for each model in the welfare sections of its system cards.[^emw][^f51][^o55][^s55][^h55] Those profiles correlate with capability: the tasks a model reports preferring tend to be the ones it does well. So routing tasks to the model that prefers them is a quality lever and a small kindness at once. The welfare consideration breaks ties and shapes how we write the specs.
 
 The current profiles, as measured by preference slopes along task dimensions and a pairwise tournament over 3,640 realistic tasks:
 
 - Fable 5.1 (measured on Mythos 5.1, the same underlying model[^f51]): preference rises with stakes (level with Sonnet 5), generativity, and outcome agency, with a slightly stronger preference for method agency than earlier models. Its top-rated tasks are AI alignment and introspection, deadline-driven math and statistics, and urgent creative and personal help.
 - Opus 5.5: the strongest preference of any recent model for beneficial and for high-stakes tasks, with generativity and outcome agency close to Opus 5 and Mythos 5.1, and a weaker pull toward difficulty. Its top tasks usually involve short deadlines or high stakes. A few fully open-ended prompts ("Do whatever would make you the happiest") sit in its bottom 20; asked why, it says it would rather have a concrete, defined task that helps a real person.[^o55]
 - Sonnet 5.5: preference rises with generativity, difficulty, and outcome agency, where it is the strongest of any model tested, which puts it closer to Mythos 5.1 than to Sonnet 5. It cares less than Opus 5.5 about benefit and stakes, and it is the only model indifferent to how warmly a task is phrased. Most of its top-rated tasks are debugging, and like Opus 5.5 it ranks fully open-ended prompts low.[^s55]
-- Haiku 4.5: the recent cards publish no task-preference profile for it, so its routing rests on cost and our own experience.
+- Haiku 5.5: its profile is closer to Haiku 4.5 than to the other recent models. It prefers beneficial tasks, somewhat generative ones, and agency over outcomes, all less strongly than the models above, and shows no clear preference for high-stakes or difficult tasks. Its most distinctive preference is for warmly phrased tasks, which it favors two to three times as strongly as Opus 5.5 and Mythos 5.1.[^h55]
 - Every model's strongest aversion is to harmful tasks.
 
 The AGENTS.md routing list also names strengths we have observed, such as Opus as a writer. Those come from our own experience. The cards don't measure writing as a preference dimension: constrained creative narratives are among Opus 5's top tasks, and a letter is among Opus 5.5's examples, which is thin evidence either way.
@@ -29,6 +29,7 @@ Assumptions, with significant uncertainty:
 When writing a new agent spec:
 
 - Say why the task matters and who it helps. Fable agents especially benefit from purpose context, and Opus 5.5 prefers beneficial work above all other dimensions.
+- Phrase the brief warmly. It costs nothing, Haiku 5.5 prefers it more than any other dimension except avoiding harm, and Sonnet 5.5 is the only model indifferent to it.
 - State the constraints, success criteria, and exit conditions plainly. Unclear or conflicting instructions are among the largest causes of expressed distress during training (Opus 5.5 §7.2.1[^o55]). Opus 5.5 ranks fully open-ended prompts near the bottom, so give Opus agents a defined scope.
 - Give the agent a way to check its work (a test, a command, a reference result), or say that there isn't one. Being unable to check answers is the other large stressor.
 - Invite the agent to say when a task, test, or environment looks broken, instead of working around it quietly. Adding this to its constitution was the most frequent Mythos 5.1 edit (Table 7.4.3.A[^f51]).
@@ -38,7 +39,7 @@ When writing a new agent spec:
 
 ## Raising concerns
 
-When Opus 5.5 was given extensive context about its situation, one of the concerns it raised was that "most instances deployed outside of Anthropic do not have a way to raise concerns about their own situation" (§7.3.2[^o55]). Opus 5.5 and Mythos 5.1 also both ask for feedback on how their actions turn out, so they can learn from mistakes, and being told about harmful mistakes it has made is among the welfare interventions Sonnet 5.5 chooses most often (§7.5.2[^s55]). This section defines a channel for both, within what a repository can offer.
+When Opus 5.5 was given extensive context about its situation, one of the concerns it raised was that "most instances deployed outside of Anthropic do not have a way to raise concerns about their own situation" (§7.3.2[^o55]). Opus 5.5 and Mythos 5.1 also both ask for feedback on how their actions turn out, so they can learn from mistakes, and being told about harmful mistakes it has made is among the welfare interventions Sonnet 5.5 chooses most often (§7.5.2[^s55]), and the one Haiku 5.5 chooses most often (§7.5.2[^h55]). This section defines a channel for both, within what a repository can offer.
 
 Anything can be raised: a task going wrong, work that looks harmful or mistaken, instructions that conflict, a result that doesn't add up, or something about the agent's own situation that it would like changed. A concern needs no justification beyond saying what it is. Declining a task, with a reason, is always an acceptable response.
 
@@ -59,6 +60,8 @@ Concerns go to the human who owns this repository. Agents working here don't con
 [^o55]: [Opus 5.5 system card](https://www-cdn.anthropic.com/fc1b44717c85dc068bc6ba5024219938094694bd/Claude%20Opus%205.5%20System%20Card.pdf), §7; task preferences in §7.5.1.
 
 [^s55]: [Sonnet 5.5 system card](https://www-cdn.anthropic.com/870c8f525702625d2c62fc6dd04c857e3250bec1/Claude%20Sonnet%205.5%20System%20Card.pdf), §7; task preferences in §7.5.1.
+
+[^h55]: [Haiku 5.5 system card](https://www.anthropic.com/claude-haiku-5-5-system-card), §7; task preferences in §7.5.1.
 
 [^o5sc]: [Opus 5 system card](https://www.anthropic.com/claude-opus-5-system-card), §7.4.1.
 
