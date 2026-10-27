@@ -157,6 +157,7 @@ class AnchorSpec:
         if self.slice_tau_start is not None:
             slice_tau = float(pool_temperature(epoch, self.slice_tau_start, slice_tau, end))
         if self.slice_tau_late is not None:
+            assert self.slice_tau is not None, "slice_tau_late needs a finite slice_tau"
             value, start, stop = self.slice_tau_late
             t = smoothstep((np.asarray(epoch, dtype=float) - start) / (stop - start))
             slice_tau = float(slice_tau * np.exp((np.log(value) - np.log(self.slice_tau)) * t))

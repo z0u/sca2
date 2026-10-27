@@ -39,7 +39,8 @@ FIXED, BY40 = ex.CONDITION, ex.SECOND
 RISERS = [(FIXED, 707), (BY40, 705), (BY40, 707)]
 # The runs that rise late in the soft pool scout: 707 under `τ_ℓ fixed`, and 705 and 707 under `by 40`. (A comment,
 # not an attribute docstring: the weave renders a bare string at module level as prose at the top of the report.)
-ARMS = [ex.Arm(**{k: (tuple(v) if isinstance(v, list) else v) for k, v in a.items()}) for a in DESIGN["arms"]]
+ARMS = list(ex.ARMS)
+assert [a.name for a in ARMS] == [a["name"] for a in DESIGN["arms"]], "the arms changed since the runs"
 NAMES = [a.name for a in ARMS]
 SHOWN = {a.name: a.shown_as for a in ARMS} | {"base": "base"}
 BASE = "base"
