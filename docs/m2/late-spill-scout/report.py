@@ -37,7 +37,8 @@ OTHER = [o for o in range(len(OPS)) if o != D]
 SEEDS: list[int] = DESIGN["seeds"]
 FIXED, BY40 = ex.CONDITION, ex.SECOND
 RISERS = [(FIXED, 707), (BY40, 705), (BY40, 707)]
-"""The runs that rise late in the soft pool scout: 707 under `τ_ℓ fixed`, and 705 and 707 under `by 40`."""
+# The runs that rise late in the soft pool scout: 707 under `τ_ℓ fixed`, and 705 and 707 under `by 40`. (A comment,
+# not an attribute docstring: the weave renders a bare string at module level as prose at the top of the report.)
 ARMS = [ex.Arm(**{k: (tuple(v) if isinstance(v, list) else v) for k, v in a.items()}) for a in DESIGN["arms"]]
 NAMES = [a.name for a in ARMS]
 SHOWN = {a.name: a.shown_as for a in ARMS} | {"base": "base"}
@@ -119,7 +120,7 @@ TASK = {a: task(a) for a in NAMES}
 OVER = {a: int((SPILL[a] > CRITERION).sum()) for a in NAMES}
 LOST = {a: int((REMOVAL[a] < LOST_BELOW).sum()) for a in NAMES}
 GPU_SHIFT = np.array([END[(FIXED, BASE, s)]["spill"] - STAGE2[(FIXED, s)]["spill"] for s in SEEDS])
-"""`base` less the soft pool scout's run of the same seed: the same schedule, on another GPU after epoch 64."""
+# `base` less the soft pool scout's run of the same seed: the same schedule, on another GPU after epoch 64.
 
 
 # --- Along training: the full edit on each kept checkpoint against the median of eight reference edits ---------
@@ -143,6 +144,9 @@ def along(arm: str, cond: str, seed: int) -> np.ndarray:
 
 
 ALONG = {a: np.array([along(a, FIXED, s) for s in SEEDS]) for a in NAMES}  # (seeds, epochs)
+SPREAD_96 = np.ptp([_ALONG_BY[(FIXED, a, 707, 96)] for a in NAMES])
+# How far the four runs of 707 under `τ_ℓ fixed` have already parted at the first kept checkpoint, where the arms'
+# schedules differ by very little: the noise floor of the along-training score on one run.
 
 
 # --- The schedules and α along training, from the trajectories --------------------------------------------------
@@ -468,9 +472,11 @@ This is an exploratory study, with no preregistration and no gate. It covers one
 
 Every arm uses only schedules and temperatures, nothing keyed to a token role, so each would carry to real text as the recipe does.
 
-Since every run of a seed shares its first 64 epochs, a difference between an arm and `base` at the same seed comes from the change after epoch 64 alone. The late rise is small, though. On the runs it reaches, it ends near the criterion, while quiet runs scatter by about 0.006 (one standard deviation, over the stored runs of quiet conditions in spill-timing) around a value a little below zero. So the comparison that counts is the paired one on the runs that rise, and whether the arms move them the same way.
+Since every run of a seed shares its first 64 epochs, a difference between an arm and `base` at the same seed comes from the change after epoch 64 alone. The late rise is small, though. On the runs it reaches, it ends near the criterion, while quiet runs scatter by about 0.006 (one standard deviation, over the stored runs of quiet conditions in spill-timing) around a value a little below zero. The score along training, against eight reference axes rather than 63, is at least as noisy: at epoch 96, where the schedules of the arms have barely parted, the four runs of 707 under `τ_ℓ fixed` already spread over {SPREAD_96:.3f}. So the comparison that counts is the paired one on the runs that rise, read over the whole of training rather than at one checkpoint, and whether the arms move them the same way.
+<!-- REVIEW: added the noise floor of the along-training score (the spread of the four arms at epoch 96 on 707, where the anti weight differs by 0.014 and τ_ℓ by 0.002 between arms), since E1 rests on that score. Verify: `along(a, FIXED, 707)[0]` per arm. -->
 
-Modal had no L4 GPUs free when this ran, so every run carried on from epoch 64 on an A10G, where the soft pool scout ran on L4. The runs here are paired with one another, all on the same GPU. Against the soft pool scout's finished runs, `base` differs only in the numerics of the GPU, and that difference is informative in itself: the two runs at 707 rise late on both GPUs, but `τ_ℓ 0.1, by 40` at 705, which ended at the criterion on L4, stays below zero on the A10G (second table of E2). So whether a seed rises late is partly a matter of numerics, and a single run that rises or not says little by itself.
+Modal had no L4 GPUs free when this ran, so every run carried on from epoch 64 on an A10G, where the soft pool scout ran on L4. The runs here are paired with one another, all on the same GPU, and two arms with the same schedule up to an epoch score the same to the last digit up to it (`anti late` and `anti held` to epoch 192), so the pairing is exact. Against the soft pool scout's finished runs, `base` differs only in the numerics of the GPU, and that difference is informative in itself. On the eight seeds of `τ_ℓ 0.1, τ_ℓ fixed`, `base` ends within {np.abs(GPU_SHIFT).max():.3f} of the L4 run, and the two runs at 707 rise late on both GPUs; but `τ_ℓ 0.1, by 40` at 705, which ended at the criterion on L4, stays below zero on the A10G (second table of E2). So whether a seed rises late is partly a matter of numerics, and a single run that rises or not says little by itself.
+<!-- REVIEW: added how large the GPU numerics are (GPU_SHIFT: `base` ends within 0.003 of the L4 run on every seed of `τ_ℓ fixed`) and that the two anti arms score the same to the last digit until their schedules part, so the paragraph gives the size of the numerics as well as their existence. The L4 statement follows the soft pool scout's roles through soft-pool, split-anti-seeds, slice-terms and late-pull to `gpu="L4"`; the A10G is `GPU` in experiment.py here, for training and measurement alike, so the stage-2 column of the second table of E2 is the one scored on another GPU. Verify: GPU_SHIFT, and along("anti-late", FIXED, s) against along("anti-held", FIXED, s) at epochs 96 to 192. -->
 <!-- REVIEW: was "the seeds that rise (705 and 707)". Under `τ_ℓ 0.1, τ_ℓ fixed` only 707 rises (0.020, on `mix`); 705 rises under `τ_ℓ 0.1, by 40`, the other finished condition, and sits at −0.005 here. Verify: the by-seed table of E4 and the along-training figure of E5 in the soft pool scout. -->
 <!-- REVIEW: the noise statement quotes spill-timing (Scope and method: 0.006 over 27 quiet runs) in place of "about a third of the criterion either side of zero". -->
 
@@ -501,13 +507,14 @@ Does any arm keep the late rise down on the runs where it appears, and does the 
 
 {along_figure()}
 
-On all three rising runs the late spill follows the anti weight. Where the weight is held high (`anti held`), the spill stays near zero to the end on all three. Where the anneal pauses until epoch 200 (`anti late`), the spill of 707 under `τ_ℓ fixed` stays flat until the anneal resumes, then climbs as the weight comes down and reaches the same level as `base` by the end. On 707 under `by 40` the same arm keeps it flat throughout. The third run, 705 under `by 40`, does not rise on this GPU in any arm, `base` included, so it says nothing about the arms.
+On both runs that rise here, the late spill follows the anti weight. Where the weight is held high (`anti held`), the spill stays near zero to the end. Where
+<!-- REVIEW: was "on all three rising runs ... on all three". Only two of the three rise on this GPU (the paragraph says so of the third two sentences on), so the count is two. Verify: the by-40 705 panel, where `base` is below zero from epoch 160. --> the anneal pauses until epoch 200 (`anti late`), the spill of 707 under `τ_ℓ fixed` stays flat until the anneal resumes, then climbs as the weight comes down and reaches the same level as `base` by the end. On 707 under `by 40` the same arm keeps it flat throughout. The third run, 705 under `by 40`, does not rise on this GPU in any arm, `base` included, so it says nothing about the arms.
 
 Sharpening τ_ℓ during the anneal lowers the spill on both runs that rise, partway on 707 under `τ_ℓ fixed` and to zero on 707 under `by 40`. Its spill along training is bumpier than the other arms', which may be the pull moving between slices as the pool sharpens.
 
 The mean over the eight seeds moves little, since seven of them are quiet under every arm. All three arms sit a little below `base` on it by the end.
 
-So the timing fits the reading that the anti term keeps e₁ closed to the late ops and the anneal opens it. The `anti late` run of 707 is the clearest piece of evidence: the same model, from the same state, rises only once the weight comes down. One run is not enough to be sure, but nothing here points the other way.
+So the timing fits the reading that the anti term keeps e₁ closed to the other ops and the anneal opens it. The `anti late` run of 707 is the clearest piece of evidence: the same model, from the same state, rises only once the weight comes down. One run is not enough to be sure, but nothing here points the other way.
 """
 
 # %%
@@ -547,7 +554,8 @@ So holding the anti weight high answers the question but is not a recipe: it buy
 r"""
 ## Discussion
 
-The late spill on the candidate recipe follows the anti anneal. Holding the anti weight keeps it off, and pausing the anneal delays it until the anneal resumes. That fits the reading in the late-spill backlog item: the anti term keeps e₁ closed to the late ops, and the anneal opens it. It does not fit the other reading, that whatever draws an op to e₁ also slows its learning, since the schedule alone moves the rise here. The evidence rests on two rising runs, so it is a strong hint rather than a settled result.
+The late spill on the candidate recipe follows the anti anneal. Holding the anti weight keeps it off, and pausing the anneal delays it until the anneal resumes. That fits the reading in the [late-spill backlog item](/todo/science/late-spill-on-ops-still-being-learned.md): the anti term keeps e₁ closed to the other ops, and the anneal opens it. The other reading, that whatever draws an op to e₁ also slows its learning, predicted no change, and the schedule alone moves the rise here; but the two need not exclude each other, since we did not measure when the spilled op (`mix`) is learned on these runs. The evidence rests on two rising runs, so it is a strong hint rather than a settled result.
+<!-- REVIEW: softened from "It does not fit the other reading": the readings are not exclusive, and this report does not measure when `mix` is learned (claims review, round 1). -->
 
 Of the three changes, sharpening τ_ℓ during the anneal is the one that costs nothing we measured. It lowers the late spill on both rising runs, keeps removal and the task where they were, and adds no term or weight to the recipe, only a second step in a temperature it already has. Why it helps is less clear than for the anti arms. A sharper slice pool puts the pull almost wholly on slice 3, which may leave slices 1 and 2 freer for the anti term to clear, but nothing here measures that.
 
