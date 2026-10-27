@@ -15,6 +15,9 @@ its first 64 epochs with the finished runs of that condition:
 A fourth set of runs, `base`, carries the condition on unchanged: it repeats the soft pool scout's finished runs bit
 for bit and keeps the same dense checkpoints as the arms, so spill along training compares at every 32 epochs.
 
+Only seed 707 rises late under the condition, so all four also carry on the soft pool scout's other finished
+condition, `τ_ℓ 0.1, by 40`, at the two seeds that rise under it (705 and 707).
+
     bin/mini run docs/m2/late-spill-scout/experiment.py --app modal --max-containers 10 --budget 3h
     bin/mini status late-spill-scout
 """
@@ -66,6 +69,10 @@ KEEP_EPOCHS = tuple(range(96, EPOCHS, 32))
 """Checkpoints kept after the stop, every 32 epochs (the stored runs kept 16, 32 and 64)."""
 ANTI_END = 360.0
 """Where the recipe's anti anneal reaches the per-slice holds, and the anchor's end anneal starts."""
+SECOND = "lt0.1-by40"
+"""The soft pool scout's other finished condition (τ_ℓ 4 → 0.1 by epoch 40), carried on at its rising seeds."""
+SETS: tuple[tuple[str, tuple[int, ...]], ...] = ((CONDITION, SEEDS), (SECOND, (705, 707)))
+"""Which condition every arm carries on, at which seeds."""
 LATE_SLICE_TAU = 0.025
 """Where `lt-late` takes τ_ℓ: two more halvings past 0.1, continuing stage 1's ladder of 0.4, 0.2, 0.1."""
 
@@ -99,12 +106,12 @@ ARMS: tuple[Arm, ...] = (
 )
 
 BUDGET_USD = 15
-"""Each run carries on for 336 of 400 epochs, about \\$0.30 with its measurements at the soft pool scout's rate; 32
-runs, plus scoring ten kept checkpoints each."""
+"""Each run carries on for 336 of 400 epochs, about \\$0.30 with its measurements at the soft pool scout's rate; 40
+runs, plus scoring eleven kept checkpoints each."""
 
 
-def label_of(arm: str, model_seed: int) -> str:
-    return f"{arm}-s{model_seed}"
+def label_of(arm: str, model_seed: int, condition: str = CONDITION) -> str:
+    return ("" if condition == CONDITION else "by40-") + f"{arm}-s{model_seed}"
 
 
 # =============================================================================================
@@ -124,32 +131,35 @@ WRITE_ARRAYS_REF = PREFIX + "/write-arrays/{label}"
 ALONG_REF = PREFIX + "/along"
 
 
-def rows_of(meta, arms: tuple[Arm, ...] = ARMS, epochs: int = EPOCHS, seeds: tuple[int, ...] = SEEDS) -> list[dict]:
-    """One row per run of each arm at *seeds*: the soft pool scout's straight-run row of the condition, with the
-    arm's schedules.
+def rows_of(meta, sets=SETS, arms: tuple[Arm, ...] = ARMS, epochs: int = EPOCHS) -> list[dict]:
+    """One row per run of each arm on each condition and seed of *sets*: the soft pool scout's straight-run row of
+    the condition, with the arm's schedules.
     """
-    condition = next(c for c in sps.CONDITIONS if c.name == CONDITION)
     f = epochs / EPOCHS
     rows = []
-    for a in arms:
-        for r in sps.rows_of(meta, (condition,), None, epochs, seeds):
-            anchor, anti = a.schedules(r["anchor"], r["anti"], f)
-            rows.append(r | {"anchor": anchor, "anti": anti, "arm": asdict(a), "label": label_of(a.name, r["model_seed"])})  # fmt: skip
+    for name, seeds in sets:
+        condition = next(c for c in sps.CONDITIONS if c.name == name)
+        for a in arms:
+            for r in sps.rows_of(meta, (condition,), None, epochs, seeds):
+                anchor, anti = a.schedules(r["anchor"], r["anti"], f)
+                label = label_of(a.name, r["model_seed"], name)
+                rows.append(r | {"anchor": anchor, "anti": anti, "arm": asdict(a), "label": label})
     return rows
 
 
-def stored_resume(seeds: tuple[int, ...]) -> dict[int, dict]:
-    """The soft pool scout's epoch-64 resume state and kept checkpoints of the condition at each seed, from their
-    refs (the memo records they came from expire).
+def stored_resume(sets) -> dict[str, dict]:
+    """The soft pool scout's epoch-64 resume state and kept checkpoints of each condition and seed of *sets*, by
+    its stage-1 label, from their refs (the memo records they came from expire).
     """
     from mini.store import get_ref
 
     out = {}
-    for s in seeds:
-        label = sps.label_of(CONDITION, s)
-        state, kept = get_ref(sps.RESUME_REF.format(label=label)), get_ref(sps.KEPT_REF.format(label=label))
-        assert state is not None and kept is not None, f"not stored: {label}"
-        out[s] = {"resume_state": state, "kept_checkpoints": kept}
+    for name, seeds in sets:
+        for s in seeds:
+            label = sps.label_of(name, s)
+            state, kept = get_ref(sps.RESUME_REF.format(label=label)), get_ref(sps.KEPT_REF.format(label=label))
+            assert state is not None and kept is not None, f"not stored: {label}"
+            out[label] = {"resume_state": state, "kept_checkpoints": kept}
     return out
 
 
@@ -189,7 +199,7 @@ def train(ctx: Ctx, resolved: dict, rows: list[dict], resume: list[dict], keep: 
 def design() -> dict[str, Any]:
     return {
         "experiment": "late-spill-scout",
-        "condition": CONDITION,
+        "sets": [[c, list(s)] for c, s in SETS],
         "anchored_op": ANCHORED_OP,
         "ops": list(OP_NAMES),
         "epochs": EPOCHS,
@@ -209,7 +219,7 @@ def publish(rows: list[dict], trained: list[dict], measured: list[dict], dosed: 
 
     from mini.store import put, set_ref
 
-    meta = {r["label"]: {"arm": r["arm"]["name"], "model_seed": r["model_seed"]} for r in rows}
+    meta = {r["label"]: {"arm": r["arm"]["name"], "condition": r["condition"]["name"], "model_seed": r["model_seed"]} for r in rows}  # fmt: skip
     for t in trained:
         set_ref(CHECKPOINT_REF.format(label=t["label"]), t["checkpoint"])
         set_ref(KEPT_REF.format(label=t["label"]), t["kept_checkpoints"])
@@ -231,17 +241,18 @@ def publish(rows: list[dict], trained: list[dict], measured: list[dict], dosed: 
     return {"n_runs": len(trained)}
 
 
-def run(ctx: Ctx, epochs: int = EPOCHS, seeds: tuple[int, ...] = SEEDS, arms: tuple[Arm, ...] = ARMS,
-        resume: dict[int, dict] | None = None, keep: tuple[int, ...] = KEEP_EPOCHS, full: bool = True) -> dict:  # fmt: skip
+def run(ctx: Ctx, epochs: int = EPOCHS, sets=SETS, arms: tuple[Arm, ...] = ARMS, resume: dict[str, dict] | None = None,
+        keep: tuple[int, ...] = KEEP_EPOCHS, full: bool = True) -> dict:  # fmt: skip
     """Carry every arm on from the stored epoch-64 states, then measure and score it as the soft pool scout's stage 2
     did, scoring the kept checkpoints from the stop on. The arguments let a smoke run take the same path at a
     fraction of the size, from stops of its own, and leave the refs alone.
     """
     resolved = ctx.run(ex2222.resolve_reused, [], role="prep")
-    rows = rows_of(resolved["meta"], arms, epochs, seeds)
+    rows = rows_of(resolved["meta"], sets, arms, epochs)
     if resume is None:
-        resume = ctx.run(stored_resume, seeds, role="prep")
-    trained = train(ctx, resolved, rows, [resume[r["model_seed"]] for r in rows], keep)
+        resume = ctx.run(stored_resume, sets, role="prep")
+    stopped = [sps.label_of(r["condition"]["name"], r["model_seed"]) for r in rows]
+    trained = train(ctx, resolved, rows, [resume[s] for s in stopped], keep)
     n = len(rows)
     labels = [r["label"] for r in rows]
     holdout = [resolved["holdout"]] * n
@@ -276,8 +287,8 @@ def smoke(ctx: Ctx) -> dict:
     resolved = ctx.run(ex2222.resolve_reused, [], role="prep")
     condition = next(c for c in sps.CONDITIONS if c.name == CONDITION)
     stopped = sps.train(ctx, resolved, sps.rows_of(resolved["meta"], (condition,), 3, 8, SEEDS[:1]))
-    resume = {SEEDS[0]: {k: stopped[0][k] for k in ("resume_state", "kept_checkpoints")}}
-    return run(ctx, epochs=8, seeds=SEEDS[:1], resume=resume, keep=(4, 6), full=False)
+    resume = {sps.label_of(CONDITION, SEEDS[0]): {k: stopped[0][k] for k in ("resume_state", "kept_checkpoints")}}
+    return run(ctx, epochs=8, sets=((CONDITION, SEEDS[:1]),), resume=resume, keep=(4, 6), full=False)
 
 
 COMPUTE = sps.COMPUTE
