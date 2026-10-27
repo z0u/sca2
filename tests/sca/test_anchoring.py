@@ -1,9 +1,8 @@
 """Concept anchoring: the pull lands on the right positions, and it moves the stream."""
 
 from dataclasses import replace
-from typing import Any
-
 from functools import partial
+from typing import Any
 
 import equinox as eqx
 import jax.numpy as jnp
