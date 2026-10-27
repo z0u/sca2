@@ -589,3 +589,21 @@ Paused, the anti anneal delays the spill without preventing it under `τ_ℓ fix
 
 The GPU difference is a reminder of how small this effect is. A run that reaches the criterion late on one GPU can stay below zero on another, from the same state with the same schedule. So a count of runs over the criterion at a handful of seeds cannot tell these arms apart. If one of them carries on to more seeds, the paired spill along training is the measurement to watch.
 """
+
+# %%
+
+r"""
+## References
+
+[Soft pool scout](/docs/m2/soft-pool-scout/report.py)
+:   Pooling the pull over slices 1 to 3 with the slice temperature held at 0.1 leaves no early spill, but one or two seeds in eight rise late, after epoch 128, to about the criterion; its epoch-64 states are where every run here starts.
+
+[Spill-timing](/docs/m2/spill-timing/report.py)
+:   Spill comes in an early kind, during the rise of the pull, and a late kind, after about epoch 100, on ops a run is still learning; quiet runs scatter by about 0.006 on its score.
+
+[ex-2.1.11](/docs/m2/ex-2.1.11/report.py)
+:   The shape of the anti schedule matters: holding the anti weight constant, at its peak or at its hold, cost grading.
+
+[Late-pull](/docs/m2/late-pull/report.py)
+:   A higher anti hold (0.2) kept every run within the spill criterion, at some cost to removal.
+"""
