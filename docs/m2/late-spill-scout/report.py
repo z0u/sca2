@@ -146,6 +146,7 @@ def along(arm: str, cond: str, seed: int) -> np.ndarray:
 
 ALONG = {a: np.array([along(a, FIXED, s) for s in SEEDS]) for a in NAMES}  # (seeds, epochs)
 SPREAD_96 = np.ptp([_ALONG_BY[(FIXED, a, 707, 96)] for a in NAMES])
+BUMP = {a: float(np.sqrt(np.mean(np.diff(along(a, FIXED, 707)) ** 2))) for a in NAMES}  # RMS step between checkpoints
 # How far the four runs of 707 under `τ_ℓ fixed` have already parted at the first kept checkpoint, where the arms'
 # schedules differ by very little: the noise floor of the along-training score on one run.
 
@@ -200,12 +201,14 @@ def _dots(ax, x: float, v, color, m: str, rng) -> None:
 
 
 def along_figure() -> str:
-    """Spill along training on the rising runs and on the mean over the eight seeds, with λ_s̄ and τ_ℓ underneath."""
+    """Spill along training as small multiples: one column per arm, one row per rising run and the mean over the eight seeds, with the arm's λ_s̄ and τ_ℓ underneath."""
+    rows = [(FIXED, 707), (BY40, 707), (BY40, 705)]
     data: dict[str, Any] = {
         "epochs": list(ALONG_EPOCHS),
         "names": NAMES,
-        "titles": [f"{'τ_ℓ fixed' if c == FIXED else 'by 40'}, seed {s}" for c, s in RISERS] + ["τ_ℓ fixed, mean of 8"],
-        "spill": [{a: along(a, c, s).tolist() for a in NAMES} for c, s in RISERS]
+        "shown": {a: SHOWN[a] for a in NAMES},
+        "rows": [f"spill ↓\n{s}, {'τ_ℓ fixed' if c == FIXED else 'by 40'}" for c, s in rows] + ["spill ↓\nmean of 8"],
+        "spill": [{a: along(a, c, s).tolist() for a in NAMES} for c, s in rows]
         + [{a: ALONG[a].mean(axis=0).tolist() for a in NAMES}],
         "criterion": CRITERION,
         "stop": STOP,
@@ -215,14 +218,15 @@ def along_figure() -> str:
         "tau": {a: [schedule(a, "tau")[0].tolist(), schedule(a, "tau")[1][:, 1].tolist()] for a in NAMES},
     }
     alt = """
-        Four columns of three panels, epoch 64 to 400 on the x axis. Top row, spill per arm. τ_ℓ fixed, seed 707:
-        base rises to about the criterion by epoch 224 and stays there; anti late stays near zero to 192, then climbs
-        to just under the criterion by the end; anti held stays below 0.008 throughout; τ_ℓ late wanders between 0
-        and 0.019 and ends at 0.014. By 40, seed 705: every arm falls below zero after epoch 128. By 40, seed 707: base
-        climbs to 0.014; the three arms stay near zero. Mean of 8: all arms sit below zero, base highest. Middle row,
-        the anti weight at slice 3: base and τ_ℓ late anneal from 0.24 to 0.07 by 360; anti late holds until 200 and
-        then anneals to the same hold; anti held stays at 0.24 until 360. Bottom row, τ_ℓ: 0.1 throughout except τ_ℓ
-        late, which falls to 0.025 by 360.
+        A grid of small panels, one column per arm (base, anti late, anti held, τ_ℓ late), epoch 64 to 400 on the x
+        axis, with base drawn faintly behind the other columns. The first four rows are spill. τ_ℓ fixed, seed 707: base
+        rises to about the criterion by epoch 224 and stays there; anti late stays near zero to 192, then climbs to just
+        under the criterion by the end; anti held stays below 0.008 throughout; τ_ℓ late wanders between 0 and 0.019 and
+        ends at 0.014. By 40, seed 707: base climbs to 0.014; the three arms stay near zero. By 40, seed 705: every arm
+        falls below zero after epoch 128. Mean of 8: all arms sit below zero, base highest. The fifth row is the anti
+        weight at slice 3: base and τ_ℓ late anneal from 0.24 to 0.07 by 360; anti late holds until 200 and then anneals
+        to the same hold; anti held stays at 0.24 until 360. The last row is τ_ℓ: 0.1 throughout except τ_ℓ late, which
+        falls to 0.025 by 360.
     """
     return along_draw(data, alt)
 
@@ -233,41 +237,45 @@ def along_draw(data: dict, alt_text: str) -> str:
         name="late-spill-scout-along",
         alt_text=alt_text,
         caption=f"""
-            **Spill along training, with the schedules the arms change.** Top: the spill of each arm at the
-            checkpoints kept every 32 epochs from epoch {data["stop"]}, where the arms part, and at the end, against the median
-            of eight reference edits; the first three panels are the runs that rise late in the soft pool scout, the
-            last the mean over the eight seeds of `τ_ℓ 0.1, τ_ℓ fixed`. The dashed line is the criterion. Middle: the
-            anti weight λ_s̄ at slice 3. Bottom: the slice temperature τ_ℓ, on a log scale.
+            **Spill along training, with the schedules the arms change.** One column per arm, with `base` drawn faintly
+            behind the others. Top four rows: the spill at the checkpoints kept every 32 epochs from epoch
+            {data["stop"]}, where the arms part, and at the end, against the median of eight reference edits; the first
+            three rows are the runs that rise late in the soft pool scout, the fourth the mean over the eight seeds of
+            `τ_ℓ 0.1, τ_ℓ fixed`. The dashed line is the criterion. Below them: the anti weight λ_s̄ at slice 3, and the
+            slice temperature τ_ℓ on a log scale.
         """,
     )
     def _plot() -> plt.Figure:
         names, ep = data["names"], np.asarray(data["epochs"])
-        n = len(data["titles"])
-        fig, axes = plt.subplots(3, n, figsize=(6.6, 4.2), layout="constrained", sharex=True,
-                                 height_ratios=(3, 1, 1), sharey="row")  # fmt: skip
-        for j in range(n):
-            ax = axes[0, j]
-            for a in names:
-                ax.plot(ep, data["spill"][j][a], color=ARM_INK[a], marker=ARM_MARKER[a], ms=2.5, lw=1.0, label=tex(SHOWN[a]))  # fmt: skip
-            ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
-            ax.axhline(data["criterion"], color=RULE, lw=0.7, ls="--", zorder=1)
-            ax.set_title(tex(data["titles"][j]), fontsize=7)
-            for a in names:
-                axes[1, j].plot(*data["anti"][a], color=ARM_INK[a], lw=1.0)
-                axes[2, j].plot(*data["tau"][a], color=ARM_INK[a], lw=1.0)
-            axes[2, j].set_yscale("log")
-            axes[2, j].set_yticks([0.025, 0.05, 0.1], ["0.025", "0.05", "0.1"])
-            axes[2, j].minorticks_off()
-            axes[2, j].set_xlabel("epoch", fontsize=7)
+        n_spill = len(data["rows"])
+        fig, axes = plt.subplots(n_spill + 2, len(names), figsize=(6.6, 6.6), layout="constrained", sharex=True,
+                                 sharey="row", height_ratios=(2,) * n_spill + (1, 1))  # fmt: skip
+        for j, a in enumerate(names):
+            ghosts = [] if a == "base" else ["base"]
+            for i in range(n_spill):
+                ax = axes[i, j]
+                for g in ghosts:
+                    ax.plot(ep, data["spill"][i][g], color=GHOST, lw=0.6, zorder=1)
+                ax.plot(ep, data["spill"][i][a], color=ARM_INK[a], marker=ARM_MARKER[a], ms=2.5, lw=1.0, zorder=3)
+                ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
+                ax.axhline(data["criterion"], color=RULE, lw=0.7, ls="--", zorder=0)
+            for row, key in ((n_spill, "anti"), (n_spill + 1, "tau")):
+                for g in ghosts:
+                    axes[row, j].plot(*data[key][g], color=GHOST, lw=0.6, zorder=1)
+                axes[row, j].plot(*data[key][a], color=ARM_INK[a], lw=1.0, zorder=3)
+            axes[-1, j].set_yscale("log")
+            axes[-1, j].set_yticks([0.025, 0.05, 0.1], ["0.025", "0.05", "0.1"])
+            axes[-1, j].minorticks_off()
+            axes[-1, j].set_xlabel("epoch", fontsize=7)
+            axes[0, j].set_title(tex(data["shown"][a]), fontsize=8, color=ARM_INK[a])
             for ax in axes[:, j]:
                 ax.axvline(data["stop"], color=RULE, lw=0.6, ls=":", zorder=0)
                 ax.tick_params(labelsize=6)
-        axes[0, 0].set_ylabel("spill ↓", fontsize=7)
-        axes[1, 0].set_ylabel("$\\lambda_{\\bar s}$", fontsize=7)
-        axes[2, 0].set_ylabel("$\\tau_\\ell$", fontsize=7)
-        axes[2, 0].set_xlim(data["stop"] - 8, ep[-1] + 8)
-        handles, labels = axes[0, 0].get_legend_handles_labels()
-        fig.legend(handles, labels, loc="outside upper center", ncols=len(labels), frameon=False, fontsize=7)
+        for i, label in enumerate(data["rows"]):
+            axes[i, 0].set_ylabel(tex(label), fontsize=7)
+        axes[n_spill, 0].set_ylabel("$\\lambda_{\\bar s}$", fontsize=7)
+        axes[-1, 0].set_ylabel("$\\tau_\\ell$", fontsize=7)
+        axes[-1, 0].set_xlim(data["stop"] - 8, ep[-1] + 8)
         return fig
 
     return _plot()
@@ -443,13 +451,13 @@ The late spill on the candidate recipe of the soft pool scout follows the anti a
 
 The [soft pool scout](/docs/m2/soft-pool-scout/report.py) left a candidate recipe with no early spill: the pool over slices 1 to 3, with the slice temperature τ_ℓ held at 0.1.[^tau] But on one of its eight seeds (707) the spill rises after epoch 128 and ends at the criterion, and with more seeds some runs would likely go over it.
 
-The rise comes while the anti weight λ_s̄ anneals from its peak down to the per-slice holds.[^anti] By then this is the only loss term still moving (the cosine decay of the learning rate runs alongside it, which is a reason to move the anti anneal on its own).
+The rise comes while the anti weight λ_s̄ anneals from its peak down to the per-slice holds.[^anti] By then this is the only loss term still moving. The learning rate comes down over the same epochs on its cosine decay, so a rise that follows one follows the other too, and moving the anti anneal on its own is a way to tell them apart.
 
 Spill-timing found that the late kind of spill falls on ops the run is still learning. So one reading is that the anti term keeps e₁ closed while an op is learned, and the anneal opens it.
 
 This report asks whether a late change to the schedules keeps the late spill down, and what it costs.
 
-Each arm changes one schedule, and only after epoch 64, so each run carries on from the stored epoch-64 state of the same seed and trains for the last 336 of 400 epochs. That makes four sets of eight runs, one of them the condition unchanged. Only one seed rises under this condition, so the same four also carry on the other finished condition of the soft pool scout, `τ_ℓ 0.1, by 40`, at the two seeds that rose under it.
+Each arm changes one schedule, and only after epoch 64, so each run carries on from the stored epoch-64 state of the same seed and trains for the last 336 of 400 epochs. That makes four sets of eight runs, one of which is the condition unchanged. Only one seed rises under this condition, so the same four changes are also applied to the other finished condition of the soft pool scout, `τ_ℓ 0.1, by 40`, at the two seeds that rose under it.
 
 [^tau]: Slice temperature: how sharply the anchor pull picks among the pooled slices. A lower τ_ℓ puts more of the pull on the one slice where the evidence peaks.
 
@@ -479,7 +487,7 @@ This is an exploratory study, with no preregistration and no gate. It covers one
 :   The pause runs to epoch 360. So the anti weight never anneals to the holds, and only comes down with the anchor in the last 40 epochs. At slice 3 it stays near {HELD_W3:.2f} through epoch 300, against {BASE_W3:.2f} under `base`. This is the largest change to the anti term that keeps its first 64 epochs, so it shows the most the anti term can do about the late spill, and what that costs. We expected a cost. An early experiment, [ex-2.1.11](/docs/m2/ex-2.1.11/report.py), found that the shape of the anti schedule mattered (a constant weight, high or low, cost grading), and [late-pull](/docs/m2/late-pull/report.py) found that a higher hold cost removal.
 
 `τ_ℓ late`
-:   The slice temperature sharpens again, from 0.1 to 0.025 over epochs 64 to 360, alongside the anti anneal. Stage 1 of the soft pool scout found that a sharper τ_ℓ lowers the alignment at slice 1 and the early spill. This arm asks whether sharpening further does the same for the late kind. At 0.025 the pool over three slices is close to a max, so the pull falls almost wholly on the slice where the evidence peaks (slice 3 on every seed).
+:   The slice temperature sharpens again, from 0.1 to 0.025 over epochs 64 to 360, alongside the anti anneal. Stage 1 of the soft pool scout found that a sharper τ_ℓ lowers the alignment at slice 1 and the early spill. This arm asks whether sharpening further does the same for the late kind. At 0.025 the pool over three slices is close to a max, so the pull is confined almost wholly to the slice where the evidence peaks (slice 3 on every seed).
 
 Every arm uses only schedules and temperatures, nothing keyed to a token role, so each would transfer to real text as the recipe does.
 
@@ -489,12 +497,12 @@ But the late rise is small. On the runs it reaches, it ends near the criterion, 
 
 The score along training nets against eight reference axes rather than 63, and is at least as noisy. At epoch 96, where the schedules of the arms have barely parted, the four runs of 707 under `τ_ℓ fixed` already spread over {SPREAD_96:.3f}.
 
-So the comparison that counts is the paired one on the runs that rise, judged over the whole of training rather than at one checkpoint: do the arms move them the same way?
+So the comparison that counts is the pairings on the runs that rise, judged over the whole of training rather than at one checkpoint: do the arms move them the same way?
 <!-- REVIEW: added the noise floor of the along-training score (the spread of the four arms at epoch 96 on 707, where the anti weight differs by 0.014 and τ_ℓ by 0.002 between arms), since E1 rests on that score. Verify: `along(a, FIXED, 707)[0]` per arm. -->
 
 Modal had no L4 GPUs free when this ran, so every run carried on from epoch 64 on an A10G, where the soft pool scout ran on L4. `base` therefore differs from the finished runs of the soft pool scout only in the numerics of the GPU, and that difference is informative in itself.
 
-On the eight seeds of `τ_ℓ 0.1, τ_ℓ fixed`, `base` ends within {np.abs(GPU_SHIFT).max():.3f} of the L4 run, and the two runs at 707 rise late on both GPUs. But `τ_ℓ 0.1, by 40` at 705, which ended at the criterion on L4, stays below zero on the A10G (second table of E2). So whether a seed rises late is partly a matter of numerics, and whether a single run rises says little by itself.
+On the eight seeds of `τ_ℓ 0.1, τ_ℓ fixed`, `base` ends within {np.abs(GPU_SHIFT).max():.3f} of the L4 run, and the two runs at 707 rise late on both GPUs. But `τ_ℓ 0.1, by 40` at 705, which ended at the criterion on L4, stays below zero on the A10G (second table of E2). So whether a seed rises late is partly a matter of numerics, and whether a single run rises says little by itself. Over a long enough run, a change of GPU likely acts much like a change of seed.
 <!-- REVIEW: added how large the GPU numerics are (GPU_SHIFT: `base` ends within 0.003 of the L4 run on every seed of `τ_ℓ fixed`) and that the two anti arms score the same to the last digit until their schedules part, so the paragraph gives the size of the numerics as well as their existence. The L4 statement follows the soft pool scout's roles through soft-pool, split-anti-seeds, slice-terms and late-pull to `gpu="L4"`; the A10G is `GPU` in experiment.py here, for training and measurement alike, so the stage-2 column of the second table of E2 is the one scored on another GPU. Verify: GPU_SHIFT, and along("anti-late", FIXED, s) against along("anti-held", FIXED, s) at epochs 96 to 192. -->
 <!-- REVIEW: was "the seeds that rise (705 and 707)". Under `τ_ℓ 0.1, τ_ℓ fixed` only 707 rises (0.020, on `mix`); 705 rises under `τ_ℓ 0.1, by 40`, the other finished condition, and sits at −0.005 here. Verify: the by-seed table of E4 and the along-training figure of E5 in the soft pool scout. -->
 <!-- REVIEW: the noise statement quotes spill-timing (Scope and method: 0.006 over 27 quiet runs) in place of "about a third of the criterion either side of zero". -->
@@ -522,7 +530,7 @@ Alignment at the answers
 rf"""
 ## Spill along training (E1)
 
-Does any arm keep the late rise down on the runs where it appears, and does the rise follow the anti weight in time? The figure has the three runs that rose late in the soft pool scout, and the mean over the eight seeds of `τ_ℓ 0.1, τ_ℓ fixed`. The anti weight at slice 3 and τ_ℓ are plotted underneath.
+Does any arm keep the late rise down on the runs where it appears, and does the rise follow the anti weight in time? The figure has one column per arm, each with its own anti weight (at slice 3) and τ_ℓ at the bottom, so a change in the spill can be read against the schedule just below it. The rows are the three runs that rose late in the soft pool scout and the mean over the eight seeds of `τ_ℓ 0.1, τ_ℓ fixed`, with `base` drawn faintly behind each arm.
 
 {along_figure()}
 
@@ -531,7 +539,7 @@ On both runs that rise here, the late spill follows the anti weight. Where the w
 
 Where the anneal pauses until epoch 200 (`anti late`), the spill of 707 under `τ_ℓ fixed` stays flat until the anneal resumes. Then it climbs as the weight comes down, and reaches the level of `base` by the end. On 707 under `by 40` the same arm keeps it flat throughout.
 
-Sharpening τ_ℓ during the anneal lowers the spill on both runs that rise: partway on 707 under `τ_ℓ fixed`, and to zero on 707 under `by 40`. Its spill along training is bumpier than that of the other arms, which may be the pull moving between slices as the pool sharpens.
+Sharpening τ_ℓ during the anneal lowers the spill on both runs that rise: partway on 707 under `τ_ℓ fixed`, and to zero on 707 under `by 40`. On 707 under `τ_ℓ fixed` its spill along training is bumpier than that of the other arms, with a root-mean-square step between checkpoints of {BUMP["lt-late"]:.3f} against {BUMP["base"]:.3f} for `base`; elsewhere the arms are about as bumpy as each other. We checked that the pull stays put: slice 3 has the highest alignment at the example answers at every record after epoch 12, under `τ_ℓ late` as under `base`, so the bumps are something else that we did not measure.
 
 The mean over the eight seeds moves little, since seven of them are quiet under every arm. All three arms end a little below `base` on it.
 
@@ -579,7 +587,7 @@ r"""
 
 The late spill on the candidate recipe follows the anti anneal, which fits the reading in the [late-spill backlog item](/todo/science/late-spill-on-ops-still-being-learned.md): the anti term keeps e₁ closed to the other ops, and the anneal opens it.
 
-The other reading is that whatever draws an op to e₁ also slows its learning. It predicted no change, and here the schedule alone moves the rise. But the two readings need not exclude each other, since we did not measure when the spilled op (`mix`) is learned on these runs. The evidence rests on two rising runs, so it is a strong hint, short of a settled result.
+[Spill-timing](/docs/m2/spill-timing/report.py) left open which way the link between spill and learning runs: learning an op late may leave it free to land on e₁, or whatever draws it to e₁ may also slow its learning. The second would not tie the spill to the anti schedule, and here the schedule alone moves the rise. But the two need not exclude each other, since we did not measure when the spilled op (`mix`) is learned on these runs. The evidence rests on two rising runs, so it is a strong hint, short of a settled result.
 <!-- REVIEW: softened from "It does not fit the other reading": the readings are not exclusive, and this report does not measure when `mix` is learned (claims review, round 1). -->
 
 Of the three changes, sharpening τ_ℓ during the anneal is the one that costs nothing we measured. It lowers the late spill on both rising runs, and keeps removal and the task where they were. It adds no term or weight to the recipe, only a second step in a temperature the recipe already has.
