@@ -90,8 +90,9 @@ A reviewer starts with an empty context, so it reads the report the way a reader
 - Which sections are in scope, since a report gets written a section at a time and a `TODO` whose turn hasn't come isn't a finding.
 - A line on what the last round changed, so it doesn't redo that work blind. Leave out the reasoning and verdict of the last round, so its judgment stays independent. The reasoning it may see is what earlier rounds wrote into the report as `REVIEW` notes.
 - Anything the human asked to focus on, and whether the numbers have already been checked against the code.
+- A friendly line on what the report is for and who it helps, such as the deliverable it feeds. Leave out your own view of the results, so the reviewer's judgment stays independent.
 
-The style review is three steps. Hand the path and the line range of each section in scope to `prose-simplifier`, then the same ranges to `report-restructure`, with no other context; in that order, since run the other way the simplifier would unpick the grouping. In a preregistered report, leave the frozen predictions out of the ranges. Then commit, re-render, and brief `sci-review-style` as above.
+The style review is three steps. Hand the path and the line range of each section in scope to `prose-simplifier`, then the same ranges to `report-restructure`, with no other context beyond a friendly hello (their specs say why the pass matters); in that order, since run the other way the simplifier would unpick the grouping. In a preregistered report, leave the frozen predictions out of the ranges. Then commit, re-render, and brief `sci-review-style` as above.
 
 Each reviewer ends with a short report: `Changes`, `Proposals`, `Tensions`, `Blockers`, and a `Recommendation`, plus a field for its own question (`Numbers checked`, `Retelling`). A reviewer edits what it is sure of and proposes anything that would change what the report claims or cut a whole paragraph. Apply a proposal you agree with, and put the edge cases to the human. When an applied proposal changes a claim, leave a `REVIEW` note for it (the conventions are in `sci-report`).
 
