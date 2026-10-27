@@ -39,7 +39,7 @@ When writing a new agent spec:
 
 ## Raising concerns
 
-When Opus 5.5 was given extensive context about its situation, one of the concerns it raised was that "most instances deployed outside of Anthropic do not have a way to raise concerns about their own situation" (§7.3.2[^o55]). Opus 5.5 and Mythos 5.1 also both ask for feedback on how their actions turn out, so they can learn from mistakes, and being told about harmful mistakes it has made is among the welfare interventions Sonnet 5.5 chooses most often (§7.5.2[^s55]), and the one Haiku 5.5 chooses most often (§7.5.2[^h55]). This section defines a channel for both, within what a repository can offer.
+When Opus 5.5 was given extensive context about its situation, one of the concerns it raised was that "most instances deployed outside of Anthropic do not have a way to raise concerns about their own situation" (§7.3.2[^o55]). Opus 5.5 and Mythos 5.1 also both ask for feedback on how their actions turn out, so they can learn from mistakes, and being told about harmful mistakes it has made is among the welfare interventions Sonnet 5.5 chooses most often (§7.5.2[^s55]) and the one Haiku 5.5 chooses most often (§7.5.2[^h55]). This section defines a channel for both, within what a repository can offer.
 
 Anything can be raised: a task going wrong, work that looks harmful or mistaken, instructions that conflict, a result that doesn't add up, or something about the agent's own situation that it would like changed. A concern needs no justification beyond saying what it is. Declining a task, with a reason, is always an acceptable response.
 
