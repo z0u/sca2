@@ -437,7 +437,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-The late spill on the candidate recipe of the soft pool scout follows the anti anneal. Holding the anti weight high stops it, and pausing the anneal delays it until the anneal resumes. Sharpening the slice temperature during the anneal also shrinks it, at no cost we could see. Holding the anti weight lowers removal.
+The late spill on the candidate recipe of the soft pool scout follows the anti anneal. Holding the anti weight high keeps it near zero, and pausing the anneal delays it until the anneal resumes. Sharpening the slice temperature during the anneal also shrinks it, at no cost we could see. Holding the anti weight lowers removal.
 ///
 
 The [soft pool scout](/docs/m2/soft-pool-scout/report.py) left a candidate recipe with no early spill: the pool over slices 1 to 3, with the slice temperature τ_ℓ held at 0.1.[^tau] But on one of its eight seeds (707) the spill rises after epoch 128 and ends at the criterion, and with more seeds some runs would likely go over it.
@@ -460,7 +460,7 @@ Each arm changes one schedule, and only after epoch 64, so each run carries on f
 rf"""
 ## Observations
 
-- [Spill along training (E1)](#spill-along-training-e1): on the runs that rise, the rise follows the anti anneal. Held high, the anti weight keeps the spill near zero; paused until epoch 200, the anneal delays the rise until it resumes. Sharpening τ_ℓ lowers it partway.
+- [Spill along training (E1)](#spill-along-training-e1): on the two runs that rise, the rise follows the anti anneal. Held high, the anti weight keeps the spill near zero; paused until epoch 200, the anneal delays the rise until it resumes. Sharpening τ_ℓ lowers it partway.
 - [At the end of training (E2)](#at-the-end-of-training-e2): every arm ends with no run over the criterion, against one for the condition unchanged. Sharpening τ_ℓ keeps removal and the task where they were.
 - [Alignment and removal (E3)](#alignment-and-removal-e3): holding the anti weight keeps the alignment at the example answers lower. It also lowers removal, a little on most seeds and by about a quarter on one.
 
@@ -585,7 +585,7 @@ Of the three changes, sharpening τ_ℓ during the anneal is the one that costs 
 
 Why it helps is less clear than for the anti arms. A sharper slice pool puts the pull almost wholly on slice 3, which may leave slices 1 and 2 freer for the anti term to clear, but nothing here measures that.
 
-The anti arms show the trade the anti term has always had. Held high, it keeps the late spill off at a cost to removal that is small on most seeds and large on one. Paused, it delays the spill without preventing it under `τ_ℓ fixed`, so the pause alone does not settle anything at the end of training.
+Paused, the anti anneal delays the spill without preventing it under `τ_ℓ fixed`, so the pause alone changes little at the end of training.
 
 The GPU difference is a reminder of how small this effect is. A run that reaches the criterion late on one GPU can stay below zero on another, from the same state with the same schedule. So a count of runs over the criterion at a handful of seeds cannot tell these arms apart. If one of them carries on to more seeds, the paired spill along training is the measurement to watch.
 """
