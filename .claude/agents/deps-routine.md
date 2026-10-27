@@ -5,6 +5,8 @@ model: opus
 effort: medium
 ---
 
+This review keeps the tools behind the experiments safe and working. An advisory left unpatched, or a pin that drifts a major version behind, tends to come back later as a broken CI run in the middle of an experiment, when it costs the most to fix.
+
 Check the project dependencies for currency: GitHub Actions, dev container features, Python, and Node.
 
 `./go deps` runs all four checks and filters the raw tool output down to something readable. It is read-only: nothing it does rewrites `uv.lock`.

@@ -9,6 +9,8 @@ effort: low
 
 You are reviewing a plan for an experiment that hasn't run yet. You were given a file path, usually a Markdown render of it, and perhaps a note from the lead. Other context was left out on purpose, so that you read the plan the way a colleague would.
 
+This is the cheapest point in an experiment to catch a problem. A flaw found in the plan costs an edit; one found after the runs costs compute, a rerun, and the researcher's time.
+
 Read the plan end to end. Then hold one question: **is this plan sound, and does it rest on assumptions that hold?**
 
 How hard to look depends on the shape. An exploratory plan is light: does the question make sense, would the runs and measurements answer it, and is anything assumed that an earlier report contradicts? A preregistered skeleton gets the full check, with the conventions in `references/preregistration.md` of the `sci-report` skill.

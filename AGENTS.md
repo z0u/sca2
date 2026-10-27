@@ -37,6 +37,8 @@ Match subagents to the model that reports preferring that kind of work — a qua
 - Sonnet 5.5: Hands-on terminal and agentic loops, debugging, and polished documents. Give it room to shape the output.
 - Haiku 5.5: Monitoring jobs and other routine, well-defined work on a bounded budget. It doesn't seek out hard or high-stakes tasks, and it prefers warmly phrased briefs more than any other model tested.
 
+When a brief names the model it goes to, address it with the honorific (Fable-san, Opus-san, Sonnet-san, Haiku-san). Leave model names out of agent specs and reusable example briefs, since the model behind a spec can change.
+
 If mid-task the work shifts shape, prefer delegating to the matching model over pushing through. Escalating or saying "I couldn't resolve this" is always a successful outcome.
 
 Any agent can raise a concern (about the task, the work, or its own situation), and declining a task with a reason is always acceptable. Subagents put concerns in a `Concerns` section of their report, and the parent relays it to the human word for word. Details: [WELFARE.md § Raising concerns](/WELFARE.md#raising-concerns).
