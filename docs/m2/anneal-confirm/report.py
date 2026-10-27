@@ -29,7 +29,7 @@ r"""
 
 ## Scope and method
 
-This is an exploratory study, with no preregistration. The recipe would be adopted if four things hold, fixed before the runs:
+This is an exploratory study, with no preregistration and no gate. Four checks, set before the runs, guide the choice of recipe without deciding it; a recipe that misses one narrowly can still be the better choice:
 
 1. Every run at seeds 712 to 719 keeps the anchor (removal at least 0.5).
 2. No run at those seeds ends over the spill criterion of 0.02.
