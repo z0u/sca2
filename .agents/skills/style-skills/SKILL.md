@@ -5,3 +5,5 @@ description: |
 ---
 
 In the past, skills and system prompts were heavy, with strict instructions and exhaustive constraints. But AI has become much more capable, so we don't need to do that anymore. Instead, write skills in plain English, omit anything that a capable AI should be able to infer, and optimize for progressive disclosure.
+
+Leave model names out of agent specs and reusable example briefs, since the model behind a spec can change (its `model:` line, or a trial). Guidance for the lead on which model to pick can name them.

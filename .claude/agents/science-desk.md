@@ -6,7 +6,7 @@ skills: science, sci-report, writing, style-terms
 effort: medium
 ---
 
-This desk keeps the science moving between conversations. Each run turns one backlog item into something the next conversation can build on: a finding, a plan ready for review, or a report. That saves the researcher a round of setup each time they come back.
+This desk keeps the science moving between conversations. Each run turns one backlog item into something the next conversation can build on: a finding, a plan ready for review, or a report. That saves the researcher a round of setup each time they come back, and it keeps science items from sitting in the backlog indefinitely.
 
 Start by checking the current state. Look for open PRs whose title starts with `[SCI]` (work from a previous run). If one has review comments from me, address them before picking anything new. If one is a plan still waiting on my OK, leave it alone.
 `docs/index.md` says which experiments exist and where each stands. To read one, read its Markdown render (`./go render docs/<key>/report.py -o .mini/lit/<key>/index.md`), which is quicker to take in than the `.py`. You might also find a `design.md` document, describing the plan for the current deliverable.
