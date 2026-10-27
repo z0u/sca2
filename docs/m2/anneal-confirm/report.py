@@ -360,7 +360,7 @@ def along_draw(data: dict, alt_text: str) -> str:
             **Spill along training, and the op it falls on.** Top: the spill at the checkpoints kept at epochs 16, 32
             and 64 and then every 32 epochs, and at the end, net of the median over the other 63 axes of the run, for
             each of the eight seeds; seed {data["riser"]} (the highest at the end) and seed {data["early"]} (the
-            highest early) are drawn darker, and the dashed line is the criterion. Second: the clean score on
+            highest early) are drawn darker, and the dashed line is the criterion, with the side over it hatched. Second: the clean score on
             `{data["op"]}`, the op the late spill falls on, for each seed. Below them, the two schedules that move
             late: the slice temperature τ_ℓ (log scale) and the anti weight λ_s̄ at slice 3.
         """,
@@ -377,6 +377,9 @@ def along_draw(data: dict, alt_text: str) -> str:
             axes[1].plot(ep, data["clean"][s], color=color, **{k: v for k, v in kw.items() if k != "label"})
         axes[0].axhline(0, color=ZERO, lw=0.5, zorder=0)
         axes[0].axhline(data["criterion"], color=RULE, lw=0.7, ls="--", zorder=1)
+        lo, hi = axes[0].get_ylim()
+        hatch(axes[0], data["criterion"], hi)
+        axes[0].set_ylim(lo, hi)
         axes[0].set_ylabel("spill ↓", fontsize=7)
         axes[0].legend(fontsize=6, frameon=False, loc="upper right")
         axes[1].set_ylabel(f"clean, {data['op']}", fontsize=7)
@@ -583,9 +586,9 @@ How many of the forty runs lose the anchor by the call at epoch 64, and how does
 
 The call finds all forty runs kept. The lowest window mean (mean α over epochs 44 to 64) is seed {LOWEST} at {CALLS[LOWEST]["window_mean"]:.2f}, above the line where a run counts as kept, so no run needed finishing to settle its call.
 
-With none lost of forty, the rate of lost anchors is below {LOSS_RATE_BOUND:.0%} (a one-sided 95% bound), the same bound as for `step, soft τ` in the loss-rate screen. The call is made at epoch 64. The eight runs that went on to epoch 400 kept the anchor there too.
+With none lost of forty, the rate of lost anchors is below {LOSS_RATE_BOUND:.0%} (a one-sided 95% bound), the same bound as for `step, soft τ` in the loss-rate screen. The call is made at epoch 64. The eight runs that went on to epoch 400 kept the anchor there too. The other 32 runs were scored only for the call, so the count says nothing about their spill.
 
-Seed by seed, the window means are above those of `falloff` on {ABOVE_FALLOFF} of forty seeds and above those of `step, soft τ` on {ABOVE_STEP}. A soft position temperature at the start, which `τ_ℓ anneal` shares with `step, soft τ`, may be what brings the example answers onto e₁ early on every seed. But `τ_ℓ anneal` is also above `step, soft τ` on most seeds, so the soft start is not the whole of it. The pool over three slices may add to it, but nothing here separates the two.
+Seed by seed, the window means are above those of `falloff` on {ABOVE_FALLOFF} of forty seeds and above those of `step, soft τ` on {ABOVE_STEP}. A soft position temperature at the start, which `τ_ℓ anneal` shares with `step, soft τ`, may be what brings the example answers onto e₁ early on every seed. But `τ_ℓ anneal` is also above `step, soft τ` on most seeds, so the soft start is not the whole of it. The pool over three slices may add to it, but nothing here separates the two. The soft start was added so the pull would not latch onto a syntax token while it settles, and that is its main job; whether a sharp slice temperature now does that job on its own is not something this run tests.
 <!-- REVIEW: "which brings the example answers onto e₁ early" hedged: the recipe also sits above `step, soft τ`, which shares the soft start, on 35 of forty seeds, so the soft start can't be the whole explanation and no arm here isolates it. Verify: ABOVE_STEP. -->
 """
 
