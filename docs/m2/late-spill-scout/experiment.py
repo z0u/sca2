@@ -291,6 +291,9 @@ def smoke(ctx: Ctx) -> dict:
     return run(ctx, epochs=8, sets=((CONDITION, SEEDS[:1]),), resume=resume, keep=(4, 6), full=False)
 
 
-COMPUTE = sps.COMPUTE
+GPU = "A10G"
+"""Where every run trains and is measured. Modal had no L4s free when this ran, so the runs moved, all together so
+that the arms stay paired; `base` then repeats the soft pool scout's finished runs up to the GPU's numerics."""
+COMPUTE = sps.COMPUTE | {r: sps.COMPUTE[r] | {"gpu": GPU} for r in ("train", "measure")}
 
 experiment = Experiment(name="late-spill-scout", main=main, roles=COMPUTE)
