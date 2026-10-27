@@ -137,11 +137,15 @@ class AnchorSpec:
     warmup_start: float = 0.0
     """The epoch the warm-up starts from: the weight holds at zero until then and reaches `peak` at
     `warmup_epochs`, so the pull can wait while other terms act. Zero is the warm-up from the first step."""
+    slice_tau_late: tuple[float, float, float] | None = None
+    """`(value, start, end)`: a second move of the pool over slices, from `slice_tau` to *value* between epochs
+    *start* and *end* (minimum-jerk in log τ, as `pool_temperature`), after the first has finished. `None` holds
+    `slice_tau` from the end of the first move on. Needs a finite `slice_tau`."""
 
     @property
     def scheduled_tau(self) -> bool:
         """Whether either pooling temperature moves over training, which makes it a step input."""
-        return self.tau_start is not None or self.slice_tau_start is not None
+        return self.tau_start is not None or self.slice_tau_start is not None or self.slice_tau_late is not None
 
     def taus(self, epoch) -> tuple[float, float]:
         """The two pooling temperatures (positions, slices) at *epoch*: `tau` and `slice_tau` unless scheduled. A
@@ -150,11 +154,15 @@ class AnchorSpec:
         end = self.tau_anneal_end if self.tau_anneal_end is not None else 1.0
         tau = np.inf if self.tau is None else self.tau
         slice_tau = np.nan if self.slice_tau is None else self.slice_tau
+        if self.slice_tau_start is not None:
+            slice_tau = float(pool_temperature(epoch, self.slice_tau_start, slice_tau, end))
+        if self.slice_tau_late is not None:
+            value, start, stop = self.slice_tau_late
+            t = smoothstep((np.asarray(epoch, dtype=float) - start) / (stop - start))
+            slice_tau = float(slice_tau * np.exp((np.log(value) - np.log(self.slice_tau)) * t))
         return (
             tau if self.tau_start is None else float(pool_temperature(epoch, self.tau_start, tau, end)),
-            slice_tau
-            if self.slice_tau_start is None
-            else float(pool_temperature(epoch, self.slice_tau_start, slice_tau, end)),
+            slice_tau,
         )
 
     def __call__(self, epoch) -> np.ndarray:
@@ -229,6 +237,11 @@ class AntiSpec:
     sweep of the anchor weight leaves it where it is. A tuple holds one weight per slice the term acts on (in slice
     order), each annealing from the same peak; the weight is then a vector over those slices. `None` keeps the
     ratio."""
+    pause: tuple[float, float] | None = None
+    """`(stop, restart)`: the anneal to the hold stops at epoch *stop* and holds the weight it has reached until
+    *restart*, then finishes by `anneal_end` (minimum-jerk from rest), so the anneal can start late without changing
+    the weight before *stop*. A *restart* at or past `anneal_end` holds it until the shared end anneal. `None` is the
+    one anneal from epoch 0."""
 
     def __call__(self, epoch) -> np.ndarray:
         """The weight at *epoch*, with a trailing slice axis when `hold` is a tuple."""
@@ -244,6 +257,7 @@ class AntiSpec:
             shape=self.shape,
             peak=self.peak,
             hold=self.hold,
+            pause=self.pause,
         )
 
 
@@ -260,19 +274,21 @@ def anti_subspace_weight(
     shape: Shape = "min-jerk",
     peak: float | None = None,
     hold: float | tuple[float, ...] | None = None,
+    pause: tuple[float, float] | None = None,
 ) -> np.ndarray:
     """The anti-subspace weight at (fractional) *epoch*: see `AntiSpec`.
 
     Under `shape="flat"` the weight is `lam × hold_ratio` for the whole of
     training: a constant ratio to the anchor peak, which is the bracket arm.
     *peak* and *hold*, when given, are absolute weights in place of the ratios;
-    a tuple *hold* adds a trailing axis, one weight per slice.
+    a tuple *hold* adds a trailing axis, one weight per slice. *pause* stops the
+    anneal for a while (`AntiSpec.pause`).
     """
     e = np.asarray(epoch, dtype=float)
     if peak is None and hold is None:
         if shape == "flat":
             return lam * hold_ratio * np.ones_like(e)
-        ratio = peak_ratio + (hold_ratio - peak_ratio) * _interp(e / anneal_end, shape)
+        ratio = peak_ratio + (hold_ratio - peak_ratio) * _anneal_progress(e, anneal_end, shape, pause)
         end = 1.0 - (1.0 - floor) * _interp(
             (e - anchor_anneal_start) / (anchor_anneal_end - anchor_anneal_start), shape
         )
@@ -283,9 +299,20 @@ def anti_subspace_weight(
         e = e[..., None]
     if shape == "flat":
         return w1 * np.ones_like(e)
-    w = w0 + (w1 - w0) * _interp(e / anneal_end, shape)
+    w = w0 + (w1 - w0) * _anneal_progress(e, anneal_end, shape, pause)
     end = 1.0 - (1.0 - floor) * _interp((e - anchor_anneal_start) / (anchor_anneal_end - anchor_anneal_start), shape)
     return w * end
+
+
+def _anneal_progress(e: np.ndarray, anneal_end: float, shape: Shape, pause: tuple[float, float] | None) -> np.ndarray:
+    """How far the anti anneal has gone at *e*, from 0 to 1 by *anneal_end*, held over a *pause*."""
+    u = _interp(e / anneal_end, shape)
+    if pause is None:
+        return u
+    stop, restart = pause
+    reached = _interp(stop / anneal_end, shape)
+    rest = 0.0 if restart >= anneal_end else _interp((e - restart) / (anneal_end - restart), shape)
+    return np.where(e < stop, u, reached + (1.0 - reached) * rest)
 
 
 @dataclass(frozen=True)

@@ -474,6 +474,18 @@ def test_pool_temperature_sharpens_geometrically_then_holds():
     np.testing.assert_allclose(soft.taus(100.0), (0.1, 0.4), rtol=1e-12, atol=0)
 
 
+def test_a_late_slice_temperature_sharpens_again_after_the_first_move():
+    spec = AnchorSpec(peak=1.0, warmup_epochs=2, anneal_start=13, anneal_end=15, tau=0.1, pool_slices=True,
+                      slice_tau=0.1, tau_start=1.0, tau_anneal_end=40.0)  # fmt: skip
+    late = replace(spec, slice_tau_late=(0.025, 64.0, 360.0))
+    assert late.scheduled_tau
+    for e in (0.0, 20.0, 64.0):
+        np.testing.assert_allclose(late.taus(e), spec.taus(e), rtol=1e-12, atol=0)  # untouched up to the start
+    np.testing.assert_allclose(late.taus(212.0)[1], 0.05, rtol=1e-12, atol=0)  # halfway in log τ
+    np.testing.assert_allclose(late.taus(400.0), (0.1, 0.025), rtol=1e-12, atol=0)
+    assert replace(spec, tau_start=None, tau_anneal_end=None, slice_tau_late=(0.025, 64.0, 360.0)).scheduled_tau
+
+
 def test_traced_temperatures_match_static_ones():
     rng = np.random.default_rng(1)
     s = jnp.asarray(rng.normal(size=(3, 2, 4, 8)).astype(np.float32))
@@ -661,6 +673,23 @@ def test_anti_subspace_schedule_takes_absolute_and_per_slice_holds():
     np.testing.assert_allclose(per_slice(70), [0.2, 0.03, 0.03], rtol=1e-12, atol=0)
     np.testing.assert_allclose(per_slice(np.array([20.0, 95.0]))[:, 1], absolute(np.array([20.0, 95.0])), rtol=1e-12)
     assert per_slice(np.array([20.0, 95.0])).shape == (2, 3)
+
+
+def test_a_paused_anti_anneal_keeps_its_weight_then_finishes_on_time():
+    spec = AntiSpec(lam=0.1, peak_ratio=2.5, hold_ratio=0.3, anneal_end=360, anchor_anneal_start=360,
+                    anchor_anneal_end=400, peak=0.25, hold=(0.2, 0.03))  # fmt: skip
+    late = replace(spec, pause=(64.0, 200.0))
+    held = replace(spec, pause=(64.0, 360.0))
+    early = np.array([0.0, 32.0, 64.0])
+    np.testing.assert_allclose(late(early), spec(early), rtol=1e-12, atol=0)  # the same up to the stop
+    np.testing.assert_allclose(held(early), spec(early), rtol=1e-12, atol=0)
+    np.testing.assert_allclose(late(np.array([100.0, 200.0])), spec(np.array([64.0, 64.0])), rtol=1e-12, atol=0)
+    assert (late(250.0) < spec(64.0)).all()
+    np.testing.assert_allclose(late(np.array([360.0, 400.0])), spec(np.array([360.0, 400.0])), rtol=1e-12, atol=0)
+    np.testing.assert_allclose(held(360.0), spec(64.0), rtol=1e-12, atol=0)  # never anneals to the hold
+    np.testing.assert_allclose(held(400.0), 0.1 * spec(64.0), rtol=1e-12, atol=0)  # but shares the end anneal
+    dense = late(np.linspace(0, 400, 801))
+    assert (np.diff(dense, axis=0) <= 1e-15).all()
 
 
 def test_the_anti_subspace_term_pushes_the_cloud_off_the_axis(data_dir, tmp_path):
