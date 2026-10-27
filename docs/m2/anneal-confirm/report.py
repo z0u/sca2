@@ -157,6 +157,8 @@ EARLY = max(SEEDS, key=lambda s: ALONG[s][:3].max())
 EARLY_PEAK = float(ALONG[EARLY][:3].max())
 EARLY_EPOCH = ALONG_EPOCHS[int(ALONG[EARLY][:3].argmax())]
 BUMP_713 = float(ALONG[RISER][ALONG_EPOCHS.index(96)])
+EARLY_NEXT = float(ALONG[EARLY][ALONG_EPOCHS.index(EARLY_EPOCH) + 1])  # the early bump at the checkpoint after its peak
+GPU_SHIFT = 0.003  # how far a change of GPU moved the end spill on `τ_ℓ fixed` (the late spill scout, Scope and method)
 
 # The schedules, from the trajectory of one finished run (they are the same at every seed).
 _TRAJ = {k: v["traj"] for k, v in fetch_json(ex.FINISHED_TRAJ_REF).items()}
@@ -234,8 +236,8 @@ def end_figure() -> str:
         Three panels, one column per recipe (falloff, step soft τ and τ_ℓ fixed at seeds 704 to 711, τ_ℓ anneal at
         712 to 719), seeds as dots. Removal: τ_ℓ fixed sits tightly near 0.90; falloff and step soft τ spread from
         about 0.76 to 0.91; τ_ℓ anneal spreads from {r.min():.2f} to {r.max():.2f}, mean {r.mean():.2f}. Spill: every
-        recipe has most seeds below zero; τ_ℓ anneal tops out at {s.max():.3f}, just under the criterion of 0.02, and
-        τ_ℓ fixed has one seed at 0.020. Task change: τ_ℓ anneal between {t.min():.3f} and {t.max():.3f}, above the
+        recipe has most seeds below zero; τ_ℓ anneal tops out at {s.max():.3f}, at the criterion of 0.02, and
+        τ_ℓ fixed has one seed at 0.020 too. Task change: τ_ℓ anneal between {t.min():.3f} and {t.max():.3f}, above the
         gate at −0.02; falloff has one seed at −0.032.
     """
     return end_draw(data, alt)
@@ -339,11 +341,12 @@ def along_figure() -> str:
     alt = f"""
         Four stacked panels sharing an epoch axis from 16 to 400. Top: spill at each kept checkpoint for the eight
         seeds, as faint lines, with seed {RISER} and seed {EARLY} drawn darker. Most seeds sit between −0.03 and 0.01
-        throughout. Seed {EARLY} jumps to {EARLY_PEAK:.2f} at epoch {EARLY_EPOCH} and is back near zero by the next
-        checkpoint. Seed {RISER} wanders near zero until about epoch 300, then rises to {end:.3f} at the end, just under
-        the criterion. Second: the clean score on {RISER_OP} for every seed, rising slowly from about 0.1 to 0.29, with
-        seed {RISER} no different from the others. Third: τ_ℓ on a log scale, from 0.1 to 0.025. Bottom: the anti
-        weight at slice 3, from 0.25 to its hold by epoch 360.
+        throughout. Seed {EARLY} jumps to {EARLY_PEAK:.2f} at epoch {EARLY_EPOCH}, is at the criterion at the next
+        checkpoint, and is back near zero by the one after. Seed {RISER} has a bump to {BUMP_713:.3f} at epoch 96, then
+        wanders near zero until about epoch 300, then rises to {end:.3f} at the end, at the criterion. Second: the
+        clean score on {RISER_OP} for every seed, rising slowly from about 0.1 to 0.29, with seed {RISER} no different
+        from the others. Third: τ_ℓ on a log scale, from 0.1 to 0.025. Bottom: the anti weight at slice 3, from 0.25
+        to its hold of 0.07 by epoch 360, then down to near zero with the anchor over the last 40 epochs.
     """
     return along_draw(data, alt)
 
@@ -420,7 +423,7 @@ def count_draw(data: dict, alt_text: str) -> str:
         caption=f"""
             **The early call at forty seeds.** Mean α at the example answers at slice 3 over epochs 44 to 64, for
             each run, with a grey line joining the runs of a seed. `falloff` and `step, soft τ` are the calls of the
-            loss-rate screen (at seeds 704 to 711, from their stored full runs). Below {data["lost_max"]} a run is called
+            loss-rate screen (and at seeds 704 to 711, the same window mean on their stored full runs). Below {data["lost_max"]} a run is called
             lost and from {data["kept_min"]} kept, with the band between finished and measured.
         """,
     )
@@ -462,7 +465,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-The pool over slices 1 to 3, with its slice temperature annealing slowly from 0.1 to 0.025, keeps the anchor on every run at eight fresh seeds and on every run of a forty-seed count. Its spill and task stay within the criteria of the D2.2 design, with one run close to the spill line, and its removal is about that of `falloff`.
+The pool over slices 1 to 3, with its slice temperature annealing slowly from 0.1 to 0.025, keeps the anchor on every run at eight fresh seeds, and an early call at epoch 64 keeps it on every run of a forty-seed count. Its spill and task stay within the criteria of the D2.2 design, with one run at the spill line, and its removal is about that of `falloff`.
 ///
 
 The [soft pool scout](/docs/m2/soft-pool-scout/report.py) found a candidate for the recipe of record: the pull pooled over slices 1 to 3, with the slice temperature $\tau_\ell$ held at 0.1. It keeps the anchor and stays within the spill criterion at seeds 704 to 711, but on one or two seeds the spill rises late and ends near the criterion. The [late spill scout](/docs/m2/late-spill-scout/report.py) then found that sharpening $\tau_\ell$ again late, to 0.025, lowered that late rise at no measured cost. Here the two moves become one: $\tau_\ell$ goes from 0.1 at the start to 0.025 at epoch 400, smoothly in log, so it is still close to 0.1 while the anchor settles and halfway (0.05) at epoch 200. We call it `τ_ℓ anneal`.
@@ -476,7 +479,7 @@ r"""
 ## Observations
 
 - [The anchor at fresh seeds (E1)](#the-anchor-at-fresh-seeds-e1): every run keeps the anchor and passes the task gate. Removal spreads more than under `τ_ℓ fixed` and about as much as under `falloff`, with one seed a little below the lowest `falloff` run.
-- [Spill at the end and along training (E2)](#spill-at-the-end-and-along-training-e2): no run ends over the criterion. One seed rises late to just under it, and the same seed goes over under the edit at block 1 alone. Two seeds have brief bumps over it in the first hundred epochs, which clear by the next checkpoint.
+- [Spill at the end and along training (E2)](#spill-at-the-end-and-along-training-e2): no run ends over the criterion. One seed rises late to the line, and the same seed goes over under the edit at block 1 alone. Two seeds have brief bumps over it in the first hundred epochs, which clear within 64 epochs; the soft pool scout saw none under `τ_ℓ fixed` at the same checkpoints.
 - [Lost anchors at forty seeds (E3)](#lost-anchors-at-forty-seeds-e3): the call keeps all forty, every one of them well clear of the band where the call is unsure.
 
 ## Scope and method
@@ -525,7 +528,7 @@ Does every run at the fresh seeds keep the anchor, and are removal and the task 
 
 {end_table()}
 
-Every run keeps the anchor, and every run passes the task gate. The task stays within a few thousandths of the control on the mean over ops, and the worst single op is `{WORST_TASK_OP}` at seed {WORST_TASK_SEED} ({num(WORST_TASK)}), against a gate of −0.05. `falloff` has one run that misses the gate on one op.
+Every run keeps the anchor, and every run passes the task gate. The task stays within about a hundredth of the control on the mean over ops, and the worst single op is `{WORST_TASK_OP}` at seed {WORST_TASK_SEED} ({num(WORST_TASK)}), against a gate of −0.05. `falloff` has one run that misses the gate on one op.
 
 Removal is close to that of `falloff` on the seed mean, and below that of `τ_ℓ fixed`. Most of the gap comes from two seeds, {LOW2[0]} and {LOW2[1]}, which remove about as little as the lowest runs of the step recipes; the lower, {R_MIN_SEED} at {R_MIN:.2f}, is the only run below the lowest `falloff` run, and still well clear of the line where a run counts as lost. The other six spread from {REST.min():.2f} to {REST.max():.2f}.
 
@@ -541,11 +544,14 @@ Does any run end over the spill criterion, and does the late rise of the soft po
 
 {along_figure()}
 
-No run ends over the criterion. Seed {RISER} comes closest: it stays near zero until about epoch 300, then rises to {num(RISER_END)} at the end, just under the line. That is the late kind of spill the soft pool scout saw on one or two seeds in eight, at about the same size, so the slow anneal does not remove it. It falls on `{RISER_OP}`, which every seed learns slowly over the whole run; seed {RISER} learns it no later than the others, so here the late rise is not tied to an op still being learned.
+No run ends over the criterion, and one ends at it. Seed {RISER}, after an early bump, stays near zero until about epoch 300, then rises to {num(RISER_END)} at the end. That is under the line by {num(CRITERION - RISER_END, '.4f')}, less than a change of GPU moved this score in the late spill scout (up to {GPU_SHIFT}), so we count it as at the line rather than under it. It is the late kind of spill the soft pool scout saw on one or two seeds in eight, at about the same size and on the same op (`{RISER_OP}`, as on seed 707 under `τ_ℓ fixed`), so the slow anneal does not remove it. Every seed is still learning `{RISER_OP}` over the whole run, which fits the earlier finding, quoted in the late spill scout, that the late kind falls on ops a run is still learning. But seed {RISER} learns it no later than the others, so when `{RISER_OP}` is learned does not say why this seed rises and the others don't.
+<!-- REVIEW: was "just under the line" and "the late rise is not tied to an op still being learned". The end value is 0.0198 against a criterion of 0.02, within the GPU shift the late spill scout measured, so the pass is at the line; and `mix` is still being learned on every seed through epoch 400 (second panel), so the result fits the ops-still-learned reading and only says that the timing of learning `mix` does not single out 713. Verify: RISER_END, the clean-mix panel. -->
 
-The other seven end below or near zero. Early on, two seeds have brief bumps over the line: seed {EARLY} to {EARLY_PEAK:.2f} at epoch {EARLY_EPOCH}, while the position pool sharpens, and seed {RISER} to {BUMP_713:.3f} at epoch 96. Both are back near zero within 64 epochs. That is the early kind of spill, and these runs keep checkpoints dense enough to catch a bump that lasts a few dozen epochs. The stored runs of the step recipes were not scored this densely, so we don't know how common such bumps are under them.
+The other seven end below or near zero. Early on, two seeds have brief bumps over the line: seed {EARLY} to {EARLY_PEAK:.2f} at epoch {EARLY_EPOCH}, while the position pool sharpens, still at the line ({num(EARLY_NEXT)}) at the next checkpoint and near zero by the one after; and seed {RISER} to {BUMP_713:.3f} at epoch 96, near zero again by 128. That is the early kind of spill. The soft pool scout scored `τ_ℓ fixed` at seeds 704 to 711 on the same early checkpoints (16, 32, 64 and 128) and saw no spill above 0.003 there, and by epoch 32 the anneal has moved $\tau_\ell$ by about one percent, so the bumps are not the anneal. Two runs of eight against none of eight can't say whether the two draws of seeds differ here or the bumps are simply uncommon. The stored runs of the step recipes were not scored this densely, so we don't know how common such bumps are under them.
+<!-- REVIEW: was "which clear by the next checkpoint" (714 is at 0.0203 at epoch 64, over the line, and near zero at 96) and said nothing of the soft pool scout's early checkpoints on `τ_ℓ fixed`, which it scored at 16, 32, 64 and 128 (its E5: largest spill 0.003 up to epoch 128). Verify: ALONG[714], and E5 of the soft pool scout. -->
 
-Under the edit at block 1 alone, one run goes over the criterion ({RISER}, at {num(RISER_B1)}), as one run of each stored recipe does (table in E1). So the spill of seed {RISER} enters through block 1, as recipe-compare found for the spilling runs of the soft pool.
+Under the edit at block 1 alone, one run goes over the criterion ({RISER}, at {num(RISER_B1)}), as one run of each stored recipe does (table in E1). That the run which rises late is also the one that spills at block 1 fits what recipe-compare found under the pool, that the spill enters with the edit at block 1. But one run of every recipe goes over at block 1, the step recipes included, so the block-1 spill on its own does not single out the pool.
+<!-- REVIEW: "So the spill of seed 713 enters through block 1" lowered to "fits": one restricted edit on one run, and the E1 table has one run over at block 1 under every recipe. Verify: BLOCK1_OVER. -->
 """
 
 # %%
@@ -557,7 +563,8 @@ How many of the forty runs lose the anchor by the call at epoch 64, and how does
 
 {count_figure()}
 
-The call keeps all forty. The lowest window mean is seed {LOWEST} at {CALLS[LOWEST]["window_mean"]:.2f}, above the line where a run counts as kept, so no run needed finishing to settle its call. Seed by seed, the window means sit above those of `falloff` on {ABOVE_FALLOFF} of forty seeds and above those of `step, soft τ` on {ABOVE_STEP}. `τ_ℓ anneal` starts with a soft position temperature, as `step, soft τ` does, which brings the example answers onto e₁ early.
+The call keeps all forty. The lowest window mean is seed {LOWEST} at {CALLS[LOWEST]["window_mean"]:.2f}, above the line where a run counts as kept, so no run needed finishing to settle its call. Seed by seed, the window means sit above those of `falloff` on {ABOVE_FALLOFF} of forty seeds and above those of `step, soft τ` on {ABOVE_STEP}. `τ_ℓ anneal` starts with a soft position temperature, as `step, soft τ` does, which may be what brings the example answers onto e₁ early on every seed. It also sits above `step, soft τ` on most seeds, so the soft start is not the whole of it; the pool over three slices may add to it, but nothing here separates the two.
+<!-- REVIEW: "which brings the example answers onto e₁ early" hedged: the recipe also sits above `step, soft τ`, which shares the soft start, on 35 of forty seeds, so the soft start can't be the whole explanation and no arm here isolates it. Verify: ABOVE_STEP. -->
 
 None of forty puts the rate of lost anchors below {LOSS_RATE_BOUND:.0%} (a one-sided 95% bound), the same as `step, soft τ` in the loss-rate screen. The call stops at epoch 64; the eight runs that went on to epoch 400 kept the anchor there too.
 """
@@ -567,11 +574,14 @@ None of forty puts the rate of lost anchors below {LOSS_RATE_BOUND:.0%} (a one-s
 r"""
 ## Discussion
 
-`τ_ℓ anneal` meets the four checks. Every run at the fresh seeds keeps the anchor, none ends over the spill criterion, the task passes the gate on every run, and the count of lost anchors is the lowest a count of forty can give. Removal is the one place it sits below `τ_ℓ fixed`, but it is close to `falloff` on the mean, and its spread across seeds looks like that of the step recipes.
+`τ_ℓ anneal` meets three of the four checks outright: every run at the fresh seeds keeps the anchor, none ends over the spill criterion (one ends at it), the task passes the gate on every run, and the count of lost anchors is the lowest a count of forty can give. On the removal half of the third check it sits a little below `falloff` on the seed mean, by less than two draws of eight seeds can differ (Scope and method), so that check is met within the seed spread rather than outright. Removal is also below `τ_ℓ fixed`, and its spread across seeds looks like that of the step recipes.
+<!-- REVIEW: was "meets the four checks". Check 3 asks for removal no lower than `falloff`, and the seed mean is 0.858 against 0.872, so it is met only within the seed spread the Scope allows for. Verify: REMOVAL[NEW].mean() against REMOVAL[FALLOFF].mean(). -->
 
-The late rise is still there on one seed in eight, at about the size the soft pool scout saw, so the slow anneal of $\tau_\ell$ does not remove the late kind of spill; at most it keeps it under the line here. The late spill scout found the effect of the late sharpening to be about the size of the difference between two GPUs, so a confirmation at eight seeds can't tell whether it helps. What the run shows is that it does not cost anything we can see.
+The late rise is still there on one seed in eight, at about the size the soft pool scout saw, so the slow anneal of $\tau_\ell$ does not remove the late kind of spill; at most it keeps it at the line here. The late spill scout found the effect of the late sharpening to be about the size of the difference between two GPUs, so a confirmation at eight seeds can't tell whether it helps. What the run shows is no cost we can separate from the seed draw: removal is lower than under `τ_ℓ fixed` on the mean, and E1 can't say whether the anneal or the seeds did that.
+<!-- REVIEW: "does not cost anything we can see" became "no cost we can separate from the seed draw", since removal is 0.04 below `τ_ℓ fixed` on the mean and E1 leaves open whether the anneal or the seeds account for it. Verify: REMOVAL[NEW].mean() against REMOVAL[FIXED].mean(). -->
 
-Against `falloff`, the pool recipe has three things going for it: it chooses the slice within a range set by the architecture (slices 1 to $L-1$), it loses no anchor in forty, and its early call is never unsure. Against it, its block-1 edit spills on one seed, as the step recipes do, and its removal spreads as theirs does.
+Against `falloff`, the pool recipe has two things going for it: it chooses the slice within a range set by the architecture (slices 1 to $L-1$), and its early call is never unsure, where `falloff` hung in the band on three seeds of forty. Its count of lost anchors, none of forty against one, is a tie at this many seeds. Against it, one seed in eight ends at the spill line, where the eight stored runs of `falloff` end at most at 0.014; that is one run against the seed draw and the GPU shift, so it is a small mark rather than a difference we can rely on. Its block-1 edit goes over on one seed, as one run of every recipe does, and its removal spreads across seeds as that of the step recipes does.
+<!-- REVIEW: the "for" and "against" lists were reconciled with the data: "loses no anchor in forty" moved from a point for to a tie, as check 4 in the Scope says forty seeds can't tell none from one; the block-1 spill moved from a point against to a tie, since the E1 table has one run over at block 1 under every recipe; and the one run at the spill line was added as the one visible mark against, hedged. Verify: BLOCK1_OVER, SPILL[FALLOFF].max(), and the falloff window means in the band (3 of forty). -->
 """
 
 # %%
