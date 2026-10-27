@@ -167,6 +167,12 @@ AXES_REF = PREFIX + "/axes"
 WRITE_REF = PREFIX + "/write"
 WRITE_ARRAYS_REF = PREFIX + "/write-arrays/{label}"
 ALONG_REF = PREFIX + "/along"
+RESTRICTED_REF = PREFIX + "/restricted-axes"
+
+RESTRICTED_SETS = {k: v for k, v in lean.SLICE_SETS.items() if k != "every slice"}
+"""The slice sets of the restricted edits; the edit at every slice has its axis scoring already (`AXES_REF`)."""
+STORED_RECIPES = {"falloff": rb.sas, "step-soft": sp, "pool-123-soft": sp}
+"""The three recipes recipe-compare scored, by label, beside the experiment whose checkpoints they are."""
 
 
 def rows_of(meta, conditions: tuple[Condition, ...], stop: int | None, epochs: int = EPOCHS,
@@ -339,6 +345,78 @@ def publish_finished(rows: list[dict], trained: list[dict], measured: list[dict]
     return {"n_finished": len(trained)}
 
 
+def restricted_axes_one(checkpoint, holdout, label: str) -> dict:
+    """The full edit restricted to each slice set (as embedding-lean restricts it), along each coordinate axis, on
+    every held-out completion context: per op, expected exact match on the clean pass and the drop under each axis and
+    slice set (`drop[set][axis][op]`, e₁ first). The median over the other axes is the baseline of the D2.2 design,
+    here for the restricted edits, which earlier reports netted against the same edit on the control.
+    """
+    import numpy as np
+
+    from mini import get_data_dir
+    from mini.store import get
+    from sca.intervention import Subspace, logits_at, projection
+
+    ex2216, ex2218 = lean.ex2216, lean.ex2218
+    workdir = get_data_dir() / "soft-pool-scout" / "restricted" / label
+    model, _, color_ids, tok2color = ex2216._load_run(checkpoint, workdir)
+    P = ex2216._get_posterior()
+    table = P.build_table(ex2218.table_of(OP_NAMES))
+    ho = ex2216.load_holdout(get(holdout, workdir / "holdout.npz"), K)
+    ctx = ex2216._post_queries(P, ho, K, tok2color)
+    eq_role = ex2216.query_role(K, ex2216.QUERY_EQ)
+    width = model.transformer.wte.shape[1]
+    mask = ex2216.site_positions("every position", K)
+    full = rb.DOSE_GAMMAS[-1]
+
+    def per_op(v: np.ndarray) -> list[float]:
+        return [float(v[ho.op_ids == o].mean()) for o in range(len(OP_NAMES))]
+
+    def score(op, slices) -> np.ndarray:
+        lg = logits_at(model, ho.tokens, op, slices, eq_role, mask if slices else None)
+        return ex2216._match(table, ctx, ex2216._color_probs(lg, color_ids))
+
+    clean = score(projection(Subspace.axis(width), 0.0), ())
+    drop = {
+        name: [per_op(clean - score(projection(Subspace.axis(width, i), full), slices)) for i in range(width)]
+        for name, slices in RESTRICTED_SETS.items()
+    }
+    return {"label": label, "clean": per_op(clean), "drop": drop}
+
+
+def resolve_finished(seeds: tuple[int, ...], leaders: tuple[str, ...]) -> dict:
+    """The final checkpoints of the three stored recipes and of the finished leaders at *seeds*, by label."""
+    from mini.store import get_ref
+
+    refs = {f"{a}-s{s}": m.CHECKPOINT_REF.format(label=m.label_of(a, s)) for a, m in STORED_RECIPES.items() for s in seeds}  # fmt: skip
+    refs |= {label_of(c, s, None): CHECKPOINT_REF.format(label=label_of(c, s, None)) for c in leaders for s in seeds}
+    found = {label: get_ref(ref) for label, ref in refs.items()}
+    missing = [label for label, a in found.items() if a is None]
+    assert not missing, f"not published: {missing}"
+    return found
+
+
+def publish_restricted(scored: list[dict]) -> dict:
+    import json
+
+    from mini.store import put, set_ref
+
+    body = {"design": design(), "slice_sets": {k: list(v) for k, v in RESTRICTED_SETS.items()}, "runs": scored}
+    set_ref(RESTRICTED_REF, put(json.dumps(body).encode(), name="soft-pool-scout-restricted-axes.json"))
+    return {"n_restricted": len(scored)}
+
+
+def restrict(ctx: Ctx, resolved: dict, seeds: tuple[int, ...], leaders: tuple[str, ...], publishes: bool) -> dict:
+    """Paper round of stage 2: the restricted edits along every axis of each finished run and recipe."""
+    checkpoints = ctx.run(resolve_finished, seeds, leaders, role="prep")
+    labels = list(checkpoints)
+    n = len(labels)
+    scored = ctx.map(restricted_axes_one, [checkpoints[x] for x in labels], [resolved["holdout"]] * n, labels, role="measure")  # fmt: skip
+    if not publishes:
+        return {"restricted": [r["label"] for r in scored]}
+    return ctx.run(publish_restricted, scored, role="prep")
+
+
 def finish(ctx: Ctx, resolved: dict, stopped: list[dict], leaders: tuple[str, ...], epochs: int,
            seeds: tuple[int, ...], publishes: bool, full: bool) -> dict:  # fmt: skip
     """Stage 2: carry each leader on from its stop to the end, then measure and score it as recipe-compare did, and
@@ -399,7 +477,10 @@ def run(ctx: Ctx, epochs: int = EPOCHS, stop: int = STOP_EPOCH, seeds: tuple[int
         out = ctx.run(publish_screen, rows, trained, screen, role="prep")
     if not leaders:
         return out
-    return out | finish(ctx, resolved, trained, leaders, epochs, seeds, publishes, full)
+    out |= finish(ctx, resolved, trained, leaders, epochs, seeds, publishes, full)
+    if full:
+        out |= restrict(ctx, resolved, seeds, leaders, publishes)
+    return out
 
 
 def main(ctx: Ctx) -> dict:
