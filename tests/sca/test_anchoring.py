@@ -3,6 +3,8 @@
 from dataclasses import replace
 from typing import Any
 
+from functools import partial
+
 import equinox as eqx
 import jax.numpy as jnp
 import jax.random as jr
@@ -114,10 +116,18 @@ def test_schedule_shapes_flatten_or_straighten_the_same_keyframes():
     np.testing.assert_allclose(linear(50), 0.1, rtol=0, atol=1e-12)
     np.testing.assert_allclose(linear(100), 0.01, rtol=1e-12, atol=0)
 
-    anti = dict(lam=0.1, peak_ratio=2.5, hold_ratio=0.3, anneal_end=90)
-    shared = dict(anchor_anneal_start=90, anchor_anneal_end=100, floor=0.1)
-    flat_anti = AntiSpec(shape="flat", **anti, **shared)
-    linear_anti = AntiSpec(shape="linear", **anti, **shared)
+    anti = partial(
+        AntiSpec,
+        lam=0.1,
+        peak_ratio=2.5,
+        hold_ratio=0.3,
+        anneal_end=90,
+        anchor_anneal_start=90,
+        anchor_anneal_end=100,
+        floor=0.1,
+    )
+    flat_anti = anti(shape="flat")
+    linear_anti = anti(shape="linear")
     # Flat holds the ratio to the anchor peak and skips the anchor's end anneal.
     np.testing.assert_allclose(flat_anti(np.array([0.0, 45.0, 100.0])), 0.03, rtol=0, atol=1e-12)
     np.testing.assert_allclose(linear_anti(45), 0.1 * 1.4, rtol=1e-12, atol=0)  # halfway from 2.5 to 0.3
