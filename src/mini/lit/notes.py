@@ -4,7 +4,7 @@ Sidenotes and glossary notes: what a footnote or a defined term says, placed nex
 A python-markdown extension (:class:`NotesExtension`) that rewrites the converted tree, so the Markdown stays plain and the woven ``index.md`` is unchanged. Two things become notes:
 
 - **Footnotes.** Each footnote reference gets a copy of its footnote's text right after it, as a ``<span class="sidenote">``. The list at the end of the document stays, with each item that has a sidenote marked ``sidenoted`` and its number pinned (``value``), so the stylesheet can hide it where the sidenote shows and the remaining items keep their numbers.
-- **Glossary terms.** The first use of a defined term in each ``h2`` section is wrapped in a ``<dfn class="term">`` and followed by the definition, as a ``<span class="sidenote glossnote">``. Definitions come from the definition list in the document's own ``## Glossary`` section, which wins, and then from a shared dictionary (:func:`load_glossary`, ``docs/glossary.md``); see :func:`dl_terms` for the syntax. A term is matched case-insensitively as a whole word, with a plural ``s``/``es``, in running prose only: not in code, links, headings, tables, captions, math, or the glossary itself. ``[text](term:key)`` marks a use the matcher would miss (other wording, or a term the dictionary keeps off auto-matching).
+- **Defined terms.** The first use of a defined term in each ``h2`` section is wrapped in a ``<dfn class="term">`` and followed by the definition, as a ``<span class="sidenote glossnote">``. Definitions come from the definition lists in the document itself (:func:`local_terms`: a ``## Glossary``, and equally a ``## Measurements`` or a ``## References`` naming other experiments), which win, and then from a shared dictionary (:func:`load_glossary`, ``docs/glossary.md``); see :func:`dl_terms` for the syntax. A term is matched case-insensitively as a whole word, with a plural ``s``/``es``, in running prose and link text: not in code, headings, tables, captions, math, or the definition lists themselves. A link that holds a term is wrapped whole, and its note follows the link rather than sitting inside it. ``[text](term:key)`` marks a use the matcher would miss (other wording, or a term the dictionary keeps off auto-matching).
 
 Where a note goes is the stylesheet's call (``lit.css``): in the margin on a wide screen and on paper, and on hover or focus of its marker on a narrow screen. A note whose marker sits where a margin float cannot reach (a table cell, a caption, a heading) is marked ``popover`` and only ever shows on hover; its footnote keeps its place in the list, so paper still has it. The floats stack rather than overlap because each one clears the one before it (``clear: right``).
 
@@ -30,17 +30,18 @@ from markdown.extensions.footnotes import NBSP_PLACEHOLDER
 from markdown.preprocessors import Preprocessor
 from markdown.treeprocessors import Treeprocessor
 
-__all__ = ["Term", "NotesExtension", "dl_terms", "load_glossary", "local_glossary"]
+__all__ = ["Term", "NotesExtension", "dl_terms", "load_glossary", "local_terms"]
 
 
 @dataclass(frozen=True)
 class Term:
-    """A defined term: its display name, its definition as an HTML fragment (inline), the words that match it, and whether prose is scanned for it."""
+    """A defined term: its display name, its definition as an HTML fragment (inline), the words that match it, whether prose is scanned for it, and its name as written when that has markup (a link, code)."""
 
     name: str
     definition: str
     aliases: tuple[str, ...] = ()
     auto: bool = True
+    label: str = ""
 
     def parts(self) -> tuple[str, str]:
         """The note as a gloss and the rest (empty when the gloss is all of it)."""
@@ -59,7 +60,11 @@ def _norm(text: str) -> str:
     return " ".join(text.lower().split())
 
 
-_DL_MD = markdown.Markdown(extensions=["def_list", "attr_list", "pymdownx.tilde", "pymdownx.caret", "pymdownx.mark"])
+# The inline dialect of the page (mini.lit.page), so a definition's math and marks render as they would in the text.
+_DL_MD = markdown.Markdown(
+    extensions=["def_list", "attr_list", "pymdownx.arithmatex", "pymdownx.tilde", "pymdownx.caret", "pymdownx.mark"],
+    extension_configs={"pymdownx.arithmatex": {"generic": True, "smart_dollar": False}},
+)
 _DL_ITEM_RE = re.compile(r"<(dt|dd)\b([^>]*)>(.*?)</\1>", re.DOTALL)
 _BLOCK_TAG_RE = re.compile(r"<(?:p|ul|ol|table|pre|div|dl|blockquote|figure)\b", re.IGNORECASE)
 
@@ -67,7 +72,7 @@ _BLOCK_TAG_RE = re.compile(r"<(?:p|ul|ol|table|pre|div|dl|blockquote|figure)\b",
 def dl_terms(markdown_text: str) -> dict[str, Term]:
     """The terms that the definition lists in *markdown_text* define, in Markdown syntax or as a raw ``<dl>``.
 
-    Each definition (``<dd>``) belongs to the terms (``<dt>``) above it: the first is the name, and any others are aliases. A term may also name several wordings, split on commas (``Red line, non-red line``), and a parenthesised one is an alias (``ᾱ (containment)``). A term with the class ``manual`` (``Band {.manual}``) is only marked where written as ``[text](term:band)``, which suits a term that is also an everyday word. A definition with block content other than paragraphs is skipped, since a note is inline markup::
+    Each definition (``<dd>``) belongs to the terms (``<dt>``) above it: the first is the name, and any others are aliases. A term may also name several wordings, split on commas (``Red line, non-red line``), and a parenthesised one is an alias (``ᾱ (containment)``). A term with the class ``manual`` (``Band {.manual}``) is only marked where written as ``[text](term:band)``, which suits a term that is also an everyday word. A term written with markup keeps it in its note, so a linked name (``[recipe-compare](/docs/m2/recipe-compare/report.py)``) links from the margin too. A definition with block content other than paragraphs is skipped, since a note is inline markup::
 
         Expected exact match
         EEM
@@ -81,20 +86,25 @@ def dl_terms(markdown_text: str) -> dict[str, Term]:
             if after_dd:
                 dts.clear()
                 after_dd = False
-            dts.append((attrs, html.unescape(re.sub(r"<[^>]+>", "", body)).strip()))
+            dts.append((attrs, body.strip()))
             continue
         after_dd = True
         definition = _unwrap_p(body.strip())
         if not dts or _BLOCK_TAG_RE.search(definition):
             continue
-        (attrs, name), *others = dts
+        (attrs, label), *others = dts
+        name = _plain(label)
         # "Red line, non-red line": the whole is the name, and each part is a form of its own.
         parts = [f.strip() for f in re.split(r",|\(|\)", name) if f.strip()]
-        aliases = (*(parts if len(parts) > 1 else ()), *(n for _, n in others))
+        aliases = (*(parts if len(parts) > 1 else ()), *(_plain(n) for _, n in others))
         auto = not re.search(r'class="[^"]*\bmanual\b', attrs)
-        t = Term(name, definition, aliases, auto)
+        t = Term(name, definition, aliases, auto, label if "<" in label else "")
         terms.setdefault(t.key, t)
     return terms
+
+
+def _plain(fragment: str) -> str:
+    return html.unescape(re.sub(r"<[^>]+>", "", fragment)).strip()
 
 
 def load_glossary(path: Path) -> dict[str, Term]:
@@ -102,17 +112,12 @@ def load_glossary(path: Path) -> dict[str, Term]:
     return dl_terms(path.read_text("utf-8")) if path.is_file() else {}
 
 
-_GLOSSARY_HEADING_RE = re.compile(r"^(#{2,6})\s+Glossary\s*$", re.MULTILINE | re.IGNORECASE)
+_FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,}).*?^ {0,3}\1[`~]*[ \t]*$", re.MULTILINE | re.DOTALL)
 
 
-def local_glossary(text: str) -> dict[str, Term]:
-    """The terms a document defines in its own ``Glossary`` section (:func:`dl_terms`)."""
-    terms: dict[str, Term] = {}
-    for m in _GLOSSARY_HEADING_RE.finditer(text):
-        level = len(m[1])
-        end = re.compile(rf"^#{{1,{level}}}\s", re.MULTILINE).search(text, m.end())
-        terms |= dl_terms(text[m.end() : end.start() if end else len(text)])
-    return terms
+def local_terms(text: str) -> dict[str, Term]:
+    """The terms that the definition lists anywhere in a document define (:func:`dl_terms`), outside fenced code; the first definition of a term wins."""
+    return dl_terms(_FENCE_RE.sub("", text))
 
 
 def _unwrap_p(fragment: str) -> str:
@@ -208,23 +213,22 @@ def _append_text(box: etree.Element, text: str | None) -> None:
 
 
 class _CollectLocal(Preprocessor):
-    """Read the document's own glossary before the raw HTML is stashed away."""
+    """Read the document's own definition lists before the raw HTML is stashed away."""
 
     def __init__(self, md: markdown.Markdown, ext: NotesExtension):
         super().__init__(md)
         self.ext = ext
 
     def run(self, lines: list[str]) -> list[str]:
-        self.ext.local = local_glossary("\n".join(lines))
+        self.ext.local = local_terms("\n".join(lines))
         return lines
 
 
 # Where a note is never placed. Matching skips the whole subtree; a footnote marker in one
-# of the float-blocking ones gets a hover-only note.
+# of the float-blocking ones gets a hover-only note. A link is matched as a whole (_link).
 _SKIP_TAGS = {
     "code",
     "pre",
-    "a",
     "sup",
     "sub",
     "h1",
@@ -369,9 +373,24 @@ class _NotesTree(Treeprocessor):
                 if key and key not in seen:
                     seen.add(key)
                     last = self._annotate(el, child, scan.terms[key])
+            elif child.tag == "a":
+                last = self._link(el, child, scan, seen)
             elif not _skipped(child):
                 self._walk(child, scan, seen)
             last.tail = self._scan_text(el, last, last.tail, scan, seen)
+
+    def _link(self, parent: etree.Element, a: etree.Element, scan: _Scanner, seen: set[str]) -> etree.Element:
+        """Wrap link *a* in a ``dfn`` if its text holds the first use of a term, so the note follows the link instead of sitting in it; returns what the rest of the text follows."""
+        m = scan.first("".join(a.itertext()), seen)
+        if m is None:
+            return a
+        seen.add(m.term.key)
+        dfn = etree.Element("dfn", {"class": "term"})
+        parent.insert(list(parent).index(a), dfn)
+        parent.remove(a)
+        dfn.append(a)
+        dfn.tail, a.tail = a.tail, None
+        return self._annotate(parent, dfn, m.term)
 
     def _scan_text(
         self, parent: etree.Element, before: etree.Element | None, text: str | None, scan: _Scanner, seen: set[str]
@@ -397,7 +416,7 @@ class _NotesTree(Treeprocessor):
         dfn.set("tabindex", "0")
         note = etree.Element("span", {"class": "sidenote glossnote", "role": "note", "tabindex": "-1"})
         name = etree.SubElement(note, "span", {"class": "glossnote-term"})
-        name.text = term.name
+        name.text = self.stash.store(term.label) if term.label else term.name
         name.tail = " "
         lead, rest = term.parts()
         etree.SubElement(note, "span", {"class": "gloss"}).text = self.stash.store(lead)
@@ -465,7 +484,7 @@ def _skip(child: etree.Element, into: etree.Element) -> None:
 
 
 class NotesExtension(Extension):
-    """Footnotes as sidenotes, and glossary terms annotated at first use per section; *glossary* is the shared dictionary (:func:`load_glossary`)."""
+    """Footnotes as sidenotes, and defined terms annotated at first use per section; *glossary* is the shared dictionary (:func:`load_glossary`)."""
 
     def __init__(self, glossary: dict[str, Term] | None = None, **kwargs):
         super().__init__(**kwargs)

@@ -49,6 +49,8 @@ Say what we make of each result where it appears, and how sure we are: "fits wit
 
 A bare "(H3)" means this report, and a section of another report takes that report's name: "H3 of ex-2.2.19".
 
+Other experiments are named through a `## References` section at the end, before the glossary: a definition list with one entry per experiment the report mentions. The term is the experiment's short name, linked to its report, and the definition is what it found that this report relies on, as one sentence that stands on its own (it is the gloss on paper). The renderer puts that sentence in the margin beside the first mention in each section, linked or not, so the prose can say "the recipe-compare experiment" and move on without recapping it. Write the measurements as a definition list too, for the same reason. The syntax is in `style-md`.
+
 For the register, read the `writing` skill, [references/exemplar-example-evidence.md](references/exemplar-example-evidence.md) (a whole report), and [references/exemplar-explanation.md](references/exemplar-explanation.md) (how to explain a mechanism).
 
 ### The lede (tl;dr)

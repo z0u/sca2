@@ -12,6 +12,7 @@ Characteristics:
 - Calibrate confidence to the evidence: plain declaratives for what was measured or observed. Show how strongly a claim is made: "would start to matter" is weaker than "matters".
 - Verbs agree with which direction is good. Containment, decay and retention run downward, so "no condition reaches 0.1" reads backwards; "falls to" does not.
 - A term the reader may not know gets a short plain-English definition: a glossary term if it comes up again (shown beside its first use in each section; see `style-md`), else a footnote. Figure captions stay pure legend.
+- Another experiment is named by its short name ("the recipe-compare experiment"), with a one-line summary of what it found in a `References` list at the end, so the summary shows beside each mention (see `sci-report` and `style-md`). A design doc or other page names other work the same way.
 - Plain connectives to continue a thought: "So", "But", etc.
 - American spelling and double quotes to match the convention in scientific literature.
 - Alt text for all images: aids vision-impaired people and LLMs alike (see the alt-text skill).

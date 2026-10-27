@@ -2,7 +2,7 @@
 
 import re
 
-from mini.lit.notes import Term, load_glossary, local_glossary
+from mini.lit.notes import Term, load_glossary, local_terms
 from mini.lit.page import render_fragment, to_html
 
 GLOSSARY = """
@@ -57,8 +57,8 @@ class TestSidenotes:
 
 
 class TestGlossary:
-    def test_local_glossary_reads_the_section(self):
-        terms = local_glossary(GLOSSARY)
+    def test_local_terms_reads_the_glossary(self):
+        terms = local_terms(GLOSSARY)
         assert set(terms) == {"op margin", "ᾱ (containment)"}
         assert terms["ᾱ (containment)"].forms[1:] == ("ᾱ", "containment")
         assert terms["op margin"].definition == "The line margin, <code>m</code>."
@@ -74,9 +74,42 @@ class TestGlossary:
         )
         assert '<dfn class="term" tabindex="0">Containment</dfn>' in html
 
-    def test_code_links_headings_and_the_glossary_are_left_alone(self):
-        html = to_html(f"## Op margin\n\n`op margin` and [op margin](#x).\n{GLOSSARY}")
-        assert "<dfn" not in html
+    def test_code_headings_and_the_glossary_are_left_alone(self):
+        html = to_html(f"## Op margin\n\n`op margin` and *[op margin](#x)*.\n{GLOSSARY}")
+        assert html.count("<dfn") == 1  # the link only
+
+    def test_link_holding_a_term_is_wrapped_and_its_note_follows(self):
+        html = to_html(f"See [the op margin](#x) here, and op margin.\n{GLOSSARY}")
+        assert html.count("<dfn") == 1
+        assert (
+            '<dfn class="term" tabindex="0"><a href="#x">the op margin</a></dfn><span class="sidenote glossnote"'
+            in html
+        )
+        assert "</span></span> here, and op margin." in html
+
+    def test_any_definition_list_defines_terms(self):
+        text = (
+            "## Results\n\nThe removal held, as in [the recipe-compare experiment](/r.py).\n\n"
+            "## Measurements\n\nRemoval\n:   How much of the op the edit takes out.\n\n"
+            "## References\n\n[recipe-compare](/docs/m2/recipe-compare/report.py)\n:   Step-soft and falloff do about equally well.\n"
+        )
+        terms = local_terms(text)
+        assert set(terms) == {"removal", "recipe-compare"}
+        assert terms["recipe-compare"].label == '<a href="/docs/m2/recipe-compare/report.py">recipe-compare</a>'
+        html = to_html(text)
+        assert '<dfn class="term" tabindex="0">removal</dfn>' in html
+        assert (
+            '<dfn class="term" tabindex="0"><a href="/r.py">the recipe-compare experiment</a></dfn>'
+            '<span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">'
+            '<a href="/docs/m2/recipe-compare/report.py">recipe-compare</a></span>' in html
+        )
+
+    def test_math_in_a_definition_is_rendered(self):
+        html = to_html("Pull here.\n\n## Glossary\n\nPull\n:   Weight $\\lambda_a$ of the pull.\n")
+        assert '<span class="gloss">Weight <span class="arithmatex">\\(\\lambda_a\\)</span> of the pull.</span>' in html
+
+    def test_definition_lists_in_fenced_code_are_examples(self):
+        assert local_terms("```md\nRemoval\n:   An example.\n```\n") == {}
 
     def test_whole_words_only(self):
         assert "<dfn" not in to_html(f"Scoop margins.\n{GLOSSARY}")
@@ -135,8 +168,9 @@ class TestGlossary:
             "band": Term("Band", "Precision.<br>More.", auto=False),
         }
 
-    def test_local_glossary_in_markdown_syntax(self):
-        terms = local_glossary("## Glossary\n\nRed line, non-red line\n:   Lines by color.\n\n## Next\n\nA\n:   B\n")
+    def test_local_terms_in_markdown_syntax(self):
+        terms = local_terms("## Glossary\n\nRed line, non-red line\n:   Lines by color.\n\n## Next\n\nA\n:   B\n")
         assert terms == {
-            "red line, non-red line": Term("Red line, non-red line", "Lines by color.", ("Red line", "non-red line"))
+            "red line, non-red line": Term("Red line, non-red line", "Lines by color.", ("Red line", "non-red line")),
+            "a": Term("A", "B"),
         }

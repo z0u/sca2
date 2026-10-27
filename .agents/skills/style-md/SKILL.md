@@ -43,7 +43,16 @@ Some backstory.
 
 A footnote made only of paragraphs becomes a margin note; one holding a list or code stays in the list at the end, and so does one cited from a table cell, a caption or a heading (it shows on hover).
 
-Glossary terms are annotated for you. The first use of each term in every `##` section carries its definition as a margin note, taken from the report's own `## Glossary` section and then from `docs/glossary.md`, the shared dictionary. Both are definition lists, in Markdown syntax (the term, then `:   definition` on the next line) or as a `<dl>`. Another term line above the same definition adds a wording, and so do commas and parentheses within one. Matching is whole-word and case-insensitive, and skips code, links, headings, tables and captions. `[the spread](term:band)` marks a use in other words, or of a term kept off auto-matching (`Band {.manual}`, for everyday words). Mechanics: `src/mini/lit/notes.py`.
+Defined terms are annotated for you. The first use of each term in every `##` section carries its definition as a margin note. The definitions come from every definition list in the report (a `## Glossary`, a `## Measurements`, a `## References` naming other experiments), and then from `docs/glossary.md`, the shared dictionary. Each is a definition list, in Markdown syntax (the term, then `:   definition` on the next line) or as a `<dl>`. Another term line above the same definition adds a wording, and so do commas and parentheses within one. A term written as a link or in code keeps that markup in its note. Definitions take the same inline Markdown as the text, math included. Matching is whole-word and case-insensitive, covers prose and link text, and skips code, headings, tables, captions and the lists themselves. A link that holds a term gets its note after the link. `[the spread](term:band)` marks a use in other words, or of a term kept off auto-matching (`Band {.manual}`, for everyday words). Mechanics: `src/mini/lit/notes.py`.
+
+```md
+## References
+
+[recipe-compare](/docs/m2/recipe-compare/report.py)
+:   Step-soft and falloff remove about as much and spill about as little; pooling over blocks 1 to 3 spills on two seeds of eight.
+```
+
+So a list that a reader may want to look back at, such as the measurements or the other experiments a report builds on, is a definition list rather than a bulleted one, and its entries then follow the reader through the report.
 
 Prefer a glossary term to a footnote when the aside defines a word the reader will meet again: the definition then shows beside the word in every section, and other reports can share it. A term whose meaning holds across reports goes in `docs/glossary.md`, and one used in a narrower sense goes in the report's own glossary. Keep footnotes for one-off asides, such as a caveat, a source, or a side calculation.
 

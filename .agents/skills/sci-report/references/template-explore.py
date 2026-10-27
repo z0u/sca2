@@ -35,7 +35,10 @@ This is an exploratory <re-analysis, or study>, with no preregistration and no g
 
 ## The measurements
 
-<What each measurement is, in words, and which way is good. A short list where there are several summaries to compare. Only what a reader needs to parse the sections below.>
+<A sentence on what the measurements have in common, if anything.>
+
+<Measurement>
+:   <What it is, in words, and which way is good. Only what a reader needs to parse the sections below. Each term's definition shows in the margin beside its first use in every section.>
 """
 
 # %%
@@ -74,4 +77,13 @@ r"""
 ## Discussion
 
 <What we make of the observations as a whole, with how sure we are, in two to four short paragraphs. What it would mean for a design can be said as a conditional. What we do next is left out of the report, for the human to decide.>
+"""
+
+# %%
+
+r"""
+## References
+
+[<experiment>](/docs/<milestone>/<experiment>/report.py)
+:   <What it found that this report relies on, in one sentence that stands on its own. Shows in the margin beside the first mention in each section.>
 """

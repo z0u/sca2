@@ -56,7 +56,8 @@ r"""
 r"""
 ## Measurements
 
-<One short paragraph per measurement the result sections use: what it is, in words, and which way is good.>
+<Measurement>
+:   <One short paragraph per measurement the result sections use: what it is, in words, and which way is good. Each shows in the margin beside its first use in every section.>
 """
 
 # %%
@@ -120,4 +121,13 @@ r"""
 ## Method
 
 <Data, calibration, and measurement details the sections refer back to. Cost.>
+"""
+
+# %%
+
+r"""
+## References
+
+[<experiment>](/docs/<milestone>/<experiment>/report.py)
+:   <What it found that this report relies on, in one sentence that stands on its own. Shows in the margin beside the first mention in each section.>
 """
