@@ -79,7 +79,7 @@ A role can also set `env=` — environment for the worker, in place *before* the
 
 Our models are small, so a GPU task's cost is mostly fixed overhead, and compilation is the part code controls. The scoring pass once spent three quarters of its wall time compiling. Measurements behind these are in [eng/gpu-efficiency.md](/eng/gpu-efficiency.md).
 
-- Use `gpu="L4"`. It's the cheapest per step for these models; faster cards cost more than they save.
+- Use `gpu="L4"`. It's the cheapest per step for these models; faster cards cost more than they save. When L4s are scarce, wait for them rather than switching card: runs that resume from, or are compared seed by seed with, runs on another card differ by its numerics as well as by the change under study (the late-spill scout lost one of its three rising runs to this).
 - Jit once, at module level, and pass everything that varies (model, batch, operator) as arguments. A `filter_jit(lambda …)` built per call compiles per call. Give an operator its parameters as an `eqx.Module`, with arrays as leaves and code-path switches as `eqx.field(static=True)`.
 - Keep shapes fixed: a fixed `batch_size`, and a handful of values at most for any static argument.
 - If a task takes longer than its arithmetic should, count compiles before anything else: `jax.config.update("jax_log_compiles", True)`.
