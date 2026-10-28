@@ -679,14 +679,14 @@ r"""
 
 /// tip |
 <!-- lede -->
-The pool over slices 1 to 3 with its slice temperature held fixed keeps the anchor on every run at eight fresh seeds, and on all forty runs of a count called at epoch 64. Paired seed by seed with the annealed version of the recipe, it removes about as much, with no late rise in spill. But some seeds that did well under one recipe did poorly under the other, and the runs of a seed parted ways early, while the two recipes were still nearly the same. So much of the variation between runs looks like how sensitive a run is to small changes, rather than either recipe.
+The pool over slices 1 to 3, with its slice temperature held fixed, keeps the anchor on all eight runs at fresh seeds. It also keeps it on all forty runs of a count that calls each run at epoch 64. Paired seed by seed with the annealed version of the recipe, it removes about as much, with no late rise in spill. But some seeds that did well under one recipe did poorly under the other. The two runs of a seed also parted ways early, while the two recipes were still nearly the same. So much of the variation between runs seems to come from how sensitive a run is to small changes, rather than from either recipe.
 ///
 
-The [anneal confirmation](/docs/m2/anneal-confirm/report.py) ran the pool over slices 1 to 3 with its slice temperature $\tau_\ell$ annealing from 0.1 to 0.025, at eight fresh seeds (712 to 719).[^tau] Every run kept the anchor. But removal varied across seeds more than it had under the simpler recipe it grew from, `τ_ℓ fixed` from the [soft pool scout](/docs/m2/soft-pool-scout/report.py), which holds $\tau_\ell$ at 0.1. Two seeds removed about as little as the lowest runs of the step recipes. The two recipes had run at different seeds, so the anneal and the seed draw could each account for that.
+The [anneal confirmation](/docs/m2/anneal-confirm/report.py) ran the pool over slices 1 to 3 with its slice temperature $\tau_\ell$ annealing from 0.1 to 0.025, at eight fresh seeds (712 to 719).[^tau] Every run kept the anchor. But removal varied across seeds more than it had under the simpler recipe it grew from. That recipe is `τ_ℓ fixed` from the [soft pool scout](/docs/m2/soft-pool-scout/report.py), which holds $\tau_\ell$ at 0.1. Two seeds removed about as little as the lowest runs of the step recipes. The two recipes had run at different seeds, so either the anneal or the seed draw could account for that.
 
 [^tau]: Slice temperature: how sharply the pooled pull picks among slices. The pull is a softmin-weighted mix over slice and position pairs, and $\tau_\ell$ sets how peaked the weights over slices are, as the pooling temperature $\tau_p$ does over positions.
 
-This report runs `τ_ℓ fixed` at the same fresh seeds, so the two recipes pair seed by seed. It is also the confirmation run for adopting `τ_ℓ fixed`, the simpler of the two, as the recipe of record: it trains the recipe to the end at 712 to 719, and to epoch 64 at forty seeds (704 to 743) to count lost anchors. On the stopped runs of both recipes it also scores spill at epochs 16, 32 and 64, which the anneal confirmation left unscored on most of its forty.
+This report runs `τ_ℓ fixed` at the same fresh seeds, so the two recipes pair seed by seed. It is also the confirmation run for adopting `τ_ℓ fixed`, the simpler of the two, as the recipe of record. So it trains the recipe to the end at seeds 712 to 719, and to epoch 64 at forty seeds (704 to 743) to count lost anchors. On the stopped runs of both recipes, it also scores spill at epochs 16, 32, and 64. The anneal confirmation left spill unscored on most of its forty runs.
 """
 
 # %%
@@ -702,7 +702,7 @@ rf"""
 
 ## Scope and method
 
-This is an exploratory study, with no preregistration and no gate. The checks are the four the anneal confirmation set for its recipe. They guide the choice of recipe without deciding it, so a recipe that misses one narrowly can still be the better choice:
+This is an exploratory study, with no preregistration and no gate. We use the four checks that the anneal confirmation set for its recipe. They guide the choice of recipe without deciding it, so a recipe that misses one narrowly can still be the better choice:
 
 1. Every run at seeds 712 to 719 keeps the anchor (removal at least 0.5).
 2. No run at those seeds ends over the spill criterion of 0.02.
@@ -711,15 +711,15 @@ This is an exploratory study, with no preregistration and no gate. The checks ar
 
 `τ_ℓ fixed` (in full, `τ_ℓ 0.1, τ_ℓ fixed`) pulls e₁ at the pool over slices 1 to 3, with $\tau_\ell$ at 0.1 throughout. The position temperature $\tau_p$ sharpens from 1 to 0.1 by epoch 40, the anchor weight warms up over the first 40 epochs, and the anti weight anneals to the per-slice holds of `falloff` by epoch 360. `τ_ℓ anneal` differs in one schedule: $\tau_\ell$ moves from 0.1 to 0.025 over the whole run, slowly at first, so it is still {TAU_64:.3f} at epoch 64. Over the first 64 epochs the two recipes are nearly the same.
 
-The forty runs of the count use the seeds of the loss-rate screen, so each pairs with a run of `falloff`, `step, soft τ`, and `τ_ℓ anneal` by initialization, batches, and label draws. Each stops at epoch 64 for its call. At seeds 704 to 711 the stopped runs are the soft pool scout's runs of this recipe, and the other 32 are new.
+The forty runs of the count use the seeds of the loss-rate screen. So each shares its initialization, batches, and label draws with a run of `falloff`, of `step, soft τ`, and of `τ_ℓ anneal`. Each stops at epoch 64 for its call. At seeds 704 to 711, the stopped runs are the runs of this recipe from the soft pool scout, and the other 32 are new.
 
 The runs at 712 to 719 continue from their stops to epoch 400, keeping a checkpoint every 32 epochs. They share their controls with the anneal confirmation (no pull and no anti term, at the same seed). All runs trained and were measured on L4 GPUs, as the anneal confirmation was.
 
-Within the fresh seeds, the two recipes pair seed by seed, so a difference between them is not a difference of seed draws. Against the stored recipes at 704 to 711, a difference includes the variation between two draws of eight seeds; under `falloff` and `step, soft τ` removal varies by about 0.15 across seeds.
+Within the fresh seeds, the two recipes pair seed by seed, so a difference between them is not a difference of seed draws. Against the stored recipes at seeds 704 to 711, a difference also includes the variation between two draws of eight seeds. Under `falloff` and `step, soft τ`, removal varies by about 0.15 across seeds.
 
 ## The measurements
 
-Every edit below is the e₁ edit. Each score is the drop under that edit, less the median drop under the same edit along each of the other 63 coordinate axes of the run (the rule of the D2.2 design).
+Every edit below is the e₁ edit. Each score is the drop under that edit, less a baseline: the median drop when the same edit is made along each of the other 63 coordinate axes of the run (the rule of the D2.2 design).
 
 Removal
 :   The drop on `difference` under the full edit at every position and slice, as a share of the way from the clean score to the target null. Higher is better, and a run below 0.5 has lost the anchor.
@@ -734,7 +734,7 @@ Task change
 :   The clean score per op, less that of the control at the seed.
 
 Call
-:   The early verdict on whether a run kept the anchor, from mean α at the example answers at slice 3 over epochs 44 to 64. A run below 0.15 is called lost, and one from 0.28 kept. A run in between is finished and measured.
+:   The early verdict on whether a run kept the anchor, from mean α at the example answers at slice 3 over epochs 44 to 64. A run below 0.15 is called lost, and one at 0.28 or above is called kept. A run in between is finished and measured.
 """
 
 # %%
@@ -742,7 +742,7 @@ Call
 rf"""
 ## The two recipes at the same seeds (E1)
 
-Does removal vary across the fresh seeds under `τ_ℓ fixed` as it did under `τ_ℓ anneal`, and does every run keep the anchor and pass the task gate? If the anneal made removal uneven, the anneal confirmation's two low seeds should remove well here. If those seeds are hard for the pool, they should be low under both.
+Does removal vary across the fresh seeds under `τ_ℓ fixed` as it did under `τ_ℓ anneal`, and does every run keep the anchor and pass the task gate? If the anneal made removal uneven, the two low seeds of the anneal confirmation should remove well here. If those seeds are hard for the pool, they should be low under both.
 
 {end_figure()}
 
@@ -752,20 +752,20 @@ Every run keeps the anchor. Removal under `τ_ℓ fixed` is a little above that 
 
 {pair_table()}
 
-Seed by seed, the picture is less tidy. `τ_ℓ fixed` removes more on {WORD[N_FIXED_HIGHER]} of the eight seeds, and the differences run both ways, by up to {DIFF_MAX:.2f}. The anneal confirmation's two low seeds ({LOW_ANNEAL[0]} and {LOW_ANNEAL[1]}) remove more here, but seed {LOW_FIXED[0]}, which removed well under the anneal, is the lowest here, and seed 719 is among the lowest under both.
+Seed by seed, the picture is less tidy. `τ_ℓ fixed` removes more on {WORD[N_FIXED_HIGHER]} of the eight seeds, and the differences run both ways, by up to {DIFF_MAX:.2f}. The two low seeds of the anneal confirmation ({LOW_ANNEAL[0]} and {LOW_ANNEAL[1]}) remove more here. But seed {LOW_FIXED[0]}, which removed well under the anneal, is the lowest here. And seed 719 is among the lowest under both.
 
 So neither account from the anneal confirmation fits on its own. The low seeds there were not low because of the seed alone, since seed {LOW_ANNEAL[1]} removes about as much as the seed mean here. Nor does the anneal lower removal across the board, since it removes more on some seeds.
 
-By epoch 400 the anneal has taken $\tau_\ell$ down fourfold, so the end gaps could still be a late effect of the anneal that differs by seed. Removal along training separates the two readings.
+By epoch 400 the anneal has taken $\tau_\ell$ down fourfold, so the end gaps could still be a late effect of the anneal that differs by seed. Removal along training tells these two explanations apart.
 
 {removal_along_figure()}
 
-The runs of a seed part ways early. At epoch 32, where the anneal has moved $\tau_\ell$ by under one percent ({TAU_32:.4f} against 0.1), the two runs of some seeds are up to {GAP_32:.2f} apart in removal. Most pairs then come back together by about epoch 160. The two largest gaps at the end (seeds 718 and 719, a tenth each) are set by epoch 64 to 96, while $\tau_\ell$ under the anneal is still within about a tenth of 0.1 ({TAU_96:.3f} at epoch 96), and they change little after that, while the anneal does most of its work. The smaller lasting gaps, on seeds 714 and 715, wander by a few hundredths along the way.
+The runs of a seed part ways early. At epoch 32, where the anneal has moved $\tau_\ell$ by under one percent ({TAU_32:.4f} against 0.1), the two runs of some seeds are up to {GAP_32:.2f} apart in removal. Most pairs then come back together by about epoch 160. The two largest gaps at the end (seeds 718 and 719, a tenth each) are set by epoch 64 to 96. At that point $\tau_\ell$ under the anneal is still within about a tenth of 0.1 ({TAU_96:.3f} at epoch 96). These gaps change little afterward, while the anneal does most of its work. The smaller lasting gaps, on seeds 714 and 715, wander by a few hundredths along the way.
 
-So the end gaps were set while the two recipes were nearly the same. That fits a run whose final removal is sensitive to small changes early on, while the anchor settles, so that eight seeds of either recipe give a noisy estimate of its mean. It does not rule out that a slightly sharper $\tau_\ell$ at epochs 64 to 96 matters, but a difference that small would be hard to tell from the same sensitivity. Seed 719, low under both, may also be a hard seed for the pool.
+So the end gaps were set while the two recipes were nearly the same. That fits a picture in which the final removal of a run is sensitive to small changes early on, while the anchor settles. If so, eight seeds of either recipe give a noisy estimate of its mean. This does not rule out that a slightly sharper $\tau_\ell$ at epochs 64 to 96 matters, but a difference that small would be hard to tell from the same sensitivity. Seed 719, low under both, may also be a hard seed for the pool.
 <!-- REVIEW: the warrant for the sensitivity reading moved from the end gaps to removal along training (claims review round 1): the end gaps alone could be a seed-dependent effect of the fourfold late sharpening, but the paired runs diverge at epoch 32 (τ_ℓ 0.6% apart) and the two largest end gaps (718, 719) are set by epoch 64 to 96. Verify: REMOVAL_ALONG, GAP_32, TAU_32, TAU_96. -->
 
-Seven runs pass the task gate, with the mean over ops within about a hundredth of the control. Seed {MISS} misses it: its mean over ops is {num(float(MISS_TASK.mean()))}, and two ops, `{MISS_OPS[0]}` and `{MISS_OPS[1]}`, end {num(float(MISS_TASK.min()), ".2f")} and {num(float(np.sort(MISS_TASK)[1]), ".2f")} below the control. This run learns those two ops late. At epoch {LATE_EPOCH} its clean score on `{MISS_OPS[0]}` is {MISS_AT:.2f}, where the other seven runs are at {OTHERS_AT.min():.2f} or more, and it is still rising at the end. Under the anneal the same seed learned them on time, and another seed (717) was the late one but caught up. So this too looks like a run-to-run difference more than a property of the recipe, and one run of `falloff` at 704 to 711 misses the gate too.
+Seven runs pass the task gate, with the mean over ops within about a hundredth of the control. Seed {MISS} misses it: its mean over ops is {num(float(MISS_TASK.mean()))}, and two ops, `{MISS_OPS[0]}` and `{MISS_OPS[1]}`, end {num(float(MISS_TASK.min()), ".2f")} and {num(float(np.sort(MISS_TASK)[1]), ".2f")} below the control. This run learns those two ops late. At epoch {LATE_EPOCH} its clean score on `{MISS_OPS[0]}` is {MISS_AT:.2f}, where the other seven runs are at {OTHERS_AT.min():.2f} or more, and it is still rising at the end. Under the anneal, the same seed learned them on time, and another seed (717) was the late one but caught up. So this too looks like a difference between runs more than a property of the recipe. One run of `falloff` at seeds 704 to 711 also misses the gate.
 """
 
 # %%
@@ -777,10 +777,10 @@ Does any run end over the spill criterion, and do the late rise and the early bu
 
 {along_figure()}
 
-No run ends over the criterion, nor near it: the largest end spill is {num(END_MAX[FIXED])}, against {num(END_MAX[ANNEAL])} under the anneal. Under the anneal, seed {LATE_ANNEAL} rose late to the line. Here the same seed stays near zero or below to the end, and no other seed rises late. The soft pool scout saw the late rise on one seed in eight under `τ_ℓ fixed`, so it comes and goes between runs. At eight seeds, none here against one there is within what two draws can differ by.
+No run ends over the criterion, nor near it: the largest end spill is {num(END_MAX[FIXED])}, against {num(END_MAX[ANNEAL])} under the anneal. Under the anneal, seed {LATE_ANNEAL} rose late to the line. Here the same seed stays near zero or below to the end, and no other seed rises late. The soft pool scout saw the late rise on one seed in eight under `τ_ℓ fixed`, so it comes and goes between runs. With eight seeds in each draw, a late rise on none here against one there is within the variation between two draws.
 <!-- REVIEW: was "stays below zero"; seed 713 under `τ_ℓ fixed` touches 0.001 at epoch 256. Verify: ALONG[(FIXED, 713)]. "One or two seeds" became "one seed": under `τ_ℓ fixed` the scout's rise was on 707 alone. -->
 
-Under the edit at block 1 alone, no run goes over the criterion, where one run of every other recipe did (table in E1).
+Under the edit at block 1 alone, no run goes over the criterion. Every other recipe had one run that did (table in E1).
 
 One run has an early bump: seed {BUMP} reaches {BUMP_PEAK:.3f} at epoch 64 and is near zero by epoch 96 ({num(BUMP_NEXT)}). Under the anneal, the early bumps were on seeds 714 and 713; here those seeds stay below the line throughout. As with removal, the bumps move between seeds when the recipe changes only a little.
 """
@@ -817,11 +817,11 @@ r"""
 
 `τ_ℓ fixed` meets three of the four checks outright. Every run at the fresh seeds keeps the anchor (check 1), none ends near the spill criterion (check 2), and none of forty loses the anchor by the call (check 4). Check 3 has two halves. Removal is above that of `falloff` on the seed mean, and seven of eight runs pass the task gate, with the eighth on a seed that learns two ops late. `falloff` also has one run of eight that misses the gate; `step, soft τ`, `τ_ℓ anneal`, and `τ_ℓ fixed` at 704 to 711 have none.
 
-The pairing with `τ_ℓ anneal` was meant to say whether the anneal or the seeds made removal uneven. The answer is mostly neither: the low runs move between seeds when the recipe changes only a little. So the spread of removal across eight runs is partly how sensitive a run is to small changes, and a seed mean over eight runs carries that noise. The difference in the seed mean between the two recipes is within the differences seen at single seeds, so we read the two as removing about the same.
+The pairing with `τ_ℓ anneal` was meant to say whether the anneal or the seeds made removal uneven. The answer is mostly neither: the low runs move between seeds when the recipe changes only a little. So the spread of removal across eight runs is partly how sensitive a run is to small changes, and a seed mean over eight runs carries that noise. The difference in the seed mean between the two recipes is within the differences seen at single seeds, so we take the two as removing about the same.
 
-The same holds for the other marks against a recipe at eight seeds: the late rise in spill, the early bumps, and the late learner each appeared under one recipe at a seed and not under the other. A count over more runs, as in E3, is the steadier measure for these.
+The same holds for the other problems seen at eight seeds: the late rise in spill, the early bumps, and the late learner each appeared under one recipe at a seed and not under the other. A count over more runs, as in E3, is the steadier measure for these.
 
-Between the two, `τ_ℓ fixed` has one schedule fewer, and this run gives no sign that the anneal buys anything for it. The late spill scout found the late sharpening lowered the late rise partway on both of its rising runs, and a change of GPU moved one of those runs by more than that. Here the late rise appeared under the anneal and not under the fixed recipe.
+Between the two, `τ_ℓ fixed` has one schedule fewer, and this run gives no sign that the anneal buys anything for it. The late spill scout found that the late sharpening lowered the late rise partway on both of its rising runs, and a change of GPU moved one of those runs by more than that. Here the late rise appeared under the anneal and not under the fixed recipe.
 """
 
 # %%
