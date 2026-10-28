@@ -838,7 +838,8 @@ We trained the control with no loss on `difference` contexts, so that it never l
 The edit-effects experiment found that the edited model sends the mass to the right ops overall, but shares it among them differently from the target null context by context. Its Discussion offers two readings:
 (a) the edit blurs evidence the model uses to share the mass among the other ops, or
 (b) no model with this architecture, grammar, and set of other ops learns that sharing on contexts that look like `difference`.
-A model trained without `difference` has had nothing removed, so how close it comes is a reference for the edit. It is also the filtered-corpus comparison of the D2.2 design, and its figures are meant to go into the D2.2 post. This study trains eight new runs, one at each seed from 712 to 719. It scores them beside the stored `τ_ℓ fixed` runs and controls at the same seeds.
+
+A model trained without `difference` has had nothing removed, so how close it comes is a reference for the edit. It is also the filtered-corpus comparison of the D2.2 design, with figures meant for the D2.2 post. Eight new runs, at seeds 712 to 719, are scored beside the stored `τ_ℓ fixed` runs and controls at the same seeds.
 <!-- REVIEW: the lede and Observations are new with the results; the claim that the shortfall is mostly there without the anchor rests on E2 (sans-diff about 1.5 times its own gap) and E3 (sans-diff and the edited model as far apart as two edited runs). Verify: `RATIO_OWN`, `BETWEEN`. -->
 """
 
@@ -860,21 +861,27 @@ r"""
 
 This is an exploratory study, with no preregistration and no gate.
 
-The new condition, `sans-diff`, is the 400-epoch control with the language-model loss switched off on every `difference` context. The control has no anchor; it is the one the anneal-confirm experiment trained at these seeds. The corpus, the batches, and the schedule match the control at the same seed. So the windows still hold `difference` contexts, and the model reads them as input. But no target inside one counts toward the loss, so nothing in training asks the model to answer one. The loss is the mean over the targets that do count, so a step weighs the other six ops as the control does. Each `sans-diff` run starts from the same initialization as the control and the `τ_ℓ fixed` run at its seed, and sees the same windows in the same order. So the difference between `sans-diff` and the control at a seed comes from the masked loss alone.
+The new condition, `sans-diff`, is the 400-epoch control with the language-model loss switched off on every `difference` context. The control has no anchor; it is the one the anneal-confirm experiment trained at these seeds.
+
+The windows still hold `difference` contexts, and the model reads them as input, but no target inside one counts toward the loss, so nothing in training asks the model to answer one. The loss is the mean over the targets that do count, so a step weighs the other six ops as the control does.
+
+Each `sans-diff` run matches the control and the `τ_ℓ fixed` run at its seed: the same initialization, corpus, and schedule, and the same windows in the same order. So the difference between `sans-diff` and the control at a seed comes from the masked loss alone.
 <!-- REVIEW: the condition was a corpus with the `difference` lines dropped (`filtered`), which changed the batches and left a choice between matching passes (400 epochs) and matching steps (about 467). The paper review asked whether the loss could be masked instead, keeping everything else the same; the training code already has a target mask (`loss_mask` in `sca.anchoring.sample_anchored_batches`, used for the `FALSE` verification answers), so the open decision went away. Verify: the loss in `sca.training.loop` is the mean over non-padding targets, and a masked target is set to padding. -->
 
-The contexts of the other six ops keep their replacement op noise, so about one example in twenty of theirs still shows the answer `difference` would give. That keeps the target null exact for this model. A context of another op draws its noise from the other six ops, `difference` among them. The target null keeps that same noise model when it sets `difference` to zero. So on every context `sans-diff` is trained on, the Bayes predictor is the target null.[^cube] `sans-diff` is therefore scored against the predictor that is ideal for what it was trained on.
+On every context `sans-diff` is trained on, the Bayes predictor is the target null,[^cube] so `sans-diff` is scored against the predictor that is ideal for what it was trained on. The contexts of the other six ops keep their replacement op noise, drawn from the six ops other than their own, `difference` among them, so about one example in twenty still shows the answer `difference` would give. The target null keeps that same noise model when it sets `difference` to zero.
 <!-- REVIEW: added the cube-noise aside (assumptions review). The corpus of record carries cube noise at 0.02; `sca.data.incontext.posterior_over_ops` leaves it out, but the posterior the dose scoring uses (`docs/m2/ex-2.2.16/posterior.py`) includes it, so the claim holds for the stored arrays. Verify: the likelihood in that module's `posterior`. -->
 
 [^cube]: Cube noise included: the posterior of record models it as a term of its own.
 
-Contexts like the held-out `difference` contexts are rare in the training data of `sans-diff`. A context of another op shows the answer of `difference` only on an example that is noise of that one kind, so a context whose examples mostly point at `difference` seldom occurs. On those contexts, then, `sans-diff` answers from what it learned on other contexts, as the edited model has to.
+Contexts like the held-out `difference` contexts are rare in the training data of `sans-diff`, since a context of another op shows the answer of `difference` only on an example that is noise of that one kind. On those contexts, `sans-diff` answers from what it learned on other contexts, as the edited model has to.
 <!-- REVIEW: the held-out `difference` contexts carry the same replacement noise as the corpus, so most show `difference` on two or three examples rather than all three (assumptions review). Verify: the posterior bins of edit-effects (E2 there), where 695 of 2,000 held-out `difference` contexts have a posterior of 0.95 or more. -->
 
-The reference runs are those of the fixed-confirm experiment: `τ_ℓ fixed`, the recipe of record, at seeds 712 to 719, and the controls at the same seeds. Their dose scoring is stored. It holds the answer distributions on the same held-out contexts, both clean and under the full edit, beside the posterior over ops. `sans-diff` is scored with the same pass, so every distance below is taken on the same contexts and in the same way. Each run is measured at its final checkpoint. With eight runs per condition, a difference between conditions is trusted when it is clear of the seed range of both. Seed 718 learns the HSV ops late under `τ_ℓ fixed` and misses the task criterion of fixed-confirm on two of them. E4 shows whether the control and `sans-diff` do the same at that seed.
+The reference runs are those of the fixed-confirm experiment: `τ_ℓ fixed` (the recipe of record) at seeds 712 to 719, and the controls at the same seeds. Their stored dose scoring holds the answer distributions on the same held-out contexts, clean and under the full edit, beside the posterior over ops. `sans-diff` is scored with the same pass, so every distance below is taken on the same contexts in the same way, at the final checkpoint of each run.
 <!-- REVIEW: moved from the `falloff` runs and ex-2.2.23 controls at 704–711 to the recipe of record, `τ_ℓ fixed` at 712–719, with the anneal-confirm controls (paper review). Verify: `DOSE_ARRAYS_REF` in `docs/m2/fixed-confirm/experiment.py` and `docs/m2/anneal-confirm/experiment.py`; the control arrays are under the latter. -->
 
-A check arm, `dropped`, trains at two seeds (712 and 713) on the corpus with the `difference` contexts taken out. It runs for 400 epochs, which is about six-sevenths as many steps as the control. Under the mask, `sans-diff` still reads `difference` contexts in its window; under `dropped` it never sees one. If the two land in about the same place, reading the contexts without answering them makes little difference to what the model learns.
+With eight runs per condition, a difference between conditions is trusted when it is clear of the seed range of both. Seed 718 learns the HSV ops late under `τ_ℓ fixed` and misses the task criterion of fixed-confirm on two of them; E4 shows whether the control and `sans-diff` do the same at that seed.
+
+A check arm, `dropped`, trains at seeds 712 and 713 on the corpus with the `difference` contexts taken out, for 400 epochs (about six-sevenths as many steps as the control). Under the mask, `sans-diff` still reads `difference` contexts in its window; `dropped` never sees one. If the two land in about the same place, reading the contexts without answering them makes little difference to what the model learns.
 
 Every measurement here is taken on the answer distribution, which does not change when the residual stream is rotated. So the coordinate axes that Adam favors (the rotated-basis experiment) play no part, except through the edit itself, which acts along e₁.
 
@@ -883,13 +890,13 @@ Every measurement here is taken on the answer distribution, which does not chang
 Each measurement is taken on the answer distribution at the query `=`, over the colors of the palette, and averaged over held-out contexts.
 
 Distance from the target null
-:   Total variation between the answer distribution of the model and the target null, with any mass the model puts off the palette counted as distance. It runs from 0 (a perfect match) to 1 (nothing shared), so lower is closer. On `difference` contexts it is taken under the full edit for `τ_ℓ fixed`, as in edit-effects, and on the clean pass for `sans-diff` and the control. For `sans-diff` on the contexts of the other ops, it is how far the model falls short of the predictor that is ideal for what it was trained on.
+:   Total variation (half the summed absolute difference between two distributions) between the answer distribution of the model and the target null, with any mass the model puts off the palette counted as distance. It runs from 0 (a perfect match) to 1 (nothing shared), so lower is closer. On `difference` contexts it is taken under the full edit for `τ_ℓ fixed`, as in edit-effects, and on the clean pass for `sans-diff` and the control. For `sans-diff` on the contexts of the other ops, it is how far the model falls short of the predictor that is ideal for what it was trained on.
 
 Bayes gap
-:   The same distance, between the clean control and the Bayes predictor: how far a model of this size, trained without an anchor, falls short of the ideal on contexts like the ones it trained on. It sets the scale for the other distances. It is taken both on `difference` contexts, where edit-effects took its reference, and on the contexts of the other ops. edit-effects called it a comparison point rather than a floor for the edited model, since the two are distances between different pairs. For `sans-diff` the two pairs are the same, because its Bayes predictor is the target null on every context. So its own gap on the contexts of the other ops is a floor to measure its distance on `difference` contexts against.
+:   The same distance, between the clean control and the Bayes predictor: how far a model of this size, trained without an anchor, falls short of the ideal on contexts like the ones it trained on. It sets the scale for the other distances, and is taken on `difference` contexts (where edit-effects took its reference) and on the contexts of the other ops. edit-effects called it a comparison point rather than a floor for the edited model, since the two are distances between different pairs. For `sans-diff` the pairs are the same, because its Bayes predictor is the target null on every context, so its own gap on the contexts of the other ops is a floor for its distance on `difference` contexts.
 
 Share of the way
-:   How much of the way from the control to the target null a model has come. The control is the start of the way (0), and the target null its end (1). It is one minus a ratio of two distances from the target null: that of the model over that of the control at the same seed, each a mean over `difference` contexts. edit-effects measured it for edited runs against their own clean pass in place of the control, so for the `τ_ℓ fixed` runs it is reported both ways.
+:   How much of the way from the control (0) to the target null (1) a model has come: one minus the ratio of its distance from the target null to that of the control at the same seed, each a mean over `difference` contexts. edit-effects measured it for edited runs against their own clean pass in place of the control, so for the `τ_ℓ fixed` runs it is reported both ways.
 
 Distance between the models
 :   Total variation between `sans-diff` and the edited `τ_ℓ fixed` run at the same seed, context by context, on `difference` contexts.
@@ -907,15 +914,19 @@ Task score
 rf"""
 ## Along training (E1)
 
-How does `sans-diff` learn, compared with the control, which sees the same windows in the same order? Every run records the task score of each op on held-out contexts along training. So on the six ops `sans-diff` trains on, it can be compared with the control and with `τ_ℓ fixed`, step for step. Because the batches match, a gap between `sans-diff` and the control on one of those ops is caused by the masked loss.
+Every run records the task score of each op on held-out contexts along training, so on the six ops `sans-diff` trains on, it can be compared step for step with the control and with `τ_ℓ fixed`.
 
-The `τ_ℓ fixed` runs kept checkpoints along training, and `sans-diff` keeps the same ones. Scoring both at each kept epoch gives the distance from the target null on `difference` contexts along training: on the clean pass for `sans-diff`, and under the full edit for `τ_ℓ fixed`. That shows whether the two settle early or are still closing when training ends, and whether they close at the same pace. The controls kept no checkpoints, so this curve is missing for them, though their task score on `difference` along training is there.
+The `τ_ℓ fixed` runs kept checkpoints along training, and `sans-diff` keeps the same ones. Scoring both at each kept epoch gives the distance from the target null on `difference` contexts along training (clean for `sans-diff`, under the full edit for `τ_ℓ fixed`): whether the two settle early or are still closing when training ends, and whether they close at the same pace. The controls kept no checkpoints, so they have no such curve, though their task score on `difference` along training is there.
 
 {along_figure()}
 
-On the six ops it trains on, `sans-diff` keeps pace with the control from the first record to the last, and stays a little ahead of it (left). `τ_ℓ fixed` falls a little behind the control in the first hundred epochs, while the anchor settles. It catches up by the end, except at seed 718, which learns the HSV ops late (E4). On `difference` contexts `sans-diff` scores near zero all the way through, as the target null does (middle). So reading the `difference` contexts as input, with no loss on them, does not teach the model to answer them.
+On the six ops it trains on, `sans-diff` keeps pace with the control from the first record to the last, and stays a little ahead of it (left). `τ_ℓ fixed` falls a little behind the control in the first hundred epochs, while the anchor settles, and catches up by the end, except at seed 718, which learns the HSV ops late (E4).
 
-The main measure here is the distance from the target null on `difference` contexts (right). The two models close on it together. The edited model starts further away, the gap narrows over the first hundred epochs or so, and from epoch 128 it holds at a small, steady amount while both curves keep falling. Both settle from about epoch 300, so 400 epochs is long enough for this comparison. The extra distance that the anchor and the edit leave is set early, and does not close with more training. The dashed lines are `sans-diff` on the contexts of the other ops, where the target null is the ideal for what it trains on. They fall faster and further, which is the subject of E2.
+On `difference` contexts `sans-diff` scores near zero all the way through, as the target null does (middle). So reading the `difference` contexts as input, with no loss on them, does not teach the model to answer them.
+
+The two models close on the target null together on `difference` contexts (right). The edited model starts further away, the gap narrows over the first hundred epochs or so, and from epoch 128 it holds at a small, steady amount while both curves keep falling. Both settle from about epoch 300, so 400 epochs is long enough for this comparison. The extra distance that the anchor and the edit leave is set early, and does not close with more training.
+
+The dashed lines are `sans-diff` on the contexts of the other ops, where the target null is its Bayes predictor. They fall faster and further (E2).
 """
 
 # %%
@@ -929,9 +940,11 @@ How far is `sans-diff` from the target null on `difference` contexts, beside the
 
 {close_table()}
 
-`sans-diff` comes closer than the edited model at every seed, and the seed ranges of the two are well apart. It comes about three-fifths of the way, where the edited model comes half of the way. Measured against the clean pass of the `τ_ℓ fixed` run instead of the control, the share for the edited model is the same, since the clean run is as far from the target null as the control is. So the anchor and the edit do leave some distance that a model without the op can close, about a sixth of what the edited model has left.
+`sans-diff` comes closer than the edited model at every seed, with the seed ranges of the two well apart: about three-fifths of the way, where the edited model comes half of the way. So the anchor and the edit leave some distance that a model without the op can close, about a sixth of what the edited model has left.
 
-Most of the shortfall is there without them, though. On the contexts of the other ops, where the target null is the ideal for what `sans-diff` was trained on, it falls short by about as much as the control falls short of the Bayes predictor there. On `difference` contexts it falls about half as short again. So a model with this architecture, grammar, and set of other ops that has never been asked to answer a `difference` context still lands well short of the target null on one. The edited model lands a little further.
+Measured against the clean pass of the `τ_ℓ fixed` run instead of the control, the share for the edited model is the same, since the clean run is as far from the target null as the control is.
+
+Most of the shortfall is there without them, though. On the contexts of the other ops, `sans-diff` falls short of the target null (its Bayes predictor there) by about as much as the control falls short of the Bayes predictor; on `difference` contexts it falls about half as short again. So a model with this architecture, grammar, and set of other ops that has never been asked to answer a `difference` context still lands well short of the target null on one, and the edited model a little further.
 
 The two `dropped` runs land with `sans-diff` at their seeds, inside its seed range. A model that reads `difference` contexts without answering them ends up about where one that never sees them does.
 
@@ -943,22 +956,28 @@ Split by the posterior on `difference` (right), both models are furthest away on
 rf"""
 ## Whether it misses in the same way (E3)
 
-Do the edited model and `sans-diff` miss the target null in the same way? Suppose the distance between the two models is small beside the distance of each from the target null, and near the seed-to-seed spread. Then they share the mass among the other ops alike on a context, and the part of the shortfall they have in common comes from these contexts rather than from the anchor and the edit. But if the two models are as far from each other as from the target null, they miss in different ways on a context. They may still miss in the same kind of way, which the breakdown below looks at. The main measure is the distance between the models, context by context.
+Do the edited model and `sans-diff` miss the target null in the same way? If the distance between the two models is small beside the distance of each from the target null, and near the seed-to-seed spread, they share the mass among the other ops alike on a context. The part of the shortfall they have in common then comes from these contexts rather than from the anchor and the edit.
+
+If the two models are as far from each other as from the target null, they miss in different ways on a context, though they may still miss in the same kind of way (the breakdown below). The main measure is the distance between the models, context by context.
 
 {same_figure()}
 
-Two `sans-diff` runs at different seeds land about as far from each other as each lands from the target null, and so do two edited runs. `sans-diff` and the edited model at the same seed are as far apart as two edited runs, and a little further apart than two `sans-diff` runs, clear of their range. Sharing the seed and the initialization does not make the two miss alike on a context. The edited runs also scatter more from seed to seed than the `sans-diff` runs do, so the anchor and the edit add some scatter as well as some distance. So on a given `difference` context, each run shares the mass among the other ops in a way of its own. Much of its distance from the target null is that scatter from run to run.
+Two `sans-diff` runs at different seeds land about as far from each other as each lands from the target null, and so do two edited runs. `sans-diff` and the edited model at the same seed are as far apart as two edited runs, and a little further apart than two `sans-diff` runs, clear of their range. Sharing the seed and the initialization does not make the two miss alike on a context.
+
+The edited runs also scatter more from seed to seed than the `sans-diff` runs do, so the anchor and the edit add some scatter as well as some distance. On a given `difference` context, each run shares the mass among the other ops in a way of its own, and much of its distance from the target null is that scatter from run to run.
 
 Averaging the answers of each condition over its eight seeds, context by context, shows how much.
 
 {mean_table()}
 
-The averaged `sans-diff` answers are about a third closer to the target null than a single run, and the averaged edited answers too. The two averages are still about as far from each other as the `sans-diff` average is from the target null. But two averages over four seeds each, from the same condition, land nearly as far apart. So most of what separates the two averages is scatter that is still left after averaging eight seeds. The data show little of a miss that is common to the runs of one condition but differs between the two conditions.
+The averaged answers of both conditions are about a third closer to the target null than a single run. The two averages are still about as far from each other as the `sans-diff` average is from the target null, but two averages over four seeds each, from the same condition, land nearly as far apart. So most of what separates the two averages is scatter still left after averaging eight seeds, and the data show little of a miss common to the runs of one condition but different between the two conditions.
 <!-- REVIEW: added the split-half rows (claims review); the earlier text said part of the miss "differs between the conditions", which the split-half does not support. Verify: `SPLIT_HALF` against `BETWEEN_MEANS`. -->
 
 {breakdown_table()}
 
-Both models put nearly all of the mass on answers another op could give, and very little on answers only `difference` gives (the edited model a little more). Each is close to some mixture of the answers of the ops, and that mixture is nearly as far from the target null as the model is. So both miss in how they share the mass among the other ops, as edit-effects found for the earlier recipe. Raising the posterior of the target null to a power spreads the mass more evenly over the ops, or gives more of it to the op the examples favor. Neither version fits either model better than the target null as it is, so neither model leans toward even sharing or toward the favored op.
+Both models put nearly all of the mass on answers another op could give, and very little on answers only `difference` gives (the edited model a little more). Each is close to some mixture of the answers of the ops, and that mixture is nearly as far from the target null as the model is. So both miss in how they share the mass among the other ops, as edit-effects found for the earlier recipe.
+
+Raising the posterior of the target null to a power below 1 spreads the mass more evenly over the ops; a power above 1 gives more of it to the op the examples favor. Neither version fits either model better than the target null as it is, so neither model leans toward even sharing or toward the favored op.
 
 {confusion_figure()}
 
@@ -973,15 +992,21 @@ The two models differ in two ways: `sans-diff` never learned the op, and it trai
 rf"""
 ## What leaving the op out does to the other ops (E4)
 
-On contexts of the other ops, does `sans-diff` score as well as the control, and does it gain where the target null says a model without `difference` should? The target null predicts a gain on contexts of other ops whose examples point partly at `difference`, since a model that cannot answer `difference` puts that mass on the right op. edit-effects found that the edited model gains most of what the target null predicts there. This is the same comparison for a model that never learned the op, with the edited model beside it. It also checks the training. If `sans-diff` scored well below the control on the other ops, part of its distance in E2 could come from a weaker model rather than from the missing op. The main measure is the task score.
+On contexts of the other ops, does `sans-diff` score as well as the control, and does it gain where the target null says a model without `difference` should? The target null predicts a gain on contexts of other ops whose examples point partly at `difference`, since a model that cannot answer `difference` puts that mass on the right op. edit-effects found that the edited model gains most of that; this is the same comparison for a model that never learned the op, with the edited model beside it.
+
+It also checks the training: if `sans-diff` scored well below the control on the other ops, part of its distance in E2 could come from a weaker model rather than from the missing op. The main measure is the task score.
 
 {other_figure()}
 
-`sans-diff` scores a little above the control on each of the six other ops (left). One seed, 717, scores a little below the control on the three HSV ops and above it on the rest. The two `dropped` runs score like `sans-diff` at their seeds. At seed 718, where `τ_ℓ fixed` learns the HSV ops late, the control and `sans-diff` both learn them on time, so that weakness belongs to the anchored run. So `sans-diff` is not a weaker model, and its distance in E2 comes from the missing op.
+`sans-diff` scores a little above the control on each of the six other ops (left). One seed, 717, scores a little below the control on the three HSV ops and above it on the rest. The two `dropped` runs score like `sans-diff` at their seeds.
+
+At seed 718, where `τ_ℓ fixed` learns the HSV ops late, the control and `sans-diff` both learn them on time, so that weakness belongs to the anchored run. So `sans-diff` is not a weaker model, and its distance in E2 comes from the missing op.
 
 {other_table()}
 
-The gain sits where the target null says it should (right). Most of the held-out contexts have a posterior on `difference` below 0.05, and on those `sans-diff` and the control score about the same. Above that, the gain grows with the posterior on `difference`. `sans-diff` gains about as much as the target null predicts (a little more in the second bin), and the edited model gains less in every bin above the first. The edited model also loses a little on the contexts that look least like `difference`, a small cost of the edit on contexts it would ideally leave alone. The top bin holds about a hundred contexts, so its values are loose.
+The gain sits where the target null says it should (right). Most of the held-out contexts have a posterior on `difference` below 0.05, and on those `sans-diff` and the control score about the same; above that, the gain grows with the posterior. `sans-diff` gains about as much as the target null predicts (a little more in the second bin), and the edited model gains less in every bin above the first.
+
+The edited model also loses a little on the contexts that look least like `difference`, a small cost of the edit on contexts it would ideally leave alone. The top bin holds about a hundred contexts, so its values are loose.
 """
 
 # %%
@@ -989,10 +1014,14 @@ The gain sits where the target null says it should (right). Most of the held-out
 r"""
 ## Discussion
 
-A model that never learned `difference` lands short of the target null on `difference` contexts, a little closer than the edited model, and misses in the same kind of way. Of the two readings edit-effects offered, this favors the second: most of the shortfall is what a model of this kind does on contexts that look like an op it was never asked to answer. The anchor and the edit add a smaller part on top. That part is set early in training (E1), and it is largest on the contexts where the posterior is surest of `difference` (E2). They also add some scatter from seed to seed, and the model they leave is as far from `sans-diff` as two edited runs at different seeds are from each other (E3).
+A model that never learned `difference` lands short of the target null on `difference` contexts, a little closer than the edited model, and misses in the same kind of way. Of the two readings edit-effects offered, this favors the second: most of the shortfall is what a model of this kind does on contexts that look like an op it was never asked to answer.
+
+The anchor and the edit add a smaller part on top, set early in training (E1) and largest on the contexts where the posterior is surest of `difference` (E2). They also add some scatter from seed to seed, and the model they leave is as far from `sans-diff` as two edited runs at different seeds are from each other (E3).
 <!-- REVIEW: the last clause said the added part was "about as large as the difference between two runs of one condition", which conflated the extra distance from the target null (about 0.07, E2) with the distance between the two models (0.42, E3); the two-runs comparison belongs to the latter. Verify: `TO_NULL[FIXED] - TO_NULL[SANS]` against `BETWEEN["sans-fixed"]` and `BETWEEN["fixed-fixed"]`. -->
 
-The miss looks like an underdetermined choice. On a context whose examples point at `difference`, the other six ops are all poor fits, and the training data say little about how to share the mass among them, since such contexts are rare in it. Each run settles that sharing in its own way. So runs at different seeds disagree on a context by about as much as each misses the target null, and averaging over seeds (or pooling over contexts, as a confusion matrix does) brings the answers much closer to it. The target null sits nearer the average over such models than any one of them does.
+The miss looks like an underdetermined choice. On a context whose examples point at `difference`, the other six ops are all poor fits, and the training data say little about how to share the mass among them, since such contexts are rare in it. Each run settles that sharing in its own way.
+
+So runs at different seeds disagree on a context by about as much as each misses the target null, and averaging over seeds (or pooling over contexts, as a confusion matrix does) brings the answers much closer to it. The target null sits nearer the average over such models than any one of them does.
 
 On the contexts of the other ops, a model trained without `difference` gains almost all that the target null predicts, and the edited model gains most of it. So the edited model of the recipe of record comes within about a run-to-run difference of a model trained without the op, both on `difference` contexts and on the others. On the other ops, at a given seed, the two models are as far apart as two edited runs, and about as far apart as two `sans-diff` runs.
 <!-- REVIEW: the claim on the other ops is backed by `OTHER_O` (claims review), the edited model under the full edit beside `sans-diff` on other-op contexts. -->
