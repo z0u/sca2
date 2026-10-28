@@ -981,7 +981,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-We scored the edit on the recipe of record, at its fresh seeds, the way the edit-effects report scored the recipe before it. We also added the confusion matrices of ex-2.2.22. On every measure the two recipes come out about the same. The edit takes out more of `difference` as the dose grows, and the drop follows what each context needed. The edited answers get about half of the way to the target null. And the blocks after the edit put back no more e₁ on the other ops than the clean model has there.
+We scored the edit on the recipe of record, at its fresh seeds, the way the edit-effects report scored the recipe before it. We also added the confusion matrices of ex-2.2.22. The two recipes come out about the same on every measure, apart from a wider bound at slice 3 on the seed mean, which a small tail sets. The edit takes out more of `difference` as the dose grows, and the drop follows what each context needed. The edited answers get about half of the way to the target null. And the blocks after the edit put back no more e₁ on the other ops than the clean model has there.
 ///
 
 The [fixed confirmation](/docs/m2/fixed-confirm/report.py) adopted `τ_ℓ fixed` as the recipe of record for D2.2, and scored it on removal, spill, the task, and lost anchors. The [D2.2 design doc](/docs/m2/d2.2/design.md) asks for the rest of what the edit does on the same runs before the blog post: removal by dose, the grading, the landing and the write bound of the [edit-effects report](/docs/m2/edit-effects/report.py), and the confusion matrices of [ex-2.2.22](/docs/m2/ex-2.2.22/report.py).
@@ -1160,7 +1160,7 @@ So the bound holds on the recipe of record in the sense of ex-2.2.1: the blocks 
 r"""
 ## Discussion
 
-On the recipe of record, the edit does what it did on `falloff` on every measure here. It removes more of `difference` as the dose grows, and leaves the other ops alone at every dose. The drop on each context follows how much that context needed the op. And the blocks after the edit put back less e₁ than the clean model has. These are claims (b) and (d) of the design doc, now shown on the recipe of record at fresh seeds.
+On the recipe of record, the edit does what it did on `falloff` on every measure here, apart from the wider bound at slice 3. It removes more of `difference` as the dose grows, and leaves the other ops alone at every dose. The drop on each context follows how much that context needed the op. And the blocks after the edit put back less e₁ than the clean model has. These are claims (b) and (d) of the design doc, now shown on the recipe of record at fresh seeds.
 
 The landing is where the edit falls short, as before. Pooled over contexts the edited model sends the mass of `difference` to the other ops in about the proportions of the target null, but context by context it weighs them differently. With both recipes landing in the same place, the shortfall looks like a property of the model or of the edit rather than of the recipe. A model trained without `difference` would say how close any model of this size comes to the target null.
 
