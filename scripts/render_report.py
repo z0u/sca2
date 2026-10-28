@@ -5,16 +5,19 @@ Without a PDF this is the weave alone (:mod:`mini.lit`), with the figures under 
 
 Only the named report is exported and printed, and nothing is memoized: a print takes a few seconds, and its stamp changes with every commit anyway.
 
-A Markdown page under ``docs/`` (a design doc, a proposal) renders the same way, through the same page shell and stylesheets. It has no export bundle, so its PDF is printed from the weave (:func:`mini.lit.render`), and its ``--since`` baseline is its old text woven by today's code (:func:`review_base.render_md_at`).
+A Markdown page under ``docs/`` (a design doc, a proposal) renders the same way, through the same page shell and stylesheets. It has no export bundle, so its PDF is printed from the weave (:func:`mini.lit.render`), and its ``--since`` baseline is its old text woven by today's code (:func:`review_base.render_md_at`). A Markdown draft outside ``docs/`` (a write-up in a shared folder) prints the same way, with the images it links from disk copied in beside it (:func:`local_images`).
 """
 
 import argparse
+import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from urllib.parse import unquote
 
 from build_site import Bundle, LinkResolver, open_details, print_css, printable
 from export_reports import export_one
@@ -30,6 +33,7 @@ from mini.store import active_profile
 ROOT = Path(__file__).parent.parent.resolve()
 DOCS = ROOT / "docs"
 FORMATS = (".md", ".html", ".pdf")
+ASSETS = "_assets"
 
 
 def _git(*args: str) -> str:
@@ -79,8 +83,36 @@ def review_page(report: Path, bundle: Path, review: Review, links: LinkResolver)
     html = mark_verdicts((bundle / "index.html").read_text("utf-8"))
     if report.suffix == ".md":
         html = open_details(html)
+    if report.suffix == ".md" and DOCS not in report.resolve().parents:
+        html = local_images(html, page_dir=report.parent, bundle=bundle)
     page = printable(Bundle(html), links, from_dir=from_dir, key=key, report_css=print_css(report))
     return review.mark(page, key, root=bundle)
+
+
+_IMG_SRC = re.compile(r'(<img\b[^>]*?\bsrc=")([^"]+)(")')
+_URL_SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*:")
+
+
+def local_images(html: str, *, page_dir: Path, bundle: Path) -> str:
+    """*html* with each image that names a file on disk (an absolute path, or one relative to *page_dir*) copied into the *bundle*'s ``_assets/`` and linked there, so the print shows it.
+
+    A Markdown page is printed from its weave's directory, where neither kind of path resolves; this is how a draft outside the repo (a write-up in a shared folder, with its figure beside it) prints with its figures. A page under ``docs/`` doesn't need it: its images resolve to the site as its other links do. A URL, an ``_assets/`` figure or a path to nothing is left as it is.
+    """
+
+    def bundled(m: re.Match[str]) -> str:
+        src = m[2]
+        if _URL_SCHEME.match(src) or src.startswith((f"{ASSETS}/", "#")):
+            return m[0]
+        path = page_dir / unquote(src.split("?", 1)[0])  # an absolute src replaces page_dir
+        if not path.is_file():
+            return m[0]
+        blob = path.read_bytes()
+        leaf = f"local-{hashlib.sha256(blob).hexdigest()[:12]}{path.suffix}"
+        (bundle / ASSETS).mkdir(parents=True, exist_ok=True)
+        (bundle / ASSETS / leaf).write_bytes(blob)
+        return f"{m[1]}{ASSETS}/{leaf}{m[3]}"
+
+    return _IMG_SRC.sub(bundled, html)
 
 
 def write_from_bundle(bundle: Path, page: str, outs: list[Path]) -> None:

@@ -1,3 +1,4 @@
+import re
 import sys
 from pathlib import Path
 
@@ -68,3 +69,23 @@ def test_a_markdown_baseline_is_its_old_text_woven_today(render_report, tmp_path
     review_base.render_md_at("f" * 40, page)
     html = (tmp_path / "base" / "design" / "index.html").read_text()
     assert "Old text." in html and '<main class="lit">' in html
+
+
+def test_a_markdown_print_bundles_the_images_it_links_from_disk(render_report, tmp_path: Path):
+    """A draft outside the repo links its figure by an absolute path or beside itself; the print serves both from the bundle."""
+    page_dir, elsewhere, bundle = tmp_path / "draft", tmp_path / "figs", tmp_path / "bundle"
+    page_dir.mkdir()
+    elsewhere.mkdir()
+    (page_dir / "beside.png").write_bytes(b"beside")
+    (elsewhere / "far.png").write_bytes(b"far")
+    html = (
+        '<img alt="a" src="beside.png">'
+        f'<img alt="b" src="{elsewhere / "far.png"}">'
+        '<img alt="c" src="https://example.com/x.png">'
+        '<img alt="d" src="_assets/fig.png">'
+        '<img alt="e" src="missing.png">'
+    )
+    out = render_report.local_images(html, page_dir=page_dir, bundle=bundle)
+    srcs = re.findall(r'src="([^"]+)"', out)
+    assert [(bundle / s).read_bytes() for s in srcs[:2]] == [b"beside", b"far"]
+    assert srcs[2:] == ["https://example.com/x.png", "_assets/fig.png", "missing.png"]  # left as written
