@@ -1,6 +1,6 @@
 # D2.2 design: anchoring an operation the model infers
 
-D2.2 asks whether Sparse Concept Anchoring works for a concept that is never written down. Each line of the corpus is one context: three solved examples of one hidden operation, then a query under the same op, written `op1 ? op2 = answer` with a constant `?` where the op word would be. The model has to infer the op from the examples to answer the query. We anchor one op, `difference`, to the first axis of the residual stream (e₁), and then remove it by editing that axis out.
+D2.2 asks whether Sparse Concept Anchoring works for a concept that is never written down. The model sees a few solved equations that share a hidden operation, and has to infer the op to answer the last one. We anchor one op, `difference`, to the first axis of the residual stream (e₁), and then remove it by editing that axis out.
 
 The [pivot](pivot.md) explains why we took the op words out of the grammar, and the [index](/docs/index.md#d22-anchoring-an-operation) lists every experiment along the way.
 
@@ -8,23 +8,26 @@ The [pivot](pivot.md) explains why we took the op words out of the grammar, and 
 
 The recipe of record keeps the anchor on every run we have trained, at little cost to the task. The full edit removes most of `difference`, and the other ops stay within the selectivity criterion on every run. The edited model sends the mass to the other ops in about the right overall proportions, but context by context it gets only about half of the way to where an ideal predictor would.
 
-Two pieces of work remain before the blog post: a model trained without `difference`, to show how far any model could land, and the full set of measurements on the recipe of record, confusion matrices included. Everything else is future work.
+Three pieces of work remain before the blog post: a model trained without `difference`, to show how far any model could land; the full set of measurements on the recipe of record, confusion matrices included; and a comparison with directions found after training. Everything else is future work.
 
 ## The recipe of record
 
-The recipe is `τ_ℓ fixed`, adopted after the fixed confirmation. Its pull is pooled over slices 1 to 3, so the recipe does not have to say which block holds the op.
+The recipe is `τ_ℓ fixed`, adopted after the fixed confirmation. Its pull is pooled over slices 1 to 3, the outputs of every block but the last, so the recipe does not have to say which block holds the op.
+
+Grammar {.manual}
+:   Each line of the corpus is one context: three solved examples of one hidden op, then a query under the same op, with a constant `?` where the op word would be (`op1 ? op2 = answer , op1 ? op2 = answer , op1 ? op2 = answer , op1 ? op2 = answer ⏎`). The model infers the op from the examples and completes the query answer.
 
 Task {.manual}
-:   Seven ops: `mix`, `lighten`, `darken`, `difference`, and three HSV blend modes (`hue-hsv`, `sat-hsv`, `value-hsv`). Answers between grid levels round up or down at random, so a model is scored on the probability it puts on the right answer. Three examples in ten show the answer of another op (replacement op noise), so some contexts leave the op in doubt.
+:   Seven ops: `mix`, `lighten`, `darken`, `difference`, and three HSV blend modes (`hue-hsv`, `sat-hsv`, `value-hsv`). Answers between grid levels round up or down at random, so a model is scored on the probability it puts on the right answer. Three examples in ten show the answer of another op, drawn at random (replacement op noise), so some contexts leave the op in doubt. Where the two ops agree, the replacement doesn't show.
 
 Model and training {.manual}
-:   A d64-L4 simplified nGPT with a readout table of its own and attention that stops at the line break, trained for 400 epochs on a cosine schedule.
+:   A d64-L4 simplified nGPT with a readout table of its own and attention that stays within one context, trained for 400 epochs on a cosine schedule.
 
 Labels {.manual}
 :   About one `difference` context in fifty carries a label saying only that it uses `difference`. The model never sees the label, and no other op is labelled.
 
 Pull {.manual}
-:   On a labelled context, the anchor term pulls the states at slices 1 to 3 toward e₁, pooled over every slice and position. The pool over positions starts soft and sharpens to a temperature $\tau_p$ of 0.1 by epoch 40, and the pool over slices stays at a temperature $\tau_\ell$ of 0.1 throughout. The anchor weight $\lambda_a$ warms up to 0.1 over the same 40 epochs and eases off at the end. The embedding and block 4 are not pulled.
+:   On a labelled context, the anchor term (a regularizer) pulls the states at slices 1 to 3 toward e₁, pooled over every slice and position. The pool over positions starts soft and sharpens to a temperature $\tau_p$ of 0.1 by epoch 40, and the pool over slices stays at a temperature $\tau_\ell$ of 0.1 throughout. The anchor weight $\lambda_a$ warms up to 0.1 over the same 40 epochs and eases off at the end. The embedding and block 4 are not pulled.
 
 Anti-subspace term
 :   A light push on every state, labelled or not, away from e₁, so the pull has to earn its alignment. Its weight starts at 0.25 on every slice and anneals by epoch 360 to a hold that falls off with depth, from 0.2 at the embedding to 0.03 at block 4. The high hold on the first slices keeps the color embeddings from standing in for the op.
@@ -51,7 +54,7 @@ Landing
 Write bound
 :   How much e₁ the blocks after an edit put back on the states of the other ops, against what the clean model has there.
 
-The baseline leans on Adam giving the coordinate axes a privileged role: the model parks its syntax tokens on a few axes and leaves the rest quiet, so the other axes make a fair reference. The anchor itself does not need this; it held as before with the basis of the optimizer rotated.
+The comparison with this baseline leans on Adam giving the coordinate axes a privileged role: the model parks its syntax tokens on a few axes and leaves the rest quiet, so the other axes make a fair reference. The anchor itself does not need this; it held even with the basis of the optimizer rotated.
 
 ## The claims
 
@@ -61,7 +64,7 @@ For the narrow domain of color mixing, we want to be able to say five things.
 
 The anchor sits on the example answers, where the context shows the most about its op, and its alignment there rises with the posterior on `difference`. That fits an anchor that holds the inferred op, though it follows the evidence of each example on its own more than the evidence of the whole context.
 
-Losing the anchor was the largest gap in earlier recipes. The recipe of record kept it on all eight runs at fresh seeds and on all forty runs of an early count, which puts the loss rate below about one in fourteen. Seven of the eight fresh runs passed the task gate; the eighth learned two HSV ops late and was still catching up at the end.
+Losing the anchor was the largest gap in earlier recipes. The recipe of record kept it on all eight runs at fresh seeds and on all forty partial runs (called early, at epoch 64), which puts the loss rate below about one in fourteen. Seven of the eight fresh runs passed the task gate; the eighth learned two HSV ops late and was still catching up at the end.
 
 ### (b) Removing the op is graded and selective
 
@@ -75,15 +78,15 @@ Once `difference` is removed, the model should answer as an ideal predictor that
 
 We don't know whether half is short. A model trained without any `difference` contexts would show how close a model can come, and that is the first piece of work before the blog post.
 
-### (d) The side-effects are bounded in advance
+### (d) The model does not route around the edit
 
-Because we placed the axis, the clean model tells us how far an edit can turn the states of other ops. The claim to show is that the blocks after the edit put no more e₁ back on those states than the clean model has there. On `falloff` the write stayed within that bound past the embedding. Under the pool it stays close to the bound, with a few sites over it at slice 1, where the bound is only a few degrees.
+Claims (b) and (c) cover the side-effects on the answers. This one is about the states inside the model. Because we placed the axis, the clean model tells us in advance how much e₁ the states of the other ops carry, and so how far an edit can turn them. The claim to show is that the blocks after the edit put no more e₁ back on those states than the clean model has there, so the edit stays where we put it. On `falloff` the write stayed within that bound past the embedding. Under the pool it stays close to the bound, with a few sites over it at slice 1, where the bound is only a few degrees.
 
-On the recipe of record the evidence for the op peaks at slice 3 on every seed. Why editing block 1 alone removes most of the op under the older step recipe, which never pulled block 1, is still open.
+On the recipe of record the evidence for the op peaks at slice 3 on every seed.
 
 ### (e) Scarce, noisy labels are enough
 
-About one `difference` context in fifty is labelled, which is the shape of label we expect for a concept in natural language. The labels are already noisy in one sense: a label marks the op that generated the context, even when its examples favor another op. On the op word, a fifth of the labels on the wrong op still placed the op; that is untested for the inferred op.
+About one `difference` context in fifty is labelled, which is the shape of label we expect for a concept in natural language. The labels are already noisy in one sense: a label marks the op that generated the context, even when its examples favor another op. With the op word in the grammar (the older recipe), moving a fifth of the labels onto contexts of other ops still placed the op. Under replacement op noise, about a quarter of `difference` contexts, and so of the labelled ones, have a posterior below one half on `difference` (from 3,000 contexts drawn as the corpus draws them). So many labels already mark an op the model can't work out from the context. That may be enough noise to make the claim for the post, with wrong labels on the inferred op left as future work.
 
 ## Before the blog post
 
@@ -93,14 +96,17 @@ A reference model without `difference`
 The full scoring suite on the recipe of record
 :   The measurements of the edit-effects report (removal by dose, grading, landing, and the write bound) at the fresh seeds 712 to 719, and the confusion matrices of ex-2.2.22 (by posterior bin, the clean model, the edited model, and the target null), with the reference model beside them. The runs and some of the measurements are already stored, so this is mostly a re-analysis. In the [backlog](/todo/science/full-scoring-suite-on-the-recipe-of-record.md).
 
+Directions found after training
+:   Fit a direction for `difference` on the states of the controls, which were trained without the anchor, and edit along it through the same scorer. Three fits: the difference in means, a ridge probe, and LEACE (a linear eraser). No training is needed. Ex-2.2.1 did the same for *red*, where these directions cost the lines with no red about as much as they removed from red. To keep the comparison generous, each fit gets every label as well as the scarce ones, so a gap in favor of the anchor can't come from starving the other methods. The filtered corpus is the reference model above. In the [backlog](/todo/science/baseline-comparisons-sca-plan-related-work-delta.md).
+
 ## Future work
 
 These are leads, roughly in the order we would take them up.
 
-- Why block 1 alone holds most of the op on the step recipe, and a map of what e₁ holds along the context ([backlog](/todo/science/what-e1-holds-beside-the-op.md)).
+- A map of what e₁ holds along the context ([backlog](/todo/science/what-e1-holds-beside-the-op.md)).
 - Whether the soft start of $\tau_p$ is still needed now that $\tau_\ell$ is sharp.
 - Reference models without each op in turn, with that op anchored in place of `difference` ([backlog](/todo/science/reference-models-for-each-anchored-op.md)).
-- Comparisons with methods that do not place the concept: post-hoc directions on the controls, and gradient routing ([backlog](/todo/science/baseline-comparisons-sca-plan-related-work-delta.md)).
+- Gradient routing, a training-time method that masks gradients so that labelled examples update only parameters set aside for the concept ([backlog](/todo/science/baseline-comparisons-sca-plan-related-work-delta.md)).
 - Wrong labels on the inferred op ([backlog](/todo/science/wrong-labels-on-the-inferred-op.md)).
 - Whether the rest of the representation (the color geometry and the states of the other ops) keeps its shape under the anchor.
 - A sweep of the recipe weights and schedules together ([backlog](/todo/science/full-recipe-sweep-after-the-lean-fix.md)), and a run at [600 epochs](/todo/science/spill-at-600-epochs.md).
