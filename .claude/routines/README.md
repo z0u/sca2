@@ -24,6 +24,15 @@ The science desk has its own thread and prompt, and its brief is `.claude/agents
 
 Run `git fetch origin main` first. Push to the routine's branch, named in its file: restart it from `origin/main` each run, unless an open PR already uses it, in which case build on that PR. If the remote branch is gone, push with `--force-with-lease=<branch>:`, else `--force-with-lease`.
 
+## Practical notes (for the helper)
+
+Pass these on with every brief:
+
+- Use the GitHub MCP tools (`mcp__github__*`, loaded with ToolSearch) for PRs; there's no `gh` CLI.
+- Before writing prose (PR body, todo notes, docstrings), read `.agents/skills/writing/SKILL.md` and `.agents/skills/style-terms/SKILL.md`, since the Skill tool may not know repo skills here. Don't name the user in commits, PRs, todos or code.
+- A PR is created ready for review, and its body begins with the project's two-line attribution header, copied exactly from the thread's own session context, and ends with the Claude Code footer. Commit messages end with the thread's co-author line.
+- Run `./go check` before pushing.
+
 ## Environment note (for the helper)
 
 This project's environment holds production credentials: `HF_TOKEN` can write the production storage pair, and Modal tokens are set. Run `export MINI_PROFILE=dev` before any `mini` or `./go` command, and never write to production storage. Reading production to check results is fine. Each routine's file states its Modal limit.
