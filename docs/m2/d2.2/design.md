@@ -82,7 +82,7 @@ We don't know whether half is short. A model trained without any `difference` co
 
 Claims (b) and (c) cover the side-effects on the answers. This one is about the states inside the model. Because we placed the axis, the clean model tells us in advance how much e₁ the states of the other ops carry, and so how far an edit can turn them. The claim to show is that the blocks after the edit put no more e₁ back on those states than the clean model has there, so the edit stays where we put it. On `falloff` the write stayed within that bound past the embedding. Under the pool it stays close to the bound, with a few sites over it at slice 1, where the bound is only a few degrees.
 
-On the recipe of record the evidence for the op peaks at slice 3 on every seed.
+On the recipe of record the evidence for the op peaks at slice 3 on every seed. A candidate account of where the op is held, not yet reviewed: block 1 writes the judgement of each example onto e₁, a later block (usually block 3) reads it at the query `=`, and an edit removes the op whenever it sits between the two. That would also explain why editing block 1 alone removed most of the op under the older step recipe.
 
 ### (e) Scarce, noisy labels are enough
 
