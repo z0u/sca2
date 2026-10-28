@@ -432,7 +432,7 @@ def removal_along_draw(data: dict, alt_text: str) -> str:
             **Removal along training, paired by seed.** One panel per fresh seed: removal under the full edit at the
             checkpoints kept at epochs 16, 32 and 64 and then every 32 epochs, and at the end, for `τ_ℓ fixed` and
             `τ_ℓ anneal`. Net of the median over the other 63 axes of the run, as a share of the way to the target null
-            of the run at the end. The strip beneath is the slice temperature τ_ℓ of each recipe (log scale).
+            of the run at the end. The strips beneath are the slice temperature τ_ℓ of each recipe (log scale).
         """,
     )
     def _plot() -> plt.Figure:
@@ -455,16 +455,19 @@ def removal_along_draw(data: dict, alt_text: str) -> str:
             ax.tick_params(labelsize=6)
         for ax in axes[:, 0]:
             ax.set_ylabel("removal ↑", fontsize=7)
-        strip = fig.add_subplot(gs[2, :], sharex=axes.flat[0])
         e, tau = (np.asarray(v) for v in data["tau"])
-        strip.plot([e[0], e[-1]], [0.1, 0.1], color=INK[FIXED], lw=1.0)
-        strip.plot(e, tau, color=INK[ANNEAL], lw=1.0)
-        strip.set_yscale("log")
-        strip.set_yticks([0.025, 0.05, 0.1], ["0.025", "0.05", "0.1"])
-        strip.minorticks_off()
-        strip.set_ylabel("$\\tau_\\ell$", fontsize=7)
-        strip.set_xlabel("epoch", fontsize=7)
-        strip.tick_params(labelsize=6)
+        for j in range(4):
+            axes[1, j].tick_params(labelbottom=False)
+            strip = fig.add_subplot(gs[2, j], sharex=axes.flat[0])
+            strip.plot([e[0], e[-1]], [0.1, 0.1], color=INK[FIXED], lw=1.0)
+            strip.plot(e, tau, color=INK[ANNEAL], lw=1.0)
+            strip.set_yscale("log")
+            strip.set_yticks([0.025, 0.05, 0.1], ["0.025", "0.05", "0.1"] if j == 0 else [])
+            strip.minorticks_off()
+            strip.set_xlabel("epoch", fontsize=7)
+            strip.tick_params(labelsize=6)
+            if j == 0:
+                strip.set_ylabel("$\\tau_\\ell$", fontsize=7)
         handles, labels = axes.flat[0].get_legend_handles_labels()
         fig.legend(handles, labels, loc="outside upper center", ncols=len(labels), frameon=False, fontsize=7)
         return fig
@@ -856,7 +859,9 @@ The pairing with `τ_ℓ anneal` finds that the uneven removal came mostly from 
 
 The same holds for the other problems seen at eight seeds: the late rise in spill, the early bumps, and the late learner each appeared under one recipe at a seed and not under the other. A count over more runs, as in E3, is the steadier measure for these.
 
-Between the two, `τ_ℓ fixed` has one schedule fewer, and nothing in this confirmation suggests the anneal improves on it. The late spill scout found that the late sharpening lowered the late rise partway on both of its rising runs, and a change of GPU moved one of those runs by more than that. Here the late rise appeared under the anneal and not under the fixed recipe.
+Between the two, `τ_ℓ fixed` is simpler, and nothing in this confirmation suggests the anneal improves on it. The late spill scout found that the late sharpening lowered the late rise partway on both of its rising runs, and a change of GPU moved one of those runs by more than that. Here the late rise appeared under the anneal and not under the fixed recipe.
+
+We adopt `τ_ℓ fixed` as the recipe of record for D2.2, and the next step is to run the full scoring suite on it.
 """
 
 # %%
