@@ -30,7 +30,7 @@ Pass these on with every brief:
 
 - Use the GitHub MCP tools (`mcp__github__*`, loaded with ToolSearch) for PRs; there's no `gh` CLI.
 - Before writing prose (PR body, todo notes, docstrings), read `.agents/skills/writing/SKILL.md` and `.agents/skills/style-terms/SKILL.md`, since the Skill tool may not know repo skills here. Don't name the user in commits, PRs, todos or code.
-- A PR is created ready for review, and its body begins with the project's two-line attribution header, copied exactly from the thread's own session context, and ends with the Claude Code footer. Commit messages end with the thread's co-author line.
+- Open a PR ready for review (not a draft).
 - Run `./go check` before pushing.
 
 ## Environment note (for the helper)
