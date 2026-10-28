@@ -53,7 +53,7 @@ Distance from the target null
 :   Total variation between the answer distribution of the model and the target null, with any mass the model puts off the palette counted as distance; 0 is a perfect match and 1 shares nothing. Lower is closer. On `difference` contexts for `τ_ℓ fixed` it is taken under the full edit, as in edit-effects; for `sans-diff` and the control it is taken on the clean pass. On the contexts of the other ops, for `sans-diff`, it is how far the model falls short of the predictor that is ideal for what it was trained on.
 
 Bayes gap
-:   The same distance, between the clean control and the Bayes predictor: how far a model of this size, trained without an anchor, falls short of the ideal on contexts like the ones it trained on. It sets the scale for the other distances. Taken on `difference` contexts, where edit-effects took its reference, and on the contexts of the other ops.
+:   The same distance, between the clean control and the Bayes predictor: how far a model of this size, trained without an anchor, falls short of the ideal on contexts like the ones it trained on. It sets the scale for the other distances. Taken on `difference` contexts, where edit-effects took its reference, and on the contexts of the other ops. edit-effects called it a comparison point rather than a floor for the edited model, since the two are distances between different pairs. For `sans-diff` the two pairs are the same: its Bayes predictor is the target null on every context, so its own gap on the contexts of the other ops is the floor that its distance on `difference` contexts can be measured against.
 
 Share of the way
 :   One minus the distance of a model from the target null over the distance of the control at the same seed, each a mean over `difference` contexts: how much of the way from the control to the target null that model has come. The control is the start of the way (0), and the target null its end (1). For the edited `τ_ℓ fixed` runs, edit-effects took this against their own clean pass, and it is reported both ways.
@@ -61,9 +61,9 @@ Share of the way
 Distance between the models
 :   Total variation between `sans-diff` and the edited `τ_ℓ fixed` run at the same seed, context by context, on `difference` contexts.
 
-Seed-to-seed floor
-:   The same distance, between two `sans-diff` runs at different seeds, over all 28 pairs: how far apart two models trained the same way land. A distance between the models near the floor means they are as alike as a model is to itself at another seed.
-<!-- REVIEW: added the floor and the own-gap reading of the distance on other-op contexts (assumptions review, agreed in the paper review). The paper review asked whether "the way from the control" is the floor; it is not, and the share of the way now says where the way starts and ends. -->
+Seed-to-seed spread
+:   The same distance, between two `sans-diff` runs at different seeds, over all 28 pairs: how far apart two models trained the same way land. A distance between the models near the spread means they are as alike as a model is to itself at another seed.
+<!-- REVIEW: added the seed-to-seed spread and the own-gap reading of the distance on other-op contexts (assumptions review, agreed in the paper review). The paper review asked whether "the way from the control" is the floor; it is not, and the share of the way now says where the way starts and ends. Named a spread rather than a floor, since "floor" already means the no-evidence predictor (ex-2.2.21, ex-2.2.22) and edit-effects calls the Bayes gap "a comparison point rather than a floor". -->
 
 Task score
 :   Expected exact match, per op, on the clean pass.
@@ -100,7 +100,7 @@ TODO.
 r"""
 ## Whether it misses in the same way (E3)
 
-Wherever `sans-diff` lands, do the edited model and `sans-diff` miss the target null in the same way? If the distance between the two models is small beside the distance of each from the target null, and near the seed-to-seed floor, they share the mass among the other ops alike on a context, and the part of the shortfall they share is a property of these contexts rather than of the anchor and the edit. If the two models are as far from each other as from the target null, they miss in different ways.
+Wherever `sans-diff` lands, do the edited model and `sans-diff` miss the target null in the same way? If the distance between the two models is small beside the distance of each from the target null, and near the seed-to-seed spread, they share the mass among the other ops alike on a context, and the part of the shortfall they share is a property of these contexts rather than of the anchor and the edit. If the two models are as far from each other as from the target null, they miss in different ways.
 
 The two differ in two ways: `sans-diff` never learned the op, and it trained without the anchor. The clean `τ_ℓ fixed` run and the clean control at the same seed differ only in the anchor, so their distance on the contexts of the other ops bounds how much the anchor alone moves the answers there.
 
