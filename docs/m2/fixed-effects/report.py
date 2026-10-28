@@ -655,12 +655,16 @@ def d_row_off(kind: str) -> list[float]:
     return [float(np.nanmean(np.delete(m[D], D))) for m in CONFUSION[kind]]
 
 
-def other_rows_off(kind: str) -> list[float]:
-    """The mass off the diagonal in the rows of the other ops, summed over the row and averaged over rows, by bin."""
+def other_rows_off(kind: str, among_others: bool = False) -> list[float]:
+    """The mass off the diagonal in the rows of the other ops, summed over the row and averaged over rows, by bin.
+    With *among_others*, the `difference` column is left out, so it is the mass the other ops put on each other.
+    """
     out = []
     for m in CONFUSION[kind]:
-        off = np.where(np.eye(len(OPS), dtype=bool), 0.0, m)[OTHER].sum(1)
-        out.append(float(np.nanmean(off)))
+        off = np.where(np.eye(len(OPS), dtype=bool), 0.0, m)
+        if among_others:
+            off = np.delete(off, D, axis=1)
+        out.append(float(np.nanmean(off[OTHER].sum(1))))
     return out
 
 
@@ -942,8 +946,21 @@ FIT_ONE_IN = (N_FIT + N_NOFIT) / N_FIT
 # In the rows of the other ops, the mass on the answers only `difference` gives, by bin (the `difference` column).
 D_COL = {k: [float(np.nanmean(m[OTHER, D])) for m in v] for k, v in CONFUSION.items()}
 D_ROW_DIAG = {k: [float(m[D, D]) for m in v] for k, v in CONFUSION.items()}
-OTHER_OFF = {k: other_rows_off(k) for k in CONFUSION}
+# REVIEW: the prose on the rows of the other ops quotes the mass they put on each other, leaving the `difference`
+# column out, since that column empties under the edit and hid part of the move when it was counted in the total
+# (claims review). Verify: the confusion figure, the rows other than `difference`, columns other than `difference`.
+OTHER_OFF = {k: other_rows_off(k, among_others=True) for k in CONFUSION}
 D_OFF = {k: d_row_off(k) for k in CONFUSION}
+# REVIEW: "about as much mass on the answers of each other op as the target null" narrowed to "in total", with
+# `lighten` named as the op that gets about half its share in the two surer bins (claims review). Verify: the
+# `difference` row of the edited and target null matrices in the confusion figure, `lighten` column.
+# REVIEW: the Write entry of the measurements said "within the bound when it is no larger", while E4 scores the
+# write against the 1.25× tolerance of ex-2.2.1 and the largest seed-mean ratio is above 1; the entry now gives the
+# tolerance (claims review). Verify: the over table and RATIO_MAX.
+# The one other op that gets much less of the mass of `difference` than the target null gives it, in the surer bins.
+D_ROW_SHORT = {k: [float(m[D, OPS.index("lighten")]) for m in CONFUSION[k]] for k in ("edited", "target null")}
+assert all(e < 0.75 * t for e, t in zip(D_ROW_SHORT["edited"][1:], D_ROW_SHORT["target null"][1:], strict=True))
+NOFIT_BOUND_3_FALLOFF = NOFIT_BOUND_3[FALLOFF]
 N_SPILL_POSITIVE = {n: int((SPILL[n].max(axis=1) > 0).sum()) for n in RECIPES}
 FALL_AFTER = {n: float((REMOVAL[n][:, -2] - REMOVAL[n][:, -1]).max()) for n in RECIPES}
 N_FALL_AFTER = {n: int((REMOVAL[n][:, -1] < REMOVAL[n][:, -2]).sum()) for n in RECIPES}
@@ -993,7 +1010,7 @@ rf"""
 
 - [Removal and spill by dose (E1)](#removal-and-spill-by-dose-e1): removal rises with the dose and is nearly complete by three quarters of the full edit. The other ops lose less under the edit along e₁ than along a typical axis, at every dose, on {len(SEEDS_OF[FIXED]) - N_SPILL_POSITIVE[FIXED]} runs of {len(SEEDS_OF[FIXED])}, and no run comes near the criterion.
 - [Whether the drop follows what each context needed (E2)](#whether-the-drop-follows-what-each-context-needed-e2): the edit takes about the same share of the way to the target null whatever the posterior on `{DIFF}`, as on `falloff`. On the contexts of other ops whose examples point at `{DIFF}`, it gives back part of what those examples cost, as on `falloff`.
-- [Where the edited answers go (E3)](#where-the-edited-answers-go-e3): the edited answers get about half of the way to the target null. Pooled over contexts, the `{DIFF}` row of the confusion matrix matches the target null at every level of the posterior, and the other ops lose a little more mass to each other than on the clean pass.
+- [Where the edited answers go (E3)](#where-the-edited-answers-go-e3): the edited answers get about half of the way to the target null. Pooled over contexts, the `{DIFF}` row of the confusion matrix matches the target null in total at every level of the posterior, with `lighten` getting about half its share, and the other ops lose a little more mass to each other than on the clean pass.
 - [How far the edit turns the other ops (E4)](#how-far-the-edit-turns-the-other-ops-e4): the write stays within the clean bound past the embedding, as on `falloff`. On the seed mean the bound at the answers of the other ops is wider at slice 3 than on `falloff`, though the runs of the two recipes overlap. It is set by about one answer in a hundred, and the write there is small.
 
 ## Scope and method
@@ -1030,7 +1047,7 @@ Bound
 :   From the clean pass: arcsin of the {Q:.0%} quantile of |α| over the states of the other ops at a slice and position, as an angle. It is how far the edit turns those states there. At the answers it counts only those that do not fit `{DIFF}`.
 
 Write
-:   The same quantile over the states as they arrive under the full edit, after the block before has read the edited states of the slices below. The write is within the bound when it is no larger.
+:   The same quantile over the states as they arrive under the full edit, after the block before has read the edited states of the slices below. The write is within the bound when it is no more than a quarter over it, the tolerance of H4 in ex-2.2.1; we quote the ratio.
 
 Fit {{.manual}}
 :   Of an example or query answer: one that `{DIFF}` can give on its operands. In a context of another op, about one example answer in {FIT_ONE_IN:.0f} fits. It is evidence for `{DIFF}`, so the edit is meant to turn it.
@@ -1045,7 +1062,7 @@ A smaller dose takes a share of e₁ out rather than all of it. We expect remova
 
 {dose_figure()}
 
-Removal grows with the dose on every run, and by three quarters of the full edit it is complete: on the seed mean it already matches the full edit there. Past three quarters it moves by no more than {MOVE_AFTER[FIXED]:.2f} either way on any run. So the removal is not proportional to the dose: the first quarter of the edit removes {DOSE_SHARE[FIXED][0]:.0%} of what the full edit does, and the second quarter much more. `falloff` has the same shape, a little lower at the smaller doses.
+Removal grows with the dose on every run, and by three quarters of the full edit it has done all the full edit does: on the seed mean it already matches the full edit there. Past three quarters it moves by no more than {MOVE_AFTER[FIXED]:.2f} either way on any run. So the removal is not proportional to the dose: the first quarter of the edit removes {DOSE_SHARE[FIXED][0]:.0%} of what the full edit does, and the second quarter much more. `falloff` has the same shape, a little lower at the smaller doses.
 
 Spill is below zero at every dose on {len(SEEDS_OF[FIXED]) - N_SPILL_POSITIVE[FIXED]} runs of {len(SEEDS_OF[FIXED])}: the other ops lose less under the edit along e₁ than under the same edit along a typical other axis. The largest spill of any run at any dose is {SPILL_TOP["value"]:.3f}, on seed {SPILL_TOP["seed"]} (`{SPILL_TOP["op"]}`, at the full dose), far below the criterion.
 
@@ -1065,7 +1082,7 @@ The target null also predicts a gain on the contexts of other ops: where an exam
 
 {grading_figure()}
 
-The share removed is about level across the posterior on both recipes, between {SHARE_MEAN[FIXED].min():.2f} and {SHARE_MEAN[FIXED].max():.2f} at the seed mean on `τ_ℓ fixed`. It is a little higher than on `falloff` in every bin, though by less than the seed range, so we don't read it as a difference between the recipes. The lowest bin is the noisiest, since its contexts needed little to begin with, and {LOW_BIN_OVER} runs there go past the target null; no other bin shows the overshoot that a coarse feature would give.
+The share removed is about level across the posterior on both recipes, between {SHARE_MEAN[FIXED].min():.2f} and {SHARE_MEAN[FIXED].max():.2f} at the seed mean on `τ_ℓ fixed`. It is a little higher than on `falloff` in every bin, though by less than the spread between the runs of `τ_ℓ fixed`, so we don't read it as a difference between the recipes. The lowest bin is the noisiest, since its contexts needed little to begin with, and {LOW_BIN_OVER} runs there go past the target null; no other bin shows the overshoot that a coarse feature would give, and without the control subtracted (the last row of the table) the lowest bin removes the smallest share of any.
 
 Without subtracting the control, the edit takes `{DIFF}` contexts {span(grade(FIXED, "raw_share_all"))} of the way to the target null on its own. The control loses {np.mean(grade(FIXED, "control_drop_d")):.2f} there under the same edit, which is the part a model with no anchor loses too.
 
@@ -1097,11 +1114,11 @@ The confusion matrices pool over contexts, so they show the overall proportions.
 
 {confusion_figure()}
 
-In the `{DIFF}` row, the edited model puts about as much mass on the answers of each other op as the target null does, at every level of the posterior (the mean entry off the diagonal is {", ".join(f"{v:.2f}" for v in D_OFF["edited"])} by bin, against {", ".join(f"{v:.2f}" for v in D_OFF["target null"])}). The mass left on the answers of `{DIFF}`, on the diagonal, falls to a few hundredths. So, pooled over contexts, the edit puts the mass about where the target null does, and the matrices make the edited model look closer to the target null than the landing says. That is the difference between the two measures: mismatches in opposite directions cancel in a pooled matrix and add up in the landing.
+In the `{DIFF}` row, the edited model puts about as much mass on the answers of the other ops as the target null does in total, at every level of the posterior (the mean entry off the diagonal is {", ".join(f"{v:.2f}" for v in D_OFF["edited"])} by bin, against {", ".join(f"{v:.2f}" for v in D_OFF["target null"])}), and most ops get about their share. `lighten` gets about half of its share in the two surer bins ({", ".join(f"{v:.2f}" for v in D_ROW_SHORT["edited"][1:])} against {", ".join(f"{v:.2f}" for v in D_ROW_SHORT["target null"][1:])}), as it fell short on `falloff`, and `sat-hsv` a little more than its share. The mass left on the answers of `{DIFF}`, on the diagonal, falls to a few hundredths. So, pooled over contexts, the edit puts the mass about where the target null does, and the matrices make the edited model look closer to the target null than the landing says. That is the difference between the two measures: mismatches in opposite directions cancel in a pooled matrix and add up in the landing.
 
 In the rows of the other ops, the `{DIFF}` column empties under the edit. Where the context is least sure of its true op, the clean model puts {D_COL["clean"][0]:.2f} on the answers only `{DIFF}` gives, and the edited model {D_COL["edited"][0]:.2f}, near the zero of the target null. This is the gain of E2 seen from the other side.
 
-The rest of those rows barely change. Their diagonal is lower than that of the target null on the clean pass already, since the clean model is some way from the Bayes predictor, and the edit moves a little more mass off it in the two surer bins (in total off the diagonal, {", ".join(f"{v:.2f}" for v in OTHER_OFF["clean"][1:])} clean against {", ".join(f"{v:.2f}" for v in OTHER_OFF["edited"][1:])} edited).
+The rest of those rows change little. Their diagonal is lower than that of the target null on the clean pass already, since the clean model is some way from the Bayes predictor. Where the context is least sure, the mass that leaves the `{DIFF}` column goes to the true op and to the other ops alike, both toward the target null. In the two surer bins the edit moves a little more mass off the diagonal onto the other ops, away from it (the mass the other ops put on each other is {", ".join(f"{v:.2f}" for v in OTHER_OFF["clean"][1:])} clean against {", ".join(f"{v:.2f}" for v in OTHER_OFF["edited"][1:])} edited, with {", ".join(f"{v:.2f}" for v in OTHER_OFF["target null"][1:])} for the target null).
 """
 
 # %%
@@ -1121,7 +1138,7 @@ From slice 2 on, the other ops arrive with much less e₁ than the clean model g
 
 On the seed mean, the bound itself has a different shape. On `falloff` it was widest at slice 1 at the example answers and narrowed with depth. On `τ_ℓ fixed` it widens to slice 3, to {angle(seed_mean(FIXED, "nofit", "q_clean")[3]):.0f}° against {angle(seed_mean(FALLOFF, "nofit", "q_clean")[3]):.0f}° on `falloff`, and the query answer does the same ({angle(BOUND[FIXED][3, QUERY_ANSWER]):.0f}° against {angle(BOUND[FALLOFF][3, QUERY_ANSWER]):.0f}°). Run by run the two recipes overlap, though: at the example answers the bound is wider at slice 3 than at slice 1 on {RISES_TO_3[FIXED]} runs of `τ_ℓ fixed` and {RISES_TO_3[FALLOFF]} of `falloff`.
 
-A small tail sets the bound at slice 3. The median example answer that does not fit would turn by {NOFIT_MEDIAN_3[FIXED]:.0f}° there, while the share close to e₁ (|α| above 0.5) is {TAIL[FIXED].min():.1%} to {TAIL[FIXED].max():.1%} by run ({TAIL[FALLOFF].min():.1%} to {TAIL[FALLOFF].max():.1%} on `falloff`). The bound is the 99th percentile, so a tail near one in a hundred moves it a long way: it ranges from {NOFIT_BOUND_3[FIXED].min():.0f}° to {NOFIT_BOUND_3[FIXED].max():.0f}° across the runs of `τ_ℓ fixed`. The edit-effects report found a tail like this at the query answer on `falloff`, with nothing in the examples to set it apart. Here too the contexts in the tail have about as little posterior on `{DIFF}` as the rest, on {len(SEEDS_OF[FIXED]) - len(TAIL_POST_HIGH)} runs of {len(SEEDS_OF[FIXED])}, so we have no account of it.
+A small tail sets the bound at slice 3. The median example answer that does not fit would turn by {NOFIT_MEDIAN_3[FIXED]:.0f}° there, while the share close to e₁ (|α| above 0.5) is {TAIL[FIXED].min():.1%} to {TAIL[FIXED].max():.1%} by run ({TAIL[FALLOFF].min():.1%} to {TAIL[FALLOFF].max():.1%} on `falloff`). The bound is the 99th percentile, so a tail near one in a hundred moves it a long way: it ranges from {NOFIT_BOUND_3[FIXED].min():.0f}° to {NOFIT_BOUND_3[FIXED].max():.0f}° across the runs of `τ_ℓ fixed`, and from {NOFIT_BOUND_3_FALLOFF.min():.0f}° to {NOFIT_BOUND_3_FALLOFF.max():.0f}° across those of `falloff`. The edit-effects report found a tail like this at the query answer on `falloff`, with nothing in the examples to set it apart. Here too the contexts in the tail have about as little posterior on `{DIFF}` as the rest, on {len(SEEDS_OF[FIXED]) - len(TAIL_POST_HIGH)} runs of {len(SEEDS_OF[FIXED])}, so we have no account of it.
 
 {turn_table()}
 
@@ -1135,7 +1152,7 @@ r"""
 
 On the recipe of record, the edit does what it did on `falloff` on every measure here. It removes more of `difference` as the dose grows and leaves the other ops alone at every dose; the drop on each context follows how much that context needed the op; the blocks after the edit put back less e₁ than the clean model has. These are the claims (b) and (d) of the design doc, now on the recipe of record at fresh seeds.
 
-The landing is where the edit falls short, as before. Pooled over contexts the edited model sends the mass of `difference` to the other ops in the proportions of the target null, but context by context it weighs them differently. With both recipes landing in the same place, the shortfall looks like a property of the model or of the edit rather than of the recipe. A model trained without `difference` would say how close any model of this size comes to the target null.
+The landing is where the edit falls short, as before. Pooled over contexts the edited model sends the mass of `difference` to the other ops in about the proportions of the target null, but context by context it weighs them differently. With both recipes landing in the same place, the shortfall looks like a property of the model or of the edit rather than of the recipe. A model trained without `difference` would say how close any model of this size comes to the target null.
 
 Two results add to what the edit-effects report showed. Removal is nearly complete by three quarters of the full edit, so the full edit has some margin. And the bound at slice 3 is wider than on `falloff` on the seed mean, set by a tail of about one state of another op in a hundred that varies a lot between runs. That does not change what the edit does to the answers here, but it makes the turn we can state in advance larger; if a later recipe spills, the tail at slice 3 would be a place to look.
 """
