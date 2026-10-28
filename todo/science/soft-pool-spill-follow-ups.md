@@ -1,8 +1,8 @@
 ---
-status: partial
+status: done
 tags: [anchoring, D2.2]
 opened: 2026-10-21
-priority: high
+closed: 2026-10-28
 ---
 # Could `pool 1–3, soft τ` be the recipe of record?
 
@@ -29,3 +29,5 @@ Seed count: the loss-rate screen put `falloff` at one loss in 40 seeds and `step
 **2026-10-26, recipe-compare** — [Recipe-compare](/docs/m2/recipe-compare/report.py) measured this condition beside `falloff` and `step, soft τ` on seeds 704 to 711. Its evidence peaks at slice 3 on every seed, it removes a couple of hundredths less than `falloff`, costs the task least, and spills over the criterion on two runs (707 and 711). The restricted edits put the spill at the edit at block 1, and under the pool the other ops sit closer to e₁ at the embedding and at slice 1. The paper review took the range of slices 1 to 3 as principled (the inferred op cannot exist in the embedding, and at slice 4 it can no longer reach the query `=`), so a pool over slices 2 to 4 is not wanted. It expects tuning the schedules of λ_a and τ_ℓ to bring the spill down, which fits the first and third bullets above.
 
 **2026-10-27, housekeeping** — The warm-up timing bullet has an answer, and the item now leads toward a decision. The [soft pool scout](/docs/m2/soft-pool-scout/report.py) found that the final slice temperature τ_ℓ decides the early kind of spill, and when the temperatures sharpen barely matters: at τ_ℓ 0.1 no run is over the criterion at epoch 64, and moving the λ_a warm-up shifts the spill by less than the seeds vary. Its two finished conditions stay within the criterion on every seed at epoch 400, with the late kind reaching about the line on one or two seeds. The [late-spill scout](/docs/m2/late-spill-scout/report.py) found that the late kind follows the anti anneal, and that sharpening τ_ℓ to 0.025 lowers it with no measured cost to removal or the task. The anneal-confirmation PR (#302, open) runs that schedule from epoch 0 at fresh seeds 712 to 719 and at the forty loss-rate seeds, as the confirmation run for adopting it as the recipe of record. The first two bullets (a stronger anti term while the pool is soft, and the anti term off on slice 4) are untried, and may not be needed if that run holds.
+
+**2026-10-28, design refresh** — Settled: yes. After the [anneal confirmation](/docs/m2/anneal-confirm/report.py) and the [fixed confirmation](/docs/m2/fixed-confirm/report.py), the pool over slices 1 to 3 with τ_ℓ held at 0.1 (`τ_ℓ fixed`) is the recipe of record of the [D2.2 design](/docs/m2/d2.2/design.md). The first two bullets were never needed. Whether the soft start of τ_p is still needed with a sharp τ_ℓ is listed there as future work.
