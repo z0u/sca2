@@ -252,12 +252,9 @@ def dose_figure() -> str:
         "removal": {n: REMOVAL[n].tolist() for n in RECIPES},
         "spill": {n: SPILL[n].tolist() for n in RECIPES},
     }
-    m = {n: REMOVAL[n].mean(axis=0) for n in RECIPES}
     alt = (
-        f"Left: removal rises with the dose on every run of both recipes; the τ_ℓ fixed seed mean goes "
-        f"{', '.join(f'{v:.2f}' for v in m[FIXED])} at doses 0.25 to 1, and falloff "
-        f"{', '.join(f'{v:.2f}' for v in m[FALLOFF])}. Right: spill stays below the criterion of 0.02 at every "
-        f"dose on every run of τ_ℓ fixed, with its largest value {SPILL[FIXED].max():.3f}; falloff stays below it too."
+        "Left: removal rises with the dose on every run of both recipes and levels off from three quarters of the "
+        f"full edit. Right: spill stays below the criterion of {CRITERION} at every dose on every run of both recipes."
     )
     return dose_draw(data, alt)
 
@@ -411,12 +408,9 @@ def grading_figure() -> str:
         "null": GAIN_NULL.tolist(),
     }
     alt = (
-        f"Left: the share removed is roughly level across the posterior on {DIFF} for both recipes; the τ_ℓ fixed "
-        f"seed mean runs {', '.join(f'{v:.2f}' for v in SHARE_MEAN[FIXED])} from the lowest bin to the highest, and "
-        f"falloff {', '.join(f'{v:.2f}' for v in SHARE_MEAN[FALLOFF])}. Right: on the other ops the gain under the "
-        f"edit rises with the posterior on {DIFF}; the τ_ℓ fixed seed mean is "
-        f"{', '.join(f'{v:.2f}' for v in GAIN_MEAN[FIXED])} by bin, against "
-        f"{', '.join(f'{v:.2f}' for v in GAIN_NULL)} for the target null."
+        f"Left: the share removed is roughly level across the posterior on {DIFF} for both recipes, a little under "
+        f"the target null. Right: on the other ops the gain under the edit rises with the posterior on {DIFF}, as "
+        "the target null predicts, and the two recipes match bin by bin."
     )
     return grading_draw(data, alt)
 
@@ -723,17 +717,10 @@ def confusion_draw(data: dict, alt_text: str) -> str:
 
 def confusion_figure() -> str:
     data = {k: [m.tolist() for m in v] for k, v in CONFUSION.items()}
-    fmt = lambda xs: ", ".join(f"{v:.2f}" for v in xs)  # noqa: E731
     alt = f"""
-        A grid of {len(CONF_BINS) - 1} rows, one per bin of the posterior on the true op, and three columns: the clean
-        model, the edited model, and the target null, each a {len(OPS)} by {len(OPS)} matrix with the true op on the
-        rows and, on the columns, the mass on the answers of each op that the true op cannot give. In the `{DIFF}`
-        row the clean model puts little mass off the diagonal, and the edited model and the target null put much
-        more there; the mean entry off the diagonal in that row, by bin from low to high, is
-        {fmt(d_row_off("clean"))} clean, {fmt(d_row_off("edited"))} edited, and {fmt(d_row_off("target null"))}
-        for the target null. In the rows of the other ops, the total mass off the diagonal per row is
-        {fmt(other_rows_off("clean"))} clean and {fmt(other_rows_off("edited"))} edited, against
-        {fmt(other_rows_off("target null"))} for the target null.
+        Under the edit, the {DIFF} row spreads its mass over the other ops about as the target null does, in each
+        of the {len(CONF_BINS) - 1} bins of the posterior, with less on lighten. The rows of the other ops change
+        little, apart from their {DIFF} column, which empties.
     """
     return confusion_draw(data, alt)
 
@@ -868,12 +855,11 @@ TURN_DATA = {
 
 def turn_figure() -> str:
     t = TURN_DATA[FIXED]
-    fmt = lambda xs: ", ".join(f"{v:.0f}" for v in xs)  # noqa: E731
     alt = (
-        f"Three panels by slice from the embedding to slice 4. Example answers, τ_ℓ fixed: bound {fmt(t['answers']['bound'])} "
-        f"degrees, write {fmt(t['answers']['write'])}. Query answer: bound {fmt(t['query']['bound'])}, write "
-        f"{fmt(t['query']['write'])}. Other positions: bound {fmt(t['rest']['bound'])}, write {fmt(t['rest']['write'])}. "
-        "The falloff lines follow the same shapes."
+        "On both recipes the write falls far below the bound from slice 2 on at the example and query answers, and "
+        "stays near it at the other positions. The τ_ℓ fixed bound peaks at slice 3, at "
+        f"{t['answers']['bound'][3]:.0f}° for the example answers and {t['query']['bound'][3]:.0f}° for the query "
+        "answer, where the falloff bound does not."
     )
     return turn_draw(TURN_DATA, alt)
 
@@ -1092,7 +1078,7 @@ The share removed is about level across the posterior on both recipes, between {
 
 The lowest bin is the noisiest, since its contexts needed little to begin with, and {LOW_BIN_OVER} runs there go past the target null. No other bin shows the overshoot that a coarse feature would give. Without the control subtracted (the last row of the table below), the lowest bin removes the smallest share of any.
 
-Without subtracting the control, the edit takes `{DIFF}` contexts {span(grade(FIXED, "raw_share_all"))} of the way to the target null on its own. Under the same edit, the control loses {np.mean(grade(FIXED, "control_drop_d")):.2f} there; that is the part a model with no anchor loses too.
+Over all bins, without the control subtracted, the edit takes `{DIFF}` contexts {span(grade(FIXED, "raw_share_all"))} of the way to the target null on its own. Under the same edit, the control loses {np.mean(grade(FIXED, "control_drop_d")):.2f} there; that is the part a model with no anchor loses too.
 
 {grading_table()}
 
