@@ -23,6 +23,8 @@ from mini.reports import (
     mark_figures,
     relative_urls,
     report_figures,
+    report_glossary,
+    report_styles,
     reports,
     rewrite_links,
     save_pins,
@@ -628,3 +630,20 @@ def test_mark_verdicts_is_idempotent_and_the_last_verdict_under_a_heading_wins()
 def test_mark_verdicts_leaves_a_page_without_verdicts_untouched():
     page = '<h2 id="a">Q</h2>\n<div class="admonition tip">\n<p class="admonition-title"></p>\n<p>tl;dr</p>\n</div>'
     assert mark_verdicts(page) == page
+
+
+def test_report_styles_for_a_page_outside_any_project_come_from_the_working_project(tmp_path, monkeypatch):
+    project = tmp_path / "project"
+    (project / "docs").mkdir(parents=True)
+    (project / "pyproject.toml").write_text("")
+    (project / "docs" / "report.css").write_text(".report {}")
+    (project / "docs" / "md-prose.css").write_text(".prose {}")
+    draft = tmp_path / "shared" / "draft.md"  # a draft in a shared folder, with no project of its own
+    draft.parent.mkdir()
+    draft.write_text("# Draft\n")
+    monkeypatch.chdir(project)
+    assert report_styles(draft) == ".report {}\n.prose {}"
+    assert report_glossary(draft) == project / "docs" / "glossary.md"
+    # A page inside a project keeps its own project's sheets, wherever it is rendered from.
+    monkeypatch.chdir(tmp_path)
+    assert report_styles(project / "docs" / "page.md") == ".report {}\n.prose {}"
