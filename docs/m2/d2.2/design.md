@@ -68,7 +68,7 @@ Losing the anchor was the largest gap in earlier recipes. The recipe of record k
 
 ### (b) Removing the op is graded and selective
 
-A stronger edit takes out more of `difference`, and the other ops are left as they were at every dose. On the recipe of record the full edit removes 0.88 of the way to the target null on the seed mean (0.83 to 0.91), and no run ends near the spill criterion or rises toward it late in training. The drop on each context follows how much it needed `difference`, which was measured on the scout seeds and is still to be measured at the fresh ones.
+A stronger edit takes out more of `difference`, and the other ops are left as they were at every dose. On the recipe of record the full edit removes 0.88 of the way to the target null on the seed mean (0.83 to 0.91), and no run ends near the spill criterion or rises toward it late in training. The drop on each context follows how much it needed `difference`, at the scout seeds and at the fresh ones ([fixed-effects](/docs/m2/fixed-effects/report.py)).
 
 The spill of earlier recipes came from a stand-in for the op in the color embedding table, and later from block 1. Holding the anti weight high on the first slices and keeping the pool over slices sharp took both away.
 

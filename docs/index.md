@@ -616,4 +616,12 @@ With `falloff` in hand, we looked at what the edit does beyond removal and spill
 
     <!-- mini:figures ./m2/fixed-confirm/report.py -->
 
+- [What the edit does on τ_ℓ fixed](./m2/fixed-effects/report.py)
+
+    A re-analysis of the fixed confirmation's runs, scored as the edit-effects report scored `falloff`, with the confusion matrices added. Every measure comes out about as on `falloff`: removal grows with the dose and the other ops stay well within the spill criterion at every dose, the loss on each `difference` context follows how much it needed the op, and the edited answers get about half of the way to the target null. The clean bound at slice 3 is wider on the seed mean, set by a tail of about one state in a hundred.
+
+    <span class="tags">`reanalysis` `in-context` `intervention` `grading`</span>
+
+    <!-- mini:figures ./m2/fixed-effects/report.py -->
+
 </details>
