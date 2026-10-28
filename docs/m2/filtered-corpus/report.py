@@ -258,6 +258,20 @@ CONTROL_O = [float(between(clean_of(CONTROL, a), clean_of(CONTROL, b))[~IS_D].me
 MEAN_P = {k: np.mean([p_of(k, s)[IS_D] for s in SEEDS], axis=0) for k in (SANS, FIXED)}
 BETWEEN_MEANS = float(between(MEAN_P[SANS], MEAN_P[FIXED]).mean())
 MEAN_TO_NULL = {k: float(tv(QN[IS_D], MEAN_P[k]).mean()) for k in MEAN_P}
+# Two averages of one condition, over the first and last half of the seeds: how far apart averages land by chance.
+HALF = len(SEEDS) // 2
+SPLIT_HALF = {
+    k: float(
+        between(*(np.mean([p_of(k, s)[IS_D] for s in half], axis=0) for half in (SEEDS[:HALF], SEEDS[HALF:]))).mean()
+    )
+    for k in (SANS, FIXED)
+}
+# On the contexts of the other ops: the edited model beside `sans-diff` at the same seed, and each beside itself.
+OTHER_O = {
+    "sans-fixed": [float(between(clean_of(SANS, s), DOSE[(FIXED, s)]["p_full"].astype(np.float64))[~IS_D].mean()) for s in SEEDS],
+    "sans-sans": [float(between(clean_of(SANS, a), clean_of(SANS, b))[~IS_D].mean()) for a, b in PAIRWISE],
+    "fixed-fixed": [float(between(*(DOSE[(FIXED, s)]["p_full"].astype(np.float64) for s in (a, b)))[~IS_D].mean()) for a, b in PAIRWISE],
+}  # fmt: skip
 
 
 def support(op: int, pairs: np.ndarray) -> np.ndarray:
@@ -606,13 +620,20 @@ def mean_table() -> str:
         ["`sans-diff` from the target null", span(TO_NULL[SANS]), num(MEAN_TO_NULL[SANS])],
         ["`τ_ℓ fixed`, edited, from the target null", span(TO_NULL[FIXED]), num(MEAN_TO_NULL[FIXED])],
         ["`sans-diff` from `τ_ℓ fixed`, edited", span(BETWEEN["sans-fixed"]), num(BETWEEN_MEANS)],
+        [f"`sans-diff`, seeds {SEEDS[0]}–{SEEDS[HALF - 1]} from {SEEDS[HALF]}–{SEEDS[-1]}", "", num(SPLIT_HALF[SANS])],
+        [
+            f"`τ_ℓ fixed`, edited, seeds {SEEDS[0]}–{SEEDS[HALF - 1]} from {SEEDS[HALF]}–{SEEDS[-1]}",
+            "",
+            num(SPLIT_HALF[FIXED]),
+        ],
     ]
     return table_html(
         ["on `difference` contexts", "run by run", "answers averaged over seeds"],
         rows,
         f"""**Distances taken run by run and on the answers averaged over the {len(SEEDS)} seeds.** The first column is
         the seed mean and range of the distance taken on each run (or each pair at a seed); the second takes the
-        distance once, on the answer distributions of each condition averaged over its seeds context by context.""",
+        distance once, on the answer distributions of each condition averaged over its seeds context by context; the last two
+        rows average each half of the seeds of one condition separately.""",
     )
 
 
@@ -811,7 +832,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-We trained the control with no loss on `difference` contexts, so that it never learns the op, and set it beside the edited model of the recipe of record. On `difference` contexts it lands a little closer to the target null than the edited model and still well short of it. It misses in the same way: the mass goes to the other ops, but it is shared among them differently from the target null on each context, and differently again at each seed.
+We trained the control with no loss on `difference` contexts, so that it never learns the op, and set it beside the edited model of the recipe of record. On `difference` contexts it lands a little closer to the target null than the edited model and still well short of it. It misses in the same kind of way: the mass goes to the other ops, but it is shared among them differently from the target null on each context, and differently again at each seed.
 ///
 
 The edit-effects experiment found that the edited model sends the mass to the right ops overall, but shares it among them differently from the target null context by context. Its Discussion offers two readings: the edit blurs evidence the model uses to share the mass among the other ops, or no model with this architecture, grammar, and set of other ops learns that sharing on contexts that look like `difference`. A model trained without `difference` has had nothing removed, so how close it comes is a reference for the edit. It is also the filtered-corpus comparison of the D2.2 design, and its figures are meant to go into the D2.2 post. This study trains eight new runs, one per seed at seeds 712 to 719, and scores the stored `τ_ℓ fixed` runs and controls at the same seeds.
@@ -917,17 +938,18 @@ Split by the posterior on `difference` (right), both models are furthest on the 
 rf"""
 ## Whether it misses in the same way (E3)
 
-Do the edited model and `sans-diff` miss the target null in the same way? If the distance between the two models is small beside the distance of each from the target null, and near the seed-to-seed spread, they share the mass among the other ops alike on a context, and the part of the shortfall they share is a property of these contexts rather than of the anchor and the edit. If the two models are as far from each other as from the target null, they miss in different ways. The main measure is the distance between the models, context by context.
+Do the edited model and `sans-diff` miss the target null in the same way? If the distance between the two models is small beside the distance of each from the target null, and near the seed-to-seed spread, they share the mass among the other ops alike on a context, and the part of the shortfall they share is a property of these contexts rather than of the anchor and the edit. If the two models are as far from each other as from the target null, they miss in different ways on a context, though they may still miss in the same kind of way, which the breakdown below looks at. The main measure is the distance between the models, context by context.
 
 {same_figure()}
 
-Two `sans-diff` runs at different seeds land about as far from each other as each lands from the target null, and so do two edited runs. `sans-diff` and the edited model at the same seed are as far apart as two edited runs. Sharing the seed and the initialization does not make the two miss alike on a context. So on a given `difference` context each run shares the mass among the other ops in a way of its own, and much of its distance from the target null is that scatter from run to run.
+Two `sans-diff` runs at different seeds land about as far from each other as each lands from the target null, and so do two edited runs. `sans-diff` and the edited model at the same seed are as far apart as two edited runs, and a little further apart than two `sans-diff` runs, clear of their range. Sharing the seed and the initialization does not make the two miss alike on a context. The edited runs also scatter more from seed to seed than the `sans-diff` runs do, so the anchor and the edit add some scatter as well as some distance. So on a given `difference` context each run shares the mass among the other ops in a way of its own, and much of its distance from the target null is that scatter from run to run.
 
 Averaging the answers of each condition over its eight seeds, context by context, shows how much.
 
 {mean_table()}
 
-The averaged `sans-diff` answers are about a third closer to the target null than a single run, and the averaged edited answers too. The two averages are still about as far from each other as the `sans-diff` average is from the target null, so part of the miss is shared by the runs of a condition and differs between the conditions. Eight seeds leave some scatter in an average, so these distances are upper bounds on that shared part.
+The averaged `sans-diff` answers are about a third closer to the target null than a single run, and the averaged edited answers too. The two averages are still about as far from each other as the `sans-diff` average is from the target null. But two averages over four seeds each, from one condition, land nearly as far apart, so most of what separates the two averages is scatter that eight seeds leave in an average, and the data show little of the miss that is shared by the runs of one condition and differs between the conditions.
+<!-- REVIEW: added the split-half rows (claims review); the earlier text said part of the miss "differs between the conditions", which the split-half does not support. Verify: `SPLIT_HALF` against `BETWEEN_MEANS`. -->
 
 {breakdown_table()}
 
@@ -935,7 +957,7 @@ Both models put nearly all of the mass on answers another op could give, and ver
 
 {confusion_figure()}
 
-Pooled over contexts, the `difference` row of `sans-diff` and of the edited model looks much like that of the target null: the mass spread over the six other ops in about the same proportions. The other rows look alike in all four matrices. As ex-2.2.22 found for the edited model, pooling over the contexts of a row averages away most of the context-by-context miss above, in the same way averaging over seeds does.
+Pooled over contexts, the `difference` row of `sans-diff` and of the edited model looks much like that of the target null: the mass spread over the six other ops in about the same proportions, except that the edited model gives `lighten` about a third less than the target null does. The other rows look alike in all four matrices. As ex-2.2.22 found for the edited model, pooling over the contexts of a row averages away most of the context-by-context miss above, in the same way averaging over seeds does.
 
 The two models differ in two ways: `sans-diff` never learned the op, and it trained without the anchor. On the contexts of the other ops, the clean `τ_ℓ fixed` run is as far from the control at the same seed as two controls at different seeds are from each other. So the anchor moves the answers there by about as much as a change of seed does, and on `difference` contexts too the two models differ by about as much as two runs of one condition.
 <!-- REVIEW: the anchor bound is the distance between the clean τ_ℓ fixed run and the control at one seed on other-op contexts, compared with the spread between controls. Verify: `ANCHOR_O`, `CONTROL_O`. -->
@@ -962,11 +984,13 @@ The gain sits where the target null says it should (right). On contexts whose po
 r"""
 ## Discussion
 
-A model that never learned `difference` lands short of the target null on `difference` contexts, a little closer than the edited model, and misses in the same way. Of the two readings edit-effects offered, this favors the second: most of the shortfall is what a model of this kind does on contexts that look like an op it was never asked to answer. The anchor and the edit add a smaller part on top, set early in training (E1), largest on the contexts that are surest of `difference` (E2), and about as large as the difference between two runs of one condition (E3).
+A model that never learned `difference` lands short of the target null on `difference` contexts, a little closer than the edited model, and misses in the same kind of way. Of the two readings edit-effects offered, this favors the second: most of the shortfall is what a model of this kind does on contexts that look like an op it was never asked to answer. The anchor and the edit add a smaller part on top, set early in training (E1) and largest on the contexts that are surest of `difference` (E2), and they add some scatter from seed to seed; the model they leave is as far from `sans-diff` as two edited runs at different seeds are from each other (E3).
+<!-- REVIEW: the last clause said the added part was "about as large as the difference between two runs of one condition", which conflated the extra distance from the target null (about 0.07, E2) with the distance between the two models (0.42, E3); the two-runs comparison belongs to the latter. Verify: `TO_NULL[FIXED] - TO_NULL[SANS]` against `BETWEEN["sans-fixed"]` and `BETWEEN["fixed-fixed"]`. -->
 
-The miss looks like an underdetermined choice. On a context whose examples point at `difference`, the other six ops are all poor fits, and the training data say little about how to share the mass among them, since such contexts are rare in it. Each run settles that sharing in its own way, so runs at different seeds disagree on a context by about as much as each misses the target null, and averaging over seeds, or pooling over contexts as a confusion matrix does, brings the answers much closer to it. The target null is the average over what such a model could do, and a single model is one draw from that.
+The miss looks like an underdetermined choice. On a context whose examples point at `difference`, the other six ops are all poor fits, and the training data say little about how to share the mass among them, since such contexts are rare in it. Each run settles that sharing in its own way, so runs at different seeds disagree on a context by about as much as each misses the target null, and averaging over seeds, or pooling over contexts as a confusion matrix does, brings the answers much closer to it. The target null sits nearer the average over such models than any one of them does.
 
-On the contexts of the other ops, a model trained without `difference` gains almost all that the target null predicts, and the edited model gains most of it. So the edited model of the recipe of record comes within about a run-to-run difference of a model trained without the op, on `difference` contexts and on the others.
+On the contexts of the other ops, a model trained without `difference` gains almost all that the target null predicts, and the edited model gains most of it. So the edited model of the recipe of record comes within about a run-to-run difference of a model trained without the op, on `difference` contexts and on the others, where the two models at a seed are as far apart as two edited runs and about as far as two `sans-diff` runs.
+<!-- REVIEW: the claim on the other ops is backed by `OTHER_O` (claims review), the edited model under the full edit beside `sans-diff` on other-op contexts. -->
 
 This holds for one op, at one model size, with 400 epochs of training.
 """
