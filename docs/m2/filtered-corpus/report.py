@@ -14,6 +14,7 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 from scipy.optimize import nnls
 
@@ -209,6 +210,15 @@ def along_of(kind: str, mode: str, ops: list[int]) -> dict[int, np.ndarray]:
 ALONG_SANS_D = along_of(SANS, "clean", [D])
 ALONG_SANS_O = along_of(SANS, "clean", OTHER)
 ALONG_FIXED_D = along_of(FIXED, "full", [D])
+ALONG_FIXED_O = along_of(FIXED, "full", OTHER)
+# The anchor along training, for the `τ_ℓ fixed` runs: its weight, the anti weight (mean over slices), and the
+# alignment α of the `difference` states with e₁ (mean over slices).
+ANCHOR_ALONG = {
+    s: {
+        k: np.asarray(TRAJ[fc.label_of(s, None)]["traj"][k], float) for k in ("weight", "anti_weight", "alpha_anchored")
+    }
+    for s in SEEDS
+}
 SETTLE = {k: np.mean(list(v.values()), axis=0) for k, v in (("sans", ALONG_SANS_D), ("fixed", ALONG_FIXED_D))}
 GAP_ALONG = SETTLE["fixed"] - SETTLE["sans"]
 OTHER_GAP_ALONG = np.mean([TASK_ALONG[(SANS, s)][:, OTHER].mean(1) - TASK_ALONG[(CONTROL, s)][:, OTHER].mean(1) for s in SEEDS], axis=0)  # fmt: skip
@@ -242,6 +252,9 @@ def by_bin(kind: str, s: int) -> np.ndarray:
 
 
 BY_BIN = {k: np.array([by_bin(k, s) for s in SEEDS]) for k in (SANS, FIXED, CONTROL)}
+UNEDITED_BY_BIN = np.array(
+    [[tv(QN, clean_of(FIXED, s))[(BIN == b) & IS_D].mean() for b in range(len(BIN_LABEL))] for s in SEEDS]
+)
 
 # --- E3: whether it misses in the same way --------------------------------------------------------------------
 
@@ -251,7 +264,8 @@ BETWEEN = {
     "sans-sans": [float(between(p_of(SANS, a), p_of(SANS, b))[IS_D].mean()) for a, b in PAIRWISE],
     "fixed-fixed": [float(between(p_of(FIXED, a), p_of(FIXED, b))[IS_D].mean()) for a, b in PAIRWISE],
     "sans-dropped": [float(between(p_of(SANS, s), p_of(DROPPED, s))[IS_D].mean()) for s in DROPPED_SEEDS],
-}
+    "sans-fixed-cross": [float(between(p_of(SANS, a), p_of(FIXED, b))[IS_D].mean()) for a in SEEDS for b in SEEDS if a != b],
+}  # fmt: skip
 ANCHOR_O = [float(between(clean_of(CONTROL, s), clean_of(FIXED, s))[~IS_D].mean()) for s in SEEDS]
 CONTROL_O = [float(between(clean_of(CONTROL, a), clean_of(CONTROL, b))[~IS_D].mean()) for a, b in PAIRWISE]
 # The answers each condition gives on `difference` contexts, averaged over seeds before the distance is taken.
@@ -271,6 +285,41 @@ OTHER_O = {
     "sans-fixed": [float(between(clean_of(SANS, s), DOSE[(FIXED, s)]["p_full"].astype(np.float64))[~IS_D].mean()) for s in SEEDS],
     "sans-sans": [float(between(clean_of(SANS, a), clean_of(SANS, b))[~IS_D].mean()) for a, b in PAIRWISE],
     "fixed-fixed": [float(between(*(DOSE[(FIXED, s)]["p_full"].astype(np.float64) for s in (a, b)))[~IS_D].mean()) for a, b in PAIRWISE],
+}  # fmt: skip
+
+
+def averaged_to(q: np.ndarray, kind: str, on: np.ndarray, k: int) -> float:
+    """Distance from *q* of the answers of *kind* averaged over *k* seeds, the mean over the ways to split the seeds
+    into groups of *k* that run in seed order.
+    """
+    groups = [SEEDS[i : i + k] for i in range(0, len(SEEDS), k)]
+    return float(np.mean([tv(q[on], np.mean([clean_of(kind, s)[on] for s in g], axis=0)).mean() for g in groups]))
+
+
+# How much averaging over seeds brings a model toward its ideal, where the ideal is not in doubt: `sans-diff` on the
+# contexts of the other ops (its Bayes predictor there is the target null) and the control on its own Bayes predictor.
+AVERAGE_KS = (1, 2, 4, 8)
+AVERAGED = {
+    "sans, difference": [averaged_to(QN, SANS, IS_D, k) for k in AVERAGE_KS],
+    "sans, other": [averaged_to(QN, SANS, ~IS_D, k) for k in AVERAGE_KS],
+    "control, other": [averaged_to(QI, CONTROL, ~IS_D, k) for k in AVERAGE_KS],
+}
+
+
+def spread_at(s: int, on: np.ndarray) -> float:
+    """The mean distance between the `sans-diff` run at seed *s* and the `sans-diff` runs at the other seeds."""
+    return float(np.mean([between(clean_of(SANS, s), clean_of(SANS, t))[on].mean() for t in SEEDS if t != s]))
+
+
+# Share of the way to `sans-diff`, per seed: from the control (0) to a second `sans-diff` run (1), since no model
+# lands nearer a `sans-diff` run than another one does.
+SHARE_TO_SANS = {
+    name: [
+        (between(clean_of(CONTROL, s), clean_of(SANS, s))[on].mean() - between(p_of(FIXED, s), clean_of(SANS, s))[on].mean())
+        / (between(clean_of(CONTROL, s), clean_of(SANS, s))[on].mean() - spread_at(s, on))
+        for s in SEEDS
+    ]
+    for name, on in (("difference", IS_D),)
 }  # fmt: skip
 
 
@@ -381,6 +430,7 @@ CONFUSION = {
 TASK_END = {k: np.array([[DOSE[(k, s)]["clean_eem"][OP_IDS == o].mean() for o in range(len(OPS))] for s in SEEDS]) for k in (SANS, CONTROL, FIXED)}  # fmt: skip
 TASK_DROPPED = np.array([[DOSE[(DROPPED, s)]["clean_eem"][OP_IDS == o].mean() for o in range(len(OPS))] for s in DROPPED_SEEDS])  # fmt: skip
 TASK_CHANGE = TASK_END[SANS] - TASK_END[CONTROL]  # (seeds, ops)
+TASK_OP_GATE = -0.05  # the per-op task gate of the D2.2 design, as fixed-confirm applies it
 NULL_TASK = np.array([BAYES["null_eem"][OP_IDS == o].mean() for o in range(len(OPS))])
 IDEAL_TASK = np.array([BAYES["ideal_eem"][OP_IDS == o].mean() for o in range(len(OPS))])
 
@@ -417,6 +467,10 @@ def along_figure() -> str:
         "sans_d": {s: v.tolist() for s, v in ALONG_SANS_D.items()},
         "fixed_d": {s: v.tolist() for s, v in ALONG_FIXED_D.items()},
         "sans_o": {s: v.tolist() for s, v in ALONG_SANS_O.items()},
+        "fixed_o": {s: v.tolist() for s, v in ALONG_FIXED_O.items()},
+        "alpha": {s: ANCHOR_ALONG[s]["alpha_anchored"].mean(-1).tolist() for s in SEEDS},
+        "weight": ANCHOR_ALONG[SEEDS[0]]["weight"].tolist(),
+        "anti_weight": ANCHOR_ALONG[SEEDS[0]]["anti_weight"].mean(-1).tolist(),
         "seeds": SEEDS,
     }
     alt = f"""
@@ -427,7 +481,9 @@ def along_figure() -> str:
         settles from about epoch 300; τ_ℓ fixed under the edit falls from {SETTLE["fixed"][0]:.2f} to
         {SETTLE["fixed"][-1]:.2f} on the same path, about {GAP_ALONG[-1]:.2f} above it from epoch 128 on. The distance
         of sans-diff on the other ops falls faster, from {np.mean([v[0] for v in ALONG_SANS_O.values()]):.2f} to
-        {np.mean([v[-1] for v in ALONG_SANS_O.values()]):.2f}.
+        {np.mean([v[-1] for v in ALONG_SANS_O.values()]):.2f}, and the edited model on the other ops falls with it, to
+        {np.mean([v[-1] for v in ALONG_FIXED_O.values()]):.2f}. Under the right panel, the alignment of the anchored
+        states with e₁ rises over the first 30 or so epochs while the anchor weight ramps up, then holds near 0.1.
     """
     return along_draw(data, alt)
 
@@ -443,13 +499,18 @@ def along_draw(data: dict, alt_text: str) -> str:
             four epochs.
             **Middle:** the same on `difference` contexts. **Right:** the distance from the target null on
             `difference` contexts, at the checkpoints kept at epochs 16, 32 and 64 and then every 32 epochs, and at
-            the end: `sans-diff` on the clean pass and `τ_ℓ fixed` under the full edit; the dashed lines are
-            `sans-diff` on the contexts of the other ops, its distance from the predictor that is ideal for what it
-            trains on.
+            the end: `sans-diff` on the clean pass and `τ_ℓ fixed` under the full edit, with markers; the dashed
+            lines are the same two on the contexts of the other ops, where the target null is the predictor that would
+            be ideal for a model without `difference`. **Under it:** for the `τ_ℓ fixed` runs, the alignment α of the
+            states holding `difference` with e₁ (mean over slices, one line per run), and the anchor weight λ_a
+            and the anti weight (mean over slices) on the right-hand axis.
         """,
     )
     def _plot() -> plt.Figure:
-        fig, axes = plt.subplots(1, 3, figsize=(7.0, 2.6), layout="constrained", sharex=True)
+        fig = plt.figure(figsize=(7.0, 3.5), layout="constrained")
+        grid = fig.add_gridspec(2, 3, height_ratios=(2.6, 0.9))
+        axes = [fig.add_subplot(grid[:, 0]), fig.add_subplot(grid[:, 1]), fig.add_subplot(grid[0, 2])]
+        under = fig.add_subplot(grid[1, 2], sharex=axes[2])
         ep = np.asarray(data["epochs"])
         for ax, key in zip(axes[:2], ("other", "diff"), strict=True):
             for k in (CONTROL, FIXED, SANS):
@@ -467,11 +528,25 @@ def along_draw(data: dict, alt_text: str) -> str:
             ax.plot(kept, data["sans_d"][s], color=INK[SANS], marker=MARKER[SANS], ms=1.8, lw=0.7, alpha=0.8)
             ax.plot(kept, data["fixed_d"][s], color=INK[FIXED], marker=MARKER[FIXED], ms=1.8, lw=0.7, alpha=0.8)
             ax.plot(kept, data["sans_o"][s], color=INK[SANS], lw=0.6, ls="--", alpha=0.6)
+            ax.plot(kept, data["fixed_o"][s], color=INK[FIXED], lw=0.6, ls="--", alpha=0.6)
         ax.set_ylim(0, 0.8)
         ax.set_title("distance from the target null ↓", fontsize=8)
-        ax.set_xlabel("epoch", fontsize=7)
-        ax.tick_params(labelsize=6.5)
-        handles, labels = axes[0].get_legend_handles_labels()
+        ax.tick_params(labelsize=6.5, labelbottom=False)
+        for s in data["seeds"]:
+            under.plot(ep, data["alpha"][s], color=INK[FIXED], lw=0.5, alpha=0.6)
+        under.set_ylim(0, 0.15)
+        under.set_ylabel("α", fontsize=7)
+        under.set_xlabel("epoch", fontsize=7)
+        under.tick_params(labelsize=6)
+        twin = under.twinx()
+        twin.plot(ep, data["weight"], color=RULE, lw=0.8, ls="--", label="$\\lambda_a$")
+        twin.plot(ep, data["anti_weight"], color=RULE, lw=0.8, ls=":", label="anti")
+        twin.set_ylim(0, 0.3)
+        twin.set_ylabel("weight", fontsize=7)
+        twin.tick_params(labelsize=6)
+        twin.legend(fontsize=5.5, frameon=False, loc="upper right", ncols=2)
+        handles = [Line2D([], [], color=INK[k], lw=1.6) for k in (CONTROL, FIXED, SANS)]
+        labels = [tex("τ_ℓ fixed" if k == FIXED else SHOWN[k]) for k in (CONTROL, FIXED, SANS)]
         fig.legend(handles, labels, loc="outside upper center", ncols=len(labels), frameon=False, fontsize=7)
         return fig
 
@@ -486,6 +561,7 @@ def close_figure() -> str:
         "own_o": float(np.mean(OWN_GAP_O)),
         "bins": BIN_LABEL,
         "by_bin": {k: BY_BIN[k].tolist() for k in (FIXED, SANS)},
+        "unedited": UNEDITED_BY_BIN.tolist(),
     }
     bs, bf = BY_BIN[SANS].mean(0), BY_BIN[FIXED].mean(0)
     alt = f"""
@@ -495,7 +571,8 @@ def close_figure() -> str:
         difference contexts is {data["bayes_d"]:.2f}, and sans-diff is {data["own_o"]:.2f} from the target null on the
         other ops. Right: by bin of the posterior on difference, sans-diff runs from {bs.min():.2f} to {bs.max():.2f}
         and τ_ℓ fixed from {bf.min():.2f} to {bf.max():.2f}, both furthest in the bin where the posterior is 0.95 or
-        more, with τ_ℓ fixed further in every bin.
+        more, with τ_ℓ fixed further in every bin. The unedited τ_ℓ fixed runs rise from
+        {UNEDITED_BY_BIN.mean(0)[0]:.2f} to {UNEDITED_BY_BIN.mean(0)[-1]:.2f}, since they still answer difference.
     """
     return close_draw(data, alt)
 
@@ -512,7 +589,8 @@ def close_draw(data: dict, alt_text: str) -> str:
             and the seed mean is the large mark. The dashed line is the Bayes gap on `difference` contexts (the
             control from the Bayes predictor), and the dotted line is `sans-diff` on the contexts of the other ops,
             where the target null is its own ideal. **Right:** the distance by bin of the posterior on `difference`,
-            one hairline per run and the seed mean bold.
+            one hairline per run and the seed mean bold, with the `τ_ℓ fixed` runs on the clean pass (unedited, hollow
+            marks) for comparison.
         """,
     )
     def _plot() -> plt.Figure:
@@ -530,6 +608,9 @@ def close_draw(data: dict, alt_text: str) -> str:
         ax.tick_params(labelsize=6.5)
         ax = axes[1]
         x = np.arange(len(data["bins"]))
+        u = np.asarray(data["unedited"])
+        ax.plot(x, u.mean(0), color=INK[FIXED], lw=0.9, ls="--", marker=MARKER[FIXED], ms=4, mfc="none",
+                label=tex("τ_ℓ fixed, unedited"))  # fmt: skip
         for k in (FIXED, SANS):
             v = np.asarray(data["by_bin"][k])
             for row in v:
@@ -538,7 +619,7 @@ def close_draw(data: dict, alt_text: str) -> str:
         ax.set_xticks(x, data["bins"], fontsize=6.5)
         ax.set_xlabel("posterior on difference", fontsize=7)
         ax.tick_params(labelsize=6.5)
-        ax.legend(fontsize=6.5, frameon=False, loc="lower right")
+        ax.legend(fontsize=6.5, frameon=False, loc="center right")
         return fig
 
     return _plot()
@@ -577,7 +658,8 @@ def same_figure() -> str:
         {np.mean(BETWEEN["sans-fixed"]):.2f}, about as far as two edited runs at different seeds
         ({np.mean(BETWEEN["fixed-fixed"]):.2f}) and a little further than two sans-diff runs at different seeds
         ({np.mean(BETWEEN["sans-sans"]):.2f}). Sans-diff and dropped at the same seed are
-        {np.mean(BETWEEN["sans-dropped"]):.2f} apart. All of these are about as large as the distance of each model
+        {np.mean(BETWEEN["sans-dropped"]):.2f} apart. Sans-diff and the edited model at different seeds are
+        {np.mean(BETWEEN["sans-fixed-cross"]):.2f} apart, the same as at the same seed. All of these are about as large as the distance of each model
         from the target null.
     """
     return same_draw(data, alt)
@@ -590,7 +672,8 @@ def same_draw(data: dict, alt_text: str) -> str:
         alt_text=alt_text,
         caption="""
             **How far apart the models land on `difference` contexts.** Total variation between two models, context by
-            context, one column per pair: `sans-diff` and the edited `τ_ℓ fixed` run at the same seed; two `sans-diff`
+            context, one column per pair: `sans-diff` and the edited `τ_ℓ fixed` run at the same seed, and at different
+            seeds (all 56 pairs); two `sans-diff`
             runs at different seeds (all 28 pairs); two edited `τ_ℓ fixed` runs at different seeds; and `sans-diff` and
             `dropped` at the same seed. The pairs are small dots over a thin bar for their range, and the mean is the
             large mark. The dotted lines are the distance of `sans-diff` and of the edited model from the target
@@ -598,8 +681,10 @@ def same_draw(data: dict, alt_text: str) -> str:
         """,
     )
     def _plot() -> plt.Figure:
-        fig, ax = plt.subplots(figsize=(4.2, 2.6), layout="constrained")
-        cols = [("sans-fixed", "sans-diff vs\nedited", FIXED, "s"), ("sans-sans", "sans-diff vs\nsans-diff", SANS, "D"),
+        fig, ax = plt.subplots(figsize=(5.0, 2.6), layout="constrained")
+        cols = [("sans-fixed", "sans-diff vs\nedited,\nsame seed", FIXED, "s"),
+                ("sans-fixed-cross", "sans-diff vs\nedited, other\nseeds", FIXED, "s"),
+                ("sans-sans", "sans-diff vs\nsans-diff", SANS, "D"),
                 ("fixed-fixed", "edited vs\nedited", FIXED, "s"), ("sans-dropped", "sans-diff vs\ndropped", DROPPED, "^")]  # fmt: skip
         jit = np.random.default_rng(1).uniform(-0.15, 0.15, 64)
         for i, (k, _, ink, m) in enumerate(cols):
@@ -635,6 +720,21 @@ def mean_table() -> str:
         the seed mean and range of the distance taken on each run (or each pair at a seed); the second takes the
         distance once, on the answer distributions of each condition averaged over its seeds context by context; the last two
         rows average each half of the seeds of one condition separately.""",
+    )
+
+
+def averaged_table() -> str:
+    rows = [
+        ["`sans-diff` from the target null, on `difference`", *[num(v) for v in AVERAGED["sans, difference"]]],
+        ["`sans-diff` from the target null (its Bayes predictor), on the other ops", *[num(v) for v in AVERAGED["sans, other"]]],
+        ["control from the Bayes predictor, on the other ops", *[num(v) for v in AVERAGED["control, other"]]],
+    ]  # fmt: skip
+    return table_html(
+        ["seeds averaged", *[str(k) for k in AVERAGE_KS]],
+        rows,
+        f"""**Distance from the ideal, with the answers averaged over more seeds.** The seeds are taken in order, in
+        groups of the given size ({SEEDS[0]}–{SEEDS[1]}, {SEEDS[2]}–{SEEDS[3]}, and so on for two), the answers of each
+        group averaged context by context, and the distance taken on the average; mean over the groups.""",
     )
 
 
@@ -684,7 +784,8 @@ def confusion_draw(data: dict, alt_text: str) -> str:
     )
     def _plot() -> plt.Figure:
         names = {CONTROL: "control", FIXED: "$\\tau_\\ell$ fixed, edited", SANS: "sans-diff", "null": "target null"}
-        fig, axes = plt.subplots(1, 4, figsize=(9.0, 2.9), layout="constrained", sharex=True, sharey=True)
+        fig, axes = plt.subplots(2, 2, figsize=(7.0, 6.6), layout="constrained", sharex=True, sharey=True)
+        axes = axes.ravel()
         n = len(OPS)
         eye = np.eye(n, dtype=bool)
         mats = {k: np.asarray(v) for k, v in data.items()}
@@ -695,16 +796,16 @@ def confusion_draw(data: dict, alt_text: str) -> str:
             for i, j in np.ndindex(n, n):
                 if i == j:
                     ax.add_patch(Rectangle((j - 0.46, i - 0.46), 0.92, 0.92, fill=False, ec="0.6", lw=0.6))
-                    ax.text(j, i, f"{m[i, j]:.2f}".removeprefix("0"), ha="center", va="center", fontsize=5.5,
+                    ax.text(j, i, f"{m[i, j]:.2f}".removeprefix("0"), ha="center", va="center", fontsize=7,
                             color=light_dark("#777", "#999"), fontstyle="italic")  # fmt: skip
                 elif m[i, j] >= PRINT_FLOOR:
-                    ax.text(j, i, f"{m[i, j]:.2f}"[1:], ha="center", va="center", fontsize=5.5,
+                    ax.text(j, i, f"{m[i, j]:.2f}"[1:], ha="center", va="center", fontsize=7,
                             color=cell_text_color(m[i, j], vmax))  # fmt: skip
             ax.axvspan(D - 0.5, D + 0.5, facecolor="none", edgecolor=light_dark("0.7", "0.3"), hatch="/", lw=0,
                        alpha=light_dark(0.4, 0.5))  # fmt: skip
-            ax.set_title(names[k], fontsize=8)
-            ax.set_xticks(range(n), OPS, rotation=90, fontsize=6)
-            ax.set_yticks(range(n), OPS, fontsize=6)
+            ax.set_title(names[k], fontsize=9)
+            ax.set_xticks(range(n), OPS, rotation=90, fontsize=7)
+            ax.set_yticks(range(n), OPS, fontsize=7)
         assert im is not None
         fig.colorbar(im, ax=axes, shrink=0.7, label="mass")
         return fig
@@ -756,6 +857,8 @@ def breakdown_table() -> str:
 def other_figure() -> str:
     data = {
         "change": TASK_CHANGE[:, OTHER].T.tolist(),
+        "control_spread": (TASK_END[CONTROL][:, OTHER] - TASK_END[CONTROL][:, OTHER].mean(0)).T.tolist(),
+        "gate": TASK_OP_GATE,
         "ops": [OPS[o] for o in OTHER],
         "bins": OTHER_LABEL,
         "null": GAIN_NULL.tolist(),
@@ -782,14 +885,19 @@ def other_draw(data: dict, alt_change: str, alt_gain: str) -> str:
         alt_text=alt_change,
         caption="""
             **Per op.** The task score of `sans-diff` less that of the control at the same seed. The seeds are small
-            dots over a thin bar for their range, and the seed mean is the large mark.
+            dots over a thin bar for their range, and the seed mean is the large mark. The grey band is the seed range
+            of the control about its own seed mean. The dashed line is the per-op task gate of the D2.2 design, which
+            the anchored model is held to against the control, drawn here for scale.
         """,
     )
     def _change() -> plt.Figure:
         fig, ax = plt.subplots(figsize=(3.5, 2.6), layout="constrained")
-        for i, v in enumerate(data["change"]):
+        for i, (v, c) in enumerate(zip(data["change"], data["control_spread"], strict=True)):
+            ax.add_patch(Rectangle((i - 0.3, min(c)), 0.6, max(c) - min(c), color=GHOST, alpha=0.5, lw=0, zorder=1))
             dots(ax, i, v, INK[SANS], MARKER[SANS], JIT)
         ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
+        ax.axhline(data["gate"], color=RULE, lw=0.7, ls="--", zorder=0)
+        ax.set_ylim(data["gate"] - 0.01, None)
         ax.set_xticks(range(len(data["ops"])), data["ops"], rotation=40, ha="right", fontsize=6.5)
         ax.set_ylabel("task, sans-diff less control", fontsize=7)
         ax.tick_params(labelsize=6.5)
@@ -847,12 +955,12 @@ r"""
 
 /// tip |
 <!-- lede -->
-We trained the control with no loss on `difference` contexts, so that it never learns the op, and set it beside the edited model of the recipe of record. On `difference` contexts it comes a little closer to the target null than the edited model, and still falls well short of it. It misses in the same kind of way: the mass goes to the other ops, but it is shared among them differently from the target null on each context, and differently again at each seed.
+We trained the control with no loss on `difference` contexts, so that it never learns the op, and compared it to the edited model of the recipe of record. On `difference` contexts it comes a little closer to the target null than the edited model, but still falls well short of it. It misses in the same kind of way: the mass goes to the other ops, but it is shared among them differently from the target null on each context, and differently again at each seed.
 ///
 
 The edit-effects experiment found that the edited model sends the mass to the right ops overall, but shares it among them differently from the target null context by context. Its Discussion offers two explanations:
 (a) the edit blurs evidence the model uses to share the mass among the other ops, or
-(b) no model with this architecture, grammar, and set of other ops learns that sharing on contexts that look like `difference`.
+(b) no model with this architecture, grammar, and set of other ops learns the precise sharing on contexts that look like `difference`.
 
 A model trained without `difference` has had nothing removed, so how close it comes is a reference for the edit. It is also the filtered-corpus comparison of the D2.2 design, with figures meant for the D2.2 post. Eight new runs, at seeds 712 to 719, are scored beside the stored `τ_ℓ fixed` runs and controls at the same seeds.
 <!-- REVIEW: the lede and Observations are new with the results; the claim that the shortfall is mostly there without the anchor rests on E2 (sans-diff about 1.5 times its own gap) and E3 (sans-diff and the edited model as far apart as two edited runs). Verify: `RATIO_OWN`, `BETWEEN`. -->
@@ -863,7 +971,7 @@ A model trained without `difference` has had nothing removed, so how close it co
 rf"""
 ## Observations
 
-- [Along training (E1)](#along-training-e1): the two models approach the target null at the same pace and settle from about epoch 300. From epoch 128 on, the edited model stays about {num(float(GAP_ALONG[4:].mean()))} further away. `sans-diff` keeps up with the control on the other six ops throughout, and never learns `difference`.
+- [Along training (E1)](#along-training-e1): the two conditions approach the target null at the same pace and settle from about epoch 300. From epoch 128 on, the edited model stays a small, steady amount further away. `sans-diff` keeps up with the control on the other six ops throughout, and never learns `difference`.
 - [How close it comes (E2)](#how-close-it-comes-e2): on `difference` contexts, `sans-diff` comes {num(float(np.mean(SHARE[SANS])))} of the way from the control to the target null, and the edited `τ_ℓ fixed` runs come {num(float(np.mean(SHARE[FIXED])))}. The seed ranges don't overlap. Even so, `sans-diff` stays about {num(float(np.mean(RATIO_OWN)), ".1f")} times as far from the target null there as on the contexts it trained on. The `dropped` runs end up with `sans-diff`.
 - [Whether it misses in the same way (E3)](#whether-it-misses-in-the-same-way-e3): `sans-diff` and the edited model at the same seed are as far apart as two edited runs at different seeds. Both put nearly all of the mass on answers another op could give. They miss in how they share it among those ops, and much of that miss changes from seed to seed.
 - [What leaving the op out does to the other ops (E4)](#what-leaving-the-op-out-does-to-the-other-ops-e4): `sans-diff` scores a little above the control on each of the other ops. The gain is on contexts that look partly like `difference`. On those that look most like it, `sans-diff` gets {SHARE_GAIN["sans"]:.0%} of the gain the target null predicts, and the edited model gets {SHARE_GAIN["edit"]:.0%}.
@@ -878,12 +986,12 @@ This is an exploratory study, with no preregistration and no gate.
 
 The new condition, `sans-diff`, is the 400-epoch control with the language-model loss switched off on every `difference` context. The control has no anchor; it is the one the anneal-confirm experiment trained at these seeds.
 
-The windows still hold `difference` contexts, and the model reads them as input, but no target inside one counts toward the loss, so nothing in training asks the model to answer one. The loss is the mean over the targets that do count, so a step weighs the other six ops as the control does.
+The training batches still hold `difference` contexts, and the model reads them as input, but no target inside one counts toward the loss, so nothing in training asks the model to answer one. The loss is the mean over the targets that do count, so a step weighs the other six ops as the control does.
 
 Each `sans-diff` run matches the control and the `τ_ℓ fixed` run at its seed: the same initialization, corpus, and schedule, and the same windows in the same order. So the difference between `sans-diff` and the control at a seed comes from the masked loss alone.
 <!-- REVIEW: the condition was a corpus with the `difference` lines dropped (`filtered`), which changed the batches and left a choice between matching passes (400 epochs) and matching steps (about 467). The paper review asked whether the loss could be masked instead, keeping everything else the same; the training code already has a target mask (`loss_mask` in `sca.anchoring.sample_anchored_batches`, used for the `FALSE` verification answers), so the open decision went away. Verify: the loss in `sca.training.loop` is the mean over non-padding targets, and a masked target is set to padding. -->
 
-On every context `sans-diff` is trained on, the Bayes predictor is the target null,[^cube] so `sans-diff` is scored against the predictor that is ideal for what it was trained on. The contexts of the other six ops keep their replacement op noise, drawn from the six ops other than their own, `difference` among them, so about one example in twenty still shows the answer `difference` would give. The target null keeps that same noise model when it sets `difference` to zero.
+On every context `sans-diff` is trained on, the Bayes predictor is the target null,[^cube] so `sans-diff` is scored against the predictor that is ideal for what it was trained on. The contexts of the other six ops still have their replacement op noise, drawn from the six ops other than their own, `difference` among them, so about one example in twenty still shows the answer `difference` would give. The target null keeps that same noise model when it sets `difference` to zero.
 <!-- REVIEW: added the cube-noise aside (assumptions review). The corpus of record carries cube noise at 0.02; `sca.data.incontext.posterior_over_ops` leaves it out, but the posterior the dose scoring uses (`docs/m2/ex-2.2.16/posterior.py`) includes it, so the claim holds for the stored arrays. Verify: the likelihood in that module's `posterior`. -->
 
 [^cube]: Cube noise included: the posterior of record models it as a term of its own.
@@ -896,7 +1004,7 @@ The reference runs are those of the fixed-confirm experiment: `τ_ℓ fixed` (th
 
 With eight runs per condition, a difference between conditions is trusted when it is clear of the seed range of both. Seed 718 learns the HSV ops late under `τ_ℓ fixed` and misses the task criterion of fixed-confirm on two of them; E4 shows whether the control and `sans-diff` do the same at that seed.
 
-A check arm, `dropped`, trains at seeds 712 and 713 on the corpus with the `difference` contexts taken out, for 400 epochs (about six-sevenths as many steps as the control). Under the mask, `sans-diff` still reads `difference` contexts in its window; `dropped` never sees one. If the two end up in about the same place, reading the contexts without answering them makes little difference to what the model learns.
+A check arm, `dropped`, trains at seeds 712 and 713 on the corpus with the `difference` contexts taken out entirely (not just masked), for 400 epochs (about six-sevenths as many steps as the control). Under the mask, `sans-diff` still reads `difference` contexts in its window; `dropped` never sees one. If the two end up in about the same place, reading the contexts without answering them makes little difference to what the model learns.
 
 Every measurement here is taken on the answer distribution, which does not change when the residual stream is rotated. So the coordinate axes that Adam favors (the rotated-basis experiment) play no part, except through the edit itself, which acts along e₁.
 
@@ -929,7 +1037,7 @@ Task score
 rf"""
 ## Along training (E1)
 
-Does `sans-diff` learn the other six ops as the control does, and does it close on the target null at the same pace as the edited model? Every run records the task score of each op on held-out contexts along training, so on the six ops `sans-diff` trains on, it can be compared step for step with the control and with `τ_ℓ fixed`.
+Does `sans-diff` learn the other six ops as the control does, and does it close on the target null at the same pace as the edited model? Every run records the task score of each op on held-out contexts along training, every four epochs, so on the six ops `sans-diff` trains on, it can be compared with the control and with `τ_ℓ fixed` at the same points in training.
 
 The `τ_ℓ fixed` runs kept checkpoints along training, and `sans-diff` kept the same ones. Scoring both at each kept epoch gives the distance from the target null on `difference` contexts along training (clean for `sans-diff`, under the full edit for `τ_ℓ fixed`): whether the two settle early or are still closing when training ends, and whether they close at the same pace. The controls kept no checkpoints, so they have no such curve, though their task score on `difference` along training is there.
 
@@ -941,7 +1049,9 @@ On `difference` contexts `sans-diff` scores near zero all the way through, as th
 
 The two models close on the target null together on `difference` contexts (right). The edited model starts further away, the difference between them narrows over the first hundred epochs or so, and from epoch 128 it holds at a small, steady amount while both curves keep falling. Both settle from about epoch 300, so 400 epochs is long enough for this comparison. The extra distance that the anchor and the edit leave is set early, and does not close with more training.
 
-The dashed lines are `sans-diff` on the contexts of the other ops, where the target null is its Bayes predictor. They fall faster and further (E2).
+A few edited runs stay far from the target null, or move away from it, before epoch 64 or so. That is when the anchor weight ramps up and the states holding `difference` swing onto e₁ (the panel under the right one), so it fits the anchor coming in, though the timing alone doesn't prove it.
+
+The dashed lines are the two models on the contexts of the other ops, where the target null is the Bayes predictor of `sans-diff`. They fall faster and further (E2), and the edited model follows `sans-diff` there closely.
 """
 
 # %%
@@ -963,7 +1073,7 @@ Most of the shortfall is there without the anchor and the edit, though. On the c
 
 The two `dropped` runs end up with `sans-diff` at their seeds, inside its seed range. A model that reads `difference` contexts without answering them ends up about where one that never sees them does.
 
-Split by the posterior on `difference` (right), both models are furthest away on the contexts where the posterior is nearly certain of `difference`. Those are the contexts least like anything `sans-diff` trained on. The extra distance of the edited model is also largest there, and smallest on the contexts whose examples point mostly at other ops. The middle bin holds fewer than a hundred contexts, so its value is loose.
+Split by the posterior on `difference` (right), both models are furthest away on the contexts where the posterior is nearly certain of `difference`. Those are the contexts least like anything `sans-diff` trained on. The extra distance of the edited model is also largest there, and smallest on the contexts whose examples point mostly at other ops. The middle bin holds fewer than a hundred contexts, so its value is loose. The unedited `τ_ℓ fixed` runs, which still answer `difference`, are far from the target null in every bin but the lowest, as expected.
 """
 
 # %%
@@ -973,13 +1083,16 @@ rf"""
 
 Do the edited model and `sans-diff` miss the target null in the same way? If the distance between the two models is small beside the distance of each from the target null, and near the seed-to-seed spread, they share the mass among the other ops alike on a context. The part of the shortfall they have in common then comes from these contexts rather than from the anchor and the edit.
 
-If the two models are as far from each other as from the target null, they miss in different ways on a context, though they may still miss in the same kind of way (the breakdown below). The main measure is the distance between the models, context by context.
+If the two models are as far from each other as from the target null, they miss in different ways on a context, though broadly speaking they may still miss in the same kind of way (the breakdown below). The main measure is the distance between the models, context by context.
 
 {same_figure()}
 
-Two `sans-diff` runs at different seeds land about as far from each other as each lands from the target null, and so do two edited runs. `sans-diff` and the edited model at the same seed are as far apart as two edited runs, and a little further apart than two `sans-diff` runs, clear of their range. Sharing the seed and the initialization does not make the two miss alike on a context.
+Two `sans-diff` runs at different seeds land about as far from each other as each lands from the target null, and so do two edited runs. `sans-diff` and the edited model at the same seed are as far apart as two edited runs, and a little further apart than two `sans-diff` runs, clear of their range. Sharing the seed and the initialization does not make the two miss alike on a context: at different seeds they are just as far apart.
 
-The edited runs also scatter more from seed to seed than the `sans-diff` runs do, so the anchor and the edit add some scatter as well as some distance. On a given `difference` context, each run shares the mass among the other ops in a way of its own, and much of its distance from the target null is that scatter from run to run.
+That gives another way to say how close the edited model comes to `sans-diff`. No model lands nearer a `sans-diff` run than another `sans-diff` run does, so take a second `sans-diff` run as the end of the way and the control as its start. On that scale the edited model comes {np.mean(SHARE_TO_SANS["difference"]):.0%} of the way to `sans-diff` on `difference` contexts (seeds {min(SHARE_TO_SANS["difference"]):.0%} to {max(SHARE_TO_SANS["difference"]):.0%}). On the contexts of the other ops the control, the edited model, and `sans-diff` are all about as far apart as two `sans-diff` runs, so there is no way to measure there.
+<!-- REVIEW: added the share of the way to `sans-diff` (paper review asked whether the post could report closeness to `sans-diff` rather than to the target null). Verify: `SHARE_TO_SANS`; the end of the way is the mean distance from the `sans-diff` run at that seed to the other seven. -->
+
+Two edited runs are also about a quarter further apart from each other than two `sans-diff` runs are, with the ranges of the two kinds of pair apart, so the anchor and the edit add some scatter from seed to seed as well as some distance from the target null. On a given `difference` context, each run shares the mass among the other ops in a way of its own, and much of its distance from the target null is that scatter from run to run.
 
 Averaging the answers of each condition over its eight seeds, context by context, shows how much.
 
@@ -987,6 +1100,12 @@ Averaging the answers of each condition over its eight seeds, context by context
 
 The averaged answers of both conditions are about a third closer to the target null than a single run. The two averages are still about as far from each other as the `sans-diff` average is from the target null, but two averages over four seeds each, from the same condition, land nearly as far apart. So most of what separates the two averages is scatter still left after averaging eight seeds, and the data show little of a miss common to the runs of one condition but different between the two conditions.
 <!-- REVIEW: added the split-half rows (claims review); the earlier text said part of the miss "differs between the conditions", which the split-half does not support. Verify: `SPLIT_HALF` against `BETWEEN_MEANS`. -->
+
+Averaging does the same where the ideal is not in doubt. On the contexts of the other ops, `sans-diff` comes closer to its Bayes predictor as more seeds are averaged, and the control to its own, by about the same share as `sans-diff` comes closer to the target null on `difference` contexts.
+
+{averaged_table()}
+
+So scatter from run to run is a general property of models of this size, and averaging removes about the same share of it everywhere. What sets `difference` contexts apart is how far a single run is to begin with. The averages also close on the target null the way they close on the Bayes predictor elsewhere, which is what we would expect if the target null is the right reference for these contexts.
 
 {breakdown_table()}
 
@@ -996,7 +1115,7 @@ Neither power fits either model better than the target null as it is (power 1), 
 
 {confusion_figure()}
 
-Pooled over contexts, the `difference` row of `sans-diff` and of the edited model looks much like that of the target null. The mass is spread over the six other ops in about the same proportions, except that the edited model gives `lighten` about a third less than the target null does. The other rows look alike in all four matrices. As ex-2.2.22 found for the edited model, pooling over the contexts of a row averages away most of the context-by-context miss above, as averaging over seeds does.
+Pooled over contexts, the `difference` row of `sans-diff` and of the edited model looks much like that of the target null. The mass is spread over the six other ops in about the same proportions, except that the edited model gives `lighten` about a third less than the target null does. The other rows look alike in all four matrices, except that the edited model puts a little more on the answers `sat-hsv` and `value-hsv` give for each other; nearly all of that is seed 718, the run that learns those ops late (E4). As ex-2.2.22 found for the edited model, pooling over the contexts of a row averages away most of the context-by-context miss above, as averaging over seeds does.
 
 The two models differ in two ways: `sans-diff` never learned the op, and it trained without the anchor. On the contexts of the other ops, the clean `τ_ℓ fixed` run is as far from the control at the same seed as two controls at different seeds are from each other. So the anchor moves the answers there by about as much as a change of seed does. On `difference` contexts too, the two models differ by about as much as two runs of one condition.
 <!-- REVIEW: the anchor bound is the distance between the clean τ_ℓ fixed run and the control at one seed on other-op contexts, compared with the spread between controls. Verify: `ANCHOR_O`, `CONTROL_O`. -->
@@ -1007,7 +1126,7 @@ The two models differ in two ways: `sans-diff` never learned the op, and it trai
 rf"""
 ## What leaving the op out does to the other ops (E4)
 
-On contexts of the other ops, does `sans-diff` score as well as the control, and does it gain where the target null says a model without `difference` should? The target null predicts a gain on contexts of other ops whose examples point partly at `difference`, since a model that cannot answer `difference` puts that mass on the right op. edit-effects found that the edited model gains most of that; this is the same comparison for a model that never learned the op, with the edited model beside it.
+On contexts of the other ops, does `sans-diff` score as well as the control, and does it gain where the target null says a model without `difference` should? The target null predicts a gain on contexts of other ops whose examples point partly at `difference`, since an ideal model that cannot answer `difference` puts that mass on the right op. edit-effects found that the edited model gains most of that; this is the same comparison for a model that never learned the op, with the edited model beside it.
 
 It also checks the training: if `sans-diff` scored well below the control on the other ops, part of its distance in E2 could come from a weaker model rather than from the missing op. The main measure is the task score.
 
@@ -1019,14 +1138,14 @@ At seed 718, where `τ_ℓ fixed` learns the HSV ops late, the control and `sans
 
 {other_table()}
 
-The gain falls where the target null predicts it (by posterior). Most of the held-out contexts have a posterior on `difference` below 0.05, and on those `sans-diff` and the control score about the same; above that, the gain grows with the posterior. `sans-diff` gains about as much as the target null predicts (a little more in the second bin), and the edited model gains less in every bin above the first.
+The gain is where the target null predicts it (by posterior). Most of the held-out contexts have a posterior on `difference` below 0.05, and on those `sans-diff` and the control score about the same; above that, the gain grows with the posterior. `sans-diff` gains about as much as the target null predicts (a little more in the second bin), and the edited model gains less in every bin above the first.
 
 The edited model also loses a little on the contexts that look least like `difference`, a small cost of the edit on contexts it would ideally leave alone. The top bin holds about a hundred contexts, so its values are loose.
 """
 
 # %%
 
-r"""
+rf"""
 ## Discussion
 
 A model that never learned `difference` lands short of the target null on `difference` contexts, a little closer than the edited model, and misses in the same kind of way. Of the two explanations edit-effects offered, this favors the second: most of the shortfall is what a model of this kind does on contexts that look like an op it was never asked to answer.
@@ -1034,9 +1153,9 @@ A model that never learned `difference` lands short of the target null on `diffe
 The anchor and the edit add a smaller part on top, set early in training (E1) and largest on the contexts where the posterior is surest of `difference` (E2). They also add some scatter from seed to seed, and the model they leave is as far from `sans-diff` as two edited runs at different seeds are from each other (E3).
 <!-- REVIEW: the last clause said the added part was "about as large as the difference between two runs of one condition", which conflated the extra distance from the target null (about 0.07, E2) with the distance between the two models (0.42, E3); the two-runs comparison belongs to the latter. Verify: `TO_NULL[FIXED] - TO_NULL[SANS]` against `BETWEEN["sans-fixed"]` and `BETWEEN["fixed-fixed"]`. -->
 
-The miss looks like an underdetermined choice. On a context whose examples point at `difference`, the other six ops are all poor fits, and the training data say little about how to share the mass among them, since such contexts are rare in it. Each run settles that sharing in its own way, which fits the scatter from seed to seed in E3, and the target null is nearer the average over such models than any one of them is.
+The miss looks like an underdetermined choice. On a context whose examples point at `difference`, the other six ops are all poor fits, and the training data say little about how to share the mass among them, since such contexts are rare in it. Each run settles that sharing in its own way. Runs of this size scatter on ordinary contexts too, and averaging over seeds brings them toward their ideal by about the same share there (E3), so the scatter is general; on `difference` contexts a single run starts further off.
 
-On the contexts of the other ops, a model trained without `difference` gains almost all that the target null predicts, and the edited model gains most of it. At a given seed, the answers of the edited model of the recipe of record are as far from those of `sans-diff` as two edited runs are from each other, on `difference` contexts and on the others; on the others they are also about as far apart as two `sans-diff` runs.
+On the contexts of the other ops, a model trained without `difference` gains almost all that the target null predicts, and the edited model gains most of it. At a given seed, the answers of the edited model of the recipe of record are as far from those of `sans-diff` as two edited runs are from each other, on `difference` contexts and on the others; on the others they are also about as far apart as two `sans-diff` runs. With a second `sans-diff` run as the end of the way, the edited model comes {np.mean(SHARE_TO_SANS["difference"]):.0%} of the way from the control to `sans-diff` on `difference` contexts (E3).
 <!-- REVIEW: the claim on the other ops is backed by `OTHER_O` (claims review), the edited model under the full edit beside `sans-diff` on other-op contexts. -->
 
 This holds for one op, at one model size, with 400 epochs of training.
