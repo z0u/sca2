@@ -1052,7 +1052,7 @@ On `difference` contexts `sans-diff` scores near zero all the way through, as th
 
 The two models close on the target null together on `difference` contexts (right). The edited model starts further away, the difference between them narrows over the first hundred epochs or so, and from epoch 128 it holds at a small, steady amount while both curves keep falling. Both settle from about epoch 300, so 400 epochs is long enough for this comparison. The extra distance that the anchor and the edit leave is set early, and does not close with more training.
 
-A few edited runs stay far from the target null, or move away from it, before epoch 64 or so. That is when the anchor weight ramps up and the states holding `difference` swing onto e₁ (the panel under the right one), so it fits the anchor coming in, though the timing alone doesn't prove it.
+A few edited runs stay far from the target null, or move away from it, until epoch 64 to 100 or so. The anchor itself is in place well before that: the states holding `difference` swing onto e₁ by about epoch 30, as the anchor weight ramps up (the panel under the right one). So the slow start is not the anchor arriving. It may be the edit taking more than `difference` out of a model that is still settling, though this figure can't tell.
 
 The dashed lines are the two models on the contexts of the other ops, where the target null is the Bayes predictor of `sans-diff`. They fall faster and further (E2), and the edited model follows `sans-diff` there closely.
 """
