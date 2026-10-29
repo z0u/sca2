@@ -129,31 +129,23 @@ def span(values, spec: str = ".2f") -> str:
     return f"{num(v.mean(), spec)} ({num(v.min(), spec)} to {num(v.max(), spec)})"
 
 
-def diff_interval(a, b, n_boot: int = 10_000) -> tuple[float, float, float]:
-    """The difference of the means of two samples of runs, with a 95% bootstrap interval that resamples the runs of
-    each: the comparison of two conditions as two samples, since their runs are not paired.
-    """
-    a, b = np.asarray(a, float), np.asarray(b, float)
-    rng = np.random.default_rng(0)
-    d = a[rng.integers(0, len(a), (n_boot, len(a)))].mean(1) - b[rng.integers(0, len(b), (n_boot, len(b)))].mean(1)
-    lo, hi = np.quantile(d, [0.025, 0.975])
-    return float(a.mean() - b.mean()), float(lo), float(hi)
-
-
-def gap(a, b, spec: str = ".2f", unit: str = "") -> str:
-    """The difference of means of two samples of runs, with its 95% bootstrap interval, for the prose."""
-    d, lo, hi = diff_interval(a, b)
-    return f"{num(d, spec)}{unit} (95% interval {num(lo, spec)}{unit} to {num(hi, spec)}{unit})"
-
-
 def t_interval(a, b) -> tuple[float, float]:
-    """A 95% Welch t interval on the difference of the means of two samples of runs: a check on the percentile
-    bootstrap, which is a little narrow at eight runs per sample (it covers about 90% of the time at these sizes).
-    """
+    """A 95% Welch t interval on the difference of the means of two samples of runs, which are not paired."""
     from scipy import stats
 
     ci = stats.ttest_ind(np.asarray(a, float), np.asarray(b, float), equal_var=False).confidence_interval(0.95)
     return float(ci.low), float(ci.high)
+
+
+# REVIEW: every comparison of the two recipes now takes a Welch t interval in place of the percentile bootstrap
+# (paper round 1, claims follow-up). At eight runs per recipe the bootstrap covered about 90% of the time rather than
+# 95% in a simulation at the observed spreads, and the t interval about 95%. Verify: `t_interval`, and each `gap` in
+# the prose against the wording around it.
+def gap(a, b, spec: str = ".2f", unit: str = "") -> str:
+    """The difference of means of two samples of runs, with its 95% Welch t interval, for the prose."""
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    lo, hi = t_interval(a, b)
+    return f"{num(a.mean() - b.mean(), spec)}{unit} (95% interval {num(lo, spec)}{unit} to {num(hi, spec)}{unit})"
 
 
 def table_html(head: list[str], rows: list[list[str]], caption: str) -> str:
@@ -250,6 +242,36 @@ _states_d = _states_d.astype(np.float64)
 # Per dose, the mean turn of the states holding `difference` at the example answers at slice 1, as a share of the
 # mean turn under the full edit.
 DOSE_TURN = np.array([turn_at_dose(_states_d, g).mean() / turn_at_dose(_states_d, 1.0).mean() for g in GAMMAS])
+
+
+def aligned_after(alpha, gamma: float) -> np.ndarray:
+    """|α| of a unit state after a dose: the share *gamma* of its e₁ component taken out, then back on the sphere."""
+    a = np.abs(np.asarray(alpha, np.float64))
+    return (1 - gamma) * a / np.sqrt((1 - gamma) ** 2 * a**2 + 1 - a**2)
+
+
+# REVIEW: added the geometry at the later slices (paper round 1, claims follow-up). There the states holding
+# `difference` sit nearly on e₁, where a partial dose turns a state much less than its share and putting it back on
+# the sphere gives most of the alignment back, so the turn at a single slice lags the measured removal at every dose;
+# the shape has to come from across the slices. Verify: DOSE_MEDIAN_ALPHA, DOSE_LEFT_3, and `turn_at_dose` by slice.
+_states_by_slice = {
+    sl: np.concatenate([ALPHA[(FIXED, s)]["clean"][sl][IS_D][:, ANSWERS].ravel() for s in SEEDS_OF[FIXED]]).astype(
+        np.float64
+    )
+    for sl in range(1, 5)
+}
+# The median |α| of the states holding `difference` at the example answers, at slices 2 to 4.
+DOSE_MEDIAN_ALPHA = [float(np.median(np.abs(_states_by_slice[sl]))) for sl in (2, 3, 4)]
+# At slice 3, the mean |α| left after three quarters of the edit, as a share of the clean mean |α|.
+DOSE_LEFT_3 = float(aligned_after(_states_by_slice[3], 0.75).mean() / np.abs(_states_by_slice[3]).mean())
+# At every slice past the first, a dose turns these states by a smaller share of the full turn than the share of the
+# full removal it gives, at every dose short of the full edit: the per-slice geometry lags the measured curve.
+_turn_share = {
+    sl: np.array([turn_at_dose(st, g).mean() / turn_at_dose(st, 1.0).mean() for g in GAMMAS[:-1]])
+    for sl, st in _states_by_slice.items()
+}
+assert all((_turn_share[sl] < DOSE_SHARE[FIXED][:-1]).all() for sl in (2, 3, 4))
+assert 0.75 in GAMMAS
 
 
 @memo
@@ -916,9 +938,11 @@ def tail_share(n: str, s: int, sl: int = 3) -> float:
 
 TAIL = {n: np.array([tail_share(n, s) for s in SEEDS_OF[n]]) for n in RECIPES}
 NOFIT_BOUND_3 = {n: np.array([angle(TURN[(n, s)]["nofit"]["q_clean"][3]) for s in SEEDS_OF[n]]) for n in RECIPES}
-# REVIEW: the t interval on the slice-3 bound reaches down to zero where the percentile bootstrap does not (claims
-# review 2), so E4 quotes both and calls the difference suggestive. Verify: `t_interval` against `diff_interval`.
+# REVIEW: the t interval on the slice-3 bound only just clears zero (claims review 2), so E4 calls the difference
+# suggestive. Now that `gap` takes the t interval, E4 quotes it once (paper round 1, claims follow-up). The assert keeps
+# that wording tied to the data. Verify: NOFIT_BOUND_3_T.
 NOFIT_BOUND_3_T = t_interval(NOFIT_BOUND_3[FIXED], NOFIT_BOUND_3[FALLOFF])
+assert 0 < NOFIT_BOUND_3_T[0] < 0.05 * NOFIT_BOUND_3_T[1], "E4 calls the wider bound at slice 3 suggestive"
 NOFIT_MEDIAN_3 = {n: float(angle(seed_mean(n, "nofit", "med_clean")[3])) for n in RECIPES}
 # The share of the example answers that fit `difference`: about one in this many, on the contexts of other ops.
 FIT_ONE_IN = (N_FIT + N_NOFIT) / N_FIT
@@ -987,30 +1011,42 @@ def example_colors(holdout_ref: str, checkpoint_ref: str) -> np.ndarray:
     return np.stack([np.stack([tok2color[ho.tokens[:, UNIT * e + j]] for j in (0, 2, 4)], 1) for e in range(fc.K)], 1)
 
 
-def near_fit(colors: np.ndarray) -> np.ndarray:
-    """`(contexts, examples)`: whether an example answer is at most one step of the color grid (one level, in one
-    channel) from an answer `difference` can give on its operands. Fitting answers are at zero steps.
+def grid_steps(colors: np.ndarray) -> np.ndarray:
+    """`(contexts, examples)`: how many steps of the color grid (one level, in one channel) an example answer is from
+    the nearest answer `difference` can give on its operands. Fitting answers are at zero steps.
     """
+    from sca.data.ops import PALETTE
+
+    a, b, y = colors[..., 0], colors[..., 1], colors[..., 2]
+    assert (y >= 0).all()
+    pair = a * len(PALETTE) + b
+    idx, prob = TABLE.idx[D, pair], TABLE.prob[D, pair]  # (contexts, examples, answers)
+    steps = np.abs(GRID[np.maximum(idx, 0)] - GRID[y][..., None, :]).sum(-1)
+    return np.where(prob > 0, steps, 99).min(-1)
+
+
+def palette_grid() -> np.ndarray:
+    """`(colors, 3)`: the level of each palette color in each channel."""
     from sca.data.ops import PALETTE
 
     rgb = np.array(list(PALETTE.values()), float)
     levels = np.unique(rgb)
     assert np.allclose(np.diff(levels), levels[1] - levels[0]), "the palette is an even grid"
-    grid = np.rint(rgb / (levels[1] - levels[0])).astype(int)  # (216, 3) level per channel
-    a, b, y = colors[..., 0], colors[..., 1], colors[..., 2]
-    pair = a * len(rgb) + b
-    idx, prob = TABLE.idx[D, pair], TABLE.prob[D, pair]  # (contexts, examples, answers)
-    steps = np.abs(grid[np.maximum(idx, 0)] - grid[y][..., None, :]).sum(-1)
-    return (np.where(prob > 0, steps, 99).min(-1) <= 1) & (y >= 0)
+    return np.rint(rgb / (levels[1] - levels[0])).astype(int)
 
 
+GRID = palette_grid()
 EXAMPLE_COLORS = example_colors(
     ee.ex2221.HOLDOUT_REF.format(key=ee.ex2222.MAIN_KEY),
     ee.ex2223.CHECKPOINT_REF.format(label=ee.ex2223.label_of("control", ee.EPOCHS, SEEDS_OF[FALLOFF][0])),
 )
-NEAR = near_fit(EXAMPLE_COLORS)
-# The fitting answers are near by definition; check that the colors line up with the stored fits.
-assert NEAR[FITS_D[:, : fc.K]].all()
+STEPS = grid_steps(EXAMPLE_COLORS)
+NEAR = STEPS <= 1  # a near miss, or an answer that fits
+# The fitting answers are at zero steps by definition; check that the colors line up with the stored fits.
+assert ((STEPS == 0) == FITS_D[:, : fc.K]).all()
+# The example answers of other ops that do not fit `difference`, and the share of them that are near misses.
+NOFIT_OTHER = ~FITS_D[:, : fc.K] & ~IS_D[:, None]
+NEAR_BASE = float(NEAR[NOFIT_OTHER].mean())
 
 
 def tail_near(n: str, s: int, sl: int = 3) -> tuple[float, float]:
@@ -1019,11 +1055,54 @@ def tail_near(n: str, s: int, sl: int = 3) -> tuple[float, float]:
     """
     c = np.abs(ALPHA[(n, s)]["clean"][sl].astype(np.float32))
     near = np.stack([c[:, p] for p in ANSWERS], 1) > 0.5
-    keep = ~FITS_D[:, : fc.K] & ~IS_D[:, None]
-    return float(NEAR[near & keep].mean()), float(NEAR[~near & keep].mean())
+    return float(NEAR[near & NOFIT_OTHER].mean()), float(NEAR[~near & NOFIT_OTHER].mean())
 
 
 TAIL_NEAR = {n: np.array([tail_near(n, s) for s in SEEDS_OF[n]]) for n in RECIPES}  # (seeds, [tail, rest])
+
+
+def in_tail(n: str, sl: int = 3) -> np.ndarray:
+    """`(seeds, contexts, examples)`: whether each example answer has |α| above 0.5 at slice *sl* on the clean pass."""
+    return np.stack(
+        [np.stack([np.abs(ALPHA[(n, s)]["clean"][sl][:, p].astype(np.float32)) for p in ANSWERS], 1) > 0.5
+         for s in SEEDS_OF[n]]
+    )  # fmt: skip
+
+
+# REVIEW: added the rate in the tail by distance from the nearest `difference` answer, and the check by darkness
+# (paper round 1, claims follow-up). The rate falls off steeply with each step, and near misses are in the tail far
+# more often than the rest in every stratum of darkness, so the account does not rest on how dark the answers are.
+# With that, E4 and the discussion say "much of the tail is" again. Verify: TAIL_BY_STEP and TAIL_BY_DARK.
+STEP_SHOWN = (1, 2, 3, 4, 5)
+TAIL_BY_STEP = {
+    n: [float(in_tail(n)[:, NOFIT_OTHER & (STEPS == k)].mean()) for k in STEP_SHOWN] for n in RECIPES
+}  # pooled over runs
+N_AT_STEP = [int((NOFIT_OTHER & (STEPS == k)).sum()) for k in STEP_SHOWN]  # answers per run
+assert all(np.all(np.diff(TAIL_BY_STEP[n]) < 0) for n in RECIPES)
+# Darkness: the sum of the three channel levels of the answer, in quartiles over the answers that do not fit.
+_dark = GRID[EXAMPLE_COLORS[..., 2]].sum(-1)
+_dark_q = np.digitize(_dark, np.quantile(_dark[NOFIT_OTHER], [0.25, 0.5, 0.75]))
+_tail_fixed = in_tail(FIXED)
+TAIL_BY_DARK = np.array(
+    [
+        [float(_tail_fixed[:, NOFIT_OTHER & (_dark_q == q) & m].mean()) for m in (STEPS == 1, STEPS > 1)]
+        for q in range(4)
+    ]
+)  # (quartiles, [near misses, the rest]) on `τ_ℓ fixed`, pooled over runs
+assert TAIL_BY_DARK[:, 0].min() > 5 * TAIL_BY_DARK[:, 1].max()
+
+
+def steps_table() -> str:
+    rows = [["answers per run", *[f"{v:,}" for v in N_AT_STEP]]]
+    rows += [[f"`{SHOWN[n]}`", *[f"{v:.1%}" for v in TAIL_BY_STEP[n]]] for n in RECIPES]
+    return table_html(
+        ["grid steps from a `difference` answer", *[str(k) for k in STEP_SHOWN]],
+        rows,
+        f"""**How often an answer is in the tail, by how near it comes to fitting**: of the example answers of the
+        other ops that do not fit `{DIFF}`, the share with |α| above 0.5 at slice 3 on the clean pass, by the number
+        of steps of the color grid to the nearest answer `{DIFF}` could give on its operands, pooled over the eight
+        runs of each recipe. One step is a near miss.""",
+    )
 
 
 # %%
@@ -1033,7 +1112,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-We scored the edit on the recipe of record, at its fresh seeds, the way the edit-effects report scored the recipe before it. We also added the confusion matrices of ex-2.2.22. The two recipes come out about the same on every measure, apart from a wider bound at slice 3, set by a small tail of states, many of them near misses for `difference`. The edit takes out more of `difference` as the dose grows, and the drop follows what each context needed. The edited answers get about half of the way to the target null. And the blocks after the edit put back no more e₁ on the other ops than the clean model has there.
+We scored the edit on the recipe of record, at its fresh seeds, the way the edit-effects report scored the recipe before it. We also added the confusion matrices of ex-2.2.22. The two recipes come out about the same on every measure, apart from a bound at slice 3 that is wider on the seed mean, set by a small tail of states, many of them near misses for `difference`. <!-- REVIEW: restored "on the seed mean" (paper round 1, claims follow-up): the t interval on the difference at slice 3 only just clears zero, so the report calls it suggestive. Verify: NOFIT_BOUND_3_T. --> The edit takes out more of `difference` as the dose grows, and the drop follows what each context needed. The edited answers get about half of the way to the target null. And the blocks after the edit put back no more e₁ on the other ops than the clean model has there.
 ///
 
 The [fixed confirmation](/docs/m2/fixed-confirm/report.py) adopted `τ_ℓ fixed` as the recipe of record for D2.2, and scored it on removal, spill, the task, and lost anchors. The [D2.2 design doc](/docs/m2/d2.2/design.md) asks for the rest of what the edit does on the same runs before the blog post: removal by dose, the grading, the landing and the write bound of the [edit-effects report](/docs/m2/edit-effects/report.py), and the confusion matrices of [ex-2.2.22](/docs/m2/ex-2.2.22/report.py).
@@ -1049,15 +1128,14 @@ rf"""
 - [Removal and spill by dose (E1)](#removal-and-spill-by-dose-e1): removal rises with the dose, slowly over the first quarter of the edit and steeply over the second, and it is complete by three quarters. On {len(SEEDS_OF[FIXED]) - N_SPILL_POSITIVE[FIXED]} runs of {len(SEEDS_OF[FIXED])}, the other ops lose less under the edit along e₁ than under the same edit along a typical axis, at every dose. No run comes near the spill criterion.
 - [Whether the drop follows what each context needed (E2)](#whether-the-drop-follows-what-each-context-needed-e2): the edit takes about the same share of the way to the target null whatever the posterior on `{DIFF}`, and, before the controls are subtracted, the two recipes lose the same amount bin by bin. On the contexts of other ops whose examples point at `{DIFF}`, it gives back part of what those examples cost, as on `falloff`.
 - [Where the edited answers go (E3)](#where-the-edited-answers-go-e3): the edited answers get about half of the way to the target null, a little less far than a model trained without `{DIFF}`. Pooled over contexts and runs, the `{DIFF}` row of the confusion matrix matches the target null in total at every level of the posterior, though `lighten` gets well under its share. The other ops lose a little more mass to each other than on the clean pass.
-- [How far the edit turns the other ops (E4)](#how-far-the-edit-turns-the-other-ops-e4): the write stays within the clean bound past the embedding, as on `falloff`. The bound at the answers of the other ops is wider at slice 3 than on `falloff`. It is set by about one answer in a hundred, and about half of those are near misses: one step of the color grid from an answer `{DIFF}` could give. The write there is small.
+- [How far the edit turns the other ops (E4)](#how-far-the-edit-turns-the-other-ops-e4): the write stays within the clean bound past the embedding, as on `falloff`. The bound at the answers of the other ops is wider at slice 3 than on `falloff` on the seed mean. It is set by about one answer in a hundred, and about half of those are near misses: one step of the color grid from an answer `{DIFF}` could give. The write there is small.
 
 ## Scope and method
 
 This is an exploratory re-analysis, with no preregistration and no gate. It covers the eight runs of `τ_ℓ fixed` that the fixed confirmation trained to the end, at seeds 712 to 719, and the eight controls at the same seeds from the [anneal confirmation](/docs/m2/anneal-confirm/report.py), trained without the anchor.
 
-<!-- REVIEW: the recipes were compared by whether a difference was wider than the spread of the runs of each; they are now compared as two samples, with a bootstrap interval on the difference of seed means (paper round 1, per the design checks of the sci-report skill). Verify: `diff_interval`. -->
-The comparison is `falloff` at seeds 704 to 711, the runs of the edit-effects report, with the eight controls of ex-2.2.23 at those seeds. The two recipes ran at different seeds, so we compare them as two samples of eight runs: the difference of the seed means, with a 95% bootstrap interval that resamples the runs of each. The intervals are wide, since the end of a run is sensitive to small changes early in training (the fixed confirmation). They are also a little narrow for what they claim: at eight runs a percentile interval covers about 90% of the time rather than 95%, so a difference whose interval only just clears zero is suggestive rather than settled.
-<!-- REVIEW: added the coverage caveat (claims review 2): in a simulation at the observed spreads, the 95% percentile interval on a difference of means at eight runs each covers about 90% of the time, and a Welch t interval about 95%. Verify: `t_interval`, and the slice-3 comparison in E4, the one place it bites. -->
+<!-- REVIEW: the recipes were compared by whether a difference was wider than the spread of the runs of each; they are now compared as two samples (paper round 1, per the design checks of the sci-report skill). Claims review 2 found that a percentile bootstrap at eight runs each covers about 90% of the time rather than 95%, and a Welch t interval about 95%, so every comparison now takes the t interval and the coverage caveat is gone (paper round 1, claims follow-up). Verify: `t_interval` and `gap`. -->
+The comparison is `falloff` at seeds 704 to 711, the runs of the edit-effects report, with the eight controls of ex-2.2.23 at those seeds. The two recipes ran at different seeds, so we compare them as two samples of eight runs: the difference of the seed means, with a 95% Welch t interval, which does not assume the two recipes vary alike. The intervals are wide, since the end of a run is sensitive to small changes early in training (the fixed confirmation). With eight runs a side, a difference whose interval only just clears zero is suggestive rather than settled.
 
 Every measurement is on the {len(OP_IDS):,} held-out contexts of ex-2.2.21, {int(IS_D.sum()):,} per op, each with three examples and a query. The edit removes a share of the e₁ component from the state at every position and every slice. That share is the dose, and E2 to E4 use the full dose.
 
@@ -1093,7 +1171,7 @@ Fit {{.manual}}
 :   An example or query answer fits when `{DIFF}` can give it on its operands. In a context of another op, about one example answer in {FIT_ONE_IN:.0f} fits. It is evidence for `{DIFF}`, so the edit is meant to turn it.
 
 Near miss
-:   An example answer that does not fit, but is one step of the color grid from an answer `{DIFF}` can give on its operands: one level away in one of the three channels of the 6 × 6 × 6 palette. About {NEAR[~FITS_D[:, : fc.K] & ~IS_D[:, None]].mean():.0%} of the example answers of other ops that do not fit are near misses. E4 reads the colors of the examples from the held-out set to find them.
+:   An example answer that does not fit, but is one step of the color grid from an answer `{DIFF}` can give on its operands: one level away in one of the three channels of the 6 × 6 × 6 palette. About {NEAR_BASE:.0%} of the example answers of other ops that do not fit are near misses. E4 reads the colors of the examples from the held-out set to find them.
 """
 
 # %%
@@ -1110,7 +1188,9 @@ Removal grows with the dose on every run, from zero at dose 0, which is the clea
 `falloff` has the same shape. On the seed mean it is a little lower at the smaller doses, by less than two sets of eight runs can tell apart: at half the edit, `τ_ℓ fixed` removes {gap(REMOVAL[FIXED][:, 1], REMOVAL[FALLOFF][:, 1])} more.
 
 <!-- REVIEW: the paragraph below answers the paper review (what would the curve look like against arcsin(dose)?). arcsin(dose) is not an angle of the edit, since the dose is a share of the e₁ component; the angle is `turn_at_dose`, near proportional to the dose at slice 1. Verify: DOSE_TURN. Claims review 2: narrowed to slice 1, since at the later slices the states holding `difference` sit nearly on e₁ (median |α| of 0.98 at slice 3), where a partial dose turns a state by much less than its share and renormalization gives most of the alignment back (a dose of three quarters leaves about four fifths of it at slice 3), so the geometry there is back-loaded rather than proportional. Verify: `turn_at_dose` on the slice-3 states, as DOSE_TURN does on slice 1. -->
-The slow start is not in how far the edit turns the states at slice 1. The dose is the share of the e₁ component taken out of each state before it is put back on the sphere, so how far a dose turns a state depends on how close the state is to e₁. At slice 1, where block 1 writes about half of the evidence for the op (the block1-edit experiment), the states holding `{DIFF}` are far enough from e₁ that a dose turns them by about that share of the full turn: {DOSE_TURN[0]:.0%} of it at a quarter of the edit, and {DOSE_TURN[1]:.0%} at half. So the bend seems to come from what the later blocks and the reader make of the e₁ that is left, which the edit at each later slice cuts by the same share again.
+The slow start is not in how far the edit turns the states at slice 1. The dose is the share of the e₁ component taken out of each state before it is put back on the sphere, so how far a dose turns a state depends on how close the state is to e₁. At slice 1, where block 1 writes about half of the evidence for the op (the block1-edit experiment), the states holding `{DIFF}` are far enough from e₁ that a dose turns them by about that share of the full turn: {DOSE_TURN[0]:.0%} of it at a quarter of the edit, and {DOSE_TURN[1]:.0%} at half.
+<!-- REVIEW: added the sentence on slices 2 to 4 (paper round 1, claims follow-up). Verify: DOSE_MEDIAN_ALPHA, DOSE_LEFT_3, and the assert on `_turn_share`. -->
+At slices 2 to 4 the states holding `{DIFF}` sit nearly on e₁ (median |α| of {", ".join(f"{v:.2f}" for v in DOSE_MEDIAN_ALPHA[:-1])} and {DOSE_MEDIAN_ALPHA[-1]:.2f}), where a partial dose turns a state far less than its share, and putting the state back on the sphere gives most of the alignment back: at slice 3, three quarters of the edit leaves {DOSE_LEFT_3:.2f} of the clean alignment. So at a single slice the turn is back-loaded, with most of it in the last quarter of the edit, where the measured removal has already finished. The bend has to come from how the slices compound: the edit at slice 1 starves what arrives at the later slices, which the edit there cuts by the same share again.
 
 Spill is below zero at every dose on {len(SEEDS_OF[FIXED]) - N_SPILL_POSITIVE[FIXED]} runs of {len(SEEDS_OF[FIXED])}: the other ops lose less under the edit along e₁ than under the same edit along a typical other axis. The largest spill of any run at any dose is {SPILL_TOP["value"]:.3f}, on seed {SPILL_TOP["seed"]} (`{SPILL_TOP["op"]}`, at the full dose), far below the criterion.
 
@@ -1196,8 +1276,8 @@ The write stays within the bound past the embedding. At the seed mean the larges
 
 From slice 2 on, the other ops arrive with much less e₁ than the clean model gives them, as on `falloff`: at the example answers that do not fit, the write is {ANS_RATIO[FIXED][2]:.0%} of the bound at slice 2 and {ANS_RATIO[FIXED][4]:.0%} at slice 4. The edit-effects report traced this to the edit at the slices before, which leaves each block nothing on e₁ to carry through. The block1-edit experiment found why that is enough: the later blocks mostly add to the e₁ that arrives, rather than computing it again.
 
-<!-- REVIEW: the comparison of the bound at slice 3 is now two-sample (paper round 1); the interval of the difference excludes zero, so the text no longer leans on the overlap of the runs to play it down. Verify: NOFIT_BOUND_3 under `gap`. Claims review 2: the percentile interval undercovers at eight runs, and a Welch t interval on the same runs reaches zero (a Mann-Whitney test gives p of about 0.07), so the text now gives both and calls the difference suggestive. Verify: NOFIT_BOUND_3_T. -->
-The bound itself has a different shape. On `falloff` it was widest at slice 1 at the example answers and narrowed with depth. On `τ_ℓ fixed` it widens to slice 3, to {angle(seed_mean(FIXED, "nofit", "q_clean")[3]):.0f}° against {angle(seed_mean(FALLOFF, "nofit", "q_clean")[3]):.0f}° on `falloff`, and the query answer does the same ({angle(BOUND[FIXED][3, QUERY_ANSWER]):.0f}° against {angle(BOUND[FALLOFF][3, QUERY_ANSWER]):.0f}°). Taken run by run, the bound at the example answers at slice 3 is wider on `τ_ℓ fixed` by {gap(NOFIT_BOUND_3[FIXED], NOFIT_BOUND_3[FALLOFF], ".0f", "°")}. That interval is a little narrow at eight runs, and a t interval on the same runs reaches from {num(NOFIT_BOUND_3_T[0], ".0f")}° to {num(NOFIT_BOUND_3_T[1], ".0f")}°, so the difference is suggestive rather than settled; the bound is wider at slice 3 than at slice 1 on {RISES_TO_3[FIXED]} runs of `τ_ℓ fixed` and also on {RISES_TO_3[FALLOFF]} of `falloff`.
+<!-- REVIEW: the comparison of the bound at slice 3 is now two-sample (paper round 1); the interval of the difference excludes zero, so the text no longer leans on the overlap of the runs to play it down. Verify: NOFIT_BOUND_3 under `gap`. Claims review 2: the percentile interval undercovers at eight runs, and a Welch t interval on the same runs reaches zero (a Mann-Whitney test gives p of about 0.07), so the text now gives both and calls the difference suggestive. Verify: NOFIT_BOUND_3_T. Claims follow-up: `gap` now takes the t interval, so the text quotes it once, to a tenth of a degree so that a lower end near zero does not print as zero. -->
+The bound itself has a different shape. On `falloff` it was widest at slice 1 at the example answers and narrowed with depth. On `τ_ℓ fixed` it widens to slice 3, to {angle(seed_mean(FIXED, "nofit", "q_clean")[3]):.0f}° against {angle(seed_mean(FALLOFF, "nofit", "q_clean")[3]):.0f}° on `falloff`, and the query answer does the same ({angle(BOUND[FIXED][3, QUERY_ANSWER]):.0f}° against {angle(BOUND[FALLOFF][3, QUERY_ANSWER]):.0f}°). Taken run by run, the bound at the example answers at slice 3 is wider on `τ_ℓ fixed` by {gap(NOFIT_BOUND_3[FIXED], NOFIT_BOUND_3[FALLOFF], ".1f", "°")}. The interval only just clears zero, so the difference is suggestive rather than settled; the bound is wider at slice 3 than at slice 1 on {RISES_TO_3[FIXED]} runs of `τ_ℓ fixed` and also on {RISES_TO_3[FALLOFF]} of `falloff`.
 
 A small tail sets the bound at slice 3. The median example answer that does not fit would turn by {NOFIT_MEDIAN_3[FIXED]:.0f}° there, while the share close to e₁ (|α| above 0.5) is {TAIL[FIXED].min():.1%} to {TAIL[FIXED].max():.1%} by run ({TAIL[FALLOFF].min():.1%} to {TAIL[FALLOFF].max():.1%} on `falloff`).
 
@@ -1206,7 +1286,12 @@ The bound is the 99th percentile, so a tail near one in a hundred moves it a lon
 <!-- REVIEW: was "so we have no explanation for the tail". The block1-edit account (block 1 judges each example answer against its operands, and blocks 2 and 3 build on it) suggested a graded judgement; the colors of the examples show the tail is rich in near misses. Verify: TAIL_NEAR, NEAR, and `near_fit`. -->
 On {len(SEEDS_OF[FIXED]) - len(TAIL_POST_HIGH)} runs of {len(SEEDS_OF[FIXED])}, the contexts in the tail have about as little posterior on `{DIFF}` as the rest, as the edit-effects report found for a tail at the query answer on `falloff`. But the posterior counts only answers that fit exactly. The block1-edit experiment found that block 1 writes the evidence for the op as a judgement on each example, whether its answer fits `{DIFF}` on its operands, and that blocks 2 and 3 build on what block 1 writes. A judgement of that kind made from colors could be graded, giving an answer that nearly fits some of the weight of one that fits.
 
-The tail fits that account. Of the answers in the tail, {TAIL_NEAR[FIXED][:, 0].min():.0%} to {TAIL_NEAR[FIXED][:, 0].max():.0%} by run are near misses, against about {TAIL_NEAR[FIXED][:, 1].mean():.0%} of the other answers that do not fit ({TAIL_NEAR[FALLOFF][:, 0].min():.0%} to {TAIL_NEAR[FALLOFF][:, 0].max():.0%} on `falloff`). So much of the tail looks like the model taking a near miss as weak evidence for `{DIFF}`, and turning those states would be partly removal at work, as with the answers that fit. It leaves the rest of the tail unexplained, and does not say why the tail is larger on some runs than on others.
+<!-- REVIEW: the base rate of near misses is now the pooled share over all the answers that do not fit, as in the measurement entry (paper round 1, claims follow-up); it was the share among the answers outside the tail. The gradient by grid step and the check by darkness are new, and with them the wording is back to "much of the tail is". Verify: NEAR_BASE, TAIL_BY_STEP, TAIL_BY_DARK. -->
+The tail fits that account. Of the answers in the tail, {TAIL_NEAR[FIXED][:, 0].min():.0%} to {TAIL_NEAR[FIXED][:, 0].max():.0%} by run are near misses, against about {NEAR_BASE:.0%} of all the answers of other ops that do not fit ({TAIL_NEAR[FALLOFF][:, 0].min():.0%} to {TAIL_NEAR[FALLOFF][:, 0].max():.0%} on `falloff`). The nearer an answer comes to one that fits, the more often it is in the tail, and the rate falls off steeply past one step of the grid (the table below). That does not come from how dark the answers are: in each quarter of them by darkness, near misses are in the tail {TAIL_BY_DARK[:, 0].min():.0%} to {TAIL_BY_DARK[:, 0].max():.0%} of the time, against about {TAIL_BY_DARK[:, 1].mean():.0%} for the rest.
+
+{steps_table()}
+
+Much of the tail is the model taking a near miss as weak evidence for `{DIFF}`, and turning those states is partly removal at work, as with the answers that fit. That leaves the rest of the tail unexplained, and does not say why the tail is larger on some runs than on others.
 
 {turn_table()}
 
@@ -1223,7 +1308,7 @@ On the recipe of record, the edit does what it did on `falloff` on every measure
 The landing is where the edit falls short, as before. Pooled over contexts the edited model sends the mass of `difference` to the other ops in about the proportions of the target null, but context by context it weighs them differently. <!-- REVIEW: replaced "A model trained without `difference` would say how close any model of this size comes to the target null" with what the sans-diff experiment found (paper round 1). Verify: the lede and E2 of sans-diff. -->
 With both recipes landing in the same place, the shortfall looks like a property of the model or of the edit rather than of the recipe. The [sans-diff experiment](/docs/m2/filtered-corpus/report.py) points to the model: trained without `difference`, it lands only a little closer to the target null than the edited model, and misses in the same kind of way, sharing the mass among the other ops differently on each context and at each seed. The anchor and the edit add a smaller part on top, and the shortfall on `lighten` in the pooled matrices is part of what they add.
 
-Two results add to what the edit-effects report showed. Removal is nearly complete by three quarters of the full edit, so the full edit has some margin. And the bound at slice 3 is wider than on `falloff`, set by a tail of about one state of another op in a hundred that varies a lot between runs. Much of the tail is near misses for `difference`, which the model seems to take as weak evidence for the op, so some of that turn is removal rather than a side effect. That does not change what the edit does to the answers here, but it makes the turn we can state in advance larger. If a later recipe spills, the tail at slice 3 would be a place to look.
+Two results add to what the edit-effects report showed. Removal is nearly complete by three quarters of the full edit, so the full edit has some margin. And the bound at slice 3 is wider than on `falloff` on the seed mean, set by a tail of about one state of another op in a hundred that varies a lot between runs. Much of the tail is near misses for `difference`, which the model seems to take as weak evidence for the op, so some of that turn is removal rather than a side effect. That does not change what the edit does to the answers here, but it makes the turn we can state in advance larger. If a later recipe spills, the tail at slice 3 would be a place to look.
 """
 
 # %%
