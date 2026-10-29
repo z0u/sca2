@@ -37,10 +37,12 @@ Edit {.manual}
 
 ## Scoring
 
-Every run is scored on held-out contexts, and each drop under the edit is net of a baseline: the median drop under the same edit along each of the other 63 coordinate axes of the run. A control trained without the anchor at the same seed gives the task change, and checks now and then that the baseline still agrees with it.
+Every run is scored on held-out contexts, and each drop under the edit is net of a baseline: the median drop under the same edit along each of the other 63 coordinate axes of the run. Controls trained without the anchor give the task change, and check now and then that the baseline still agrees with them.
 
 Task change
-:   The clean score per op, less that of the control. The task gate fails below −0.02 on the mean over ops, or below −0.05 on any one op.
+:   The clean score per op, less the mean of the controls. The task gate fails below −0.02 on the mean over ops, or below −0.05 on any one op. Reports up to and including *fixed-confirm* netted against the control at the same seed instead; by the end of training two runs at one seed are about as far apart as runs at different seeds, so a single control adds its own seed scatter.
+
+Two conditions are compared as two samples: the difference of their seed means, with a bootstrap or permutation interval, and Fisher's exact test for a difference in rates. Runs at the same seed are paired only when they branch from one stored state and are measured soon after.
 
 Removal
 :   The drop on `difference` under the full edit, as a share of the way to the target null. A run that removes less than half has lost the anchor.
