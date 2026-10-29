@@ -194,7 +194,7 @@ main.lit { position: relative; }  /* what a hover box spans */
 sup.fnref > a { text-decoration: none; }
 dfn.term {
   font-style: inherit;
-  text-decoration: underline dotted color-mix(in srgb, var(--fg) 45%, transparent);
+  text-decoration: underline dotted color-mix(in srgb, var(--fg) 30%, transparent);
   text-underline-offset: 0.2em;
   cursor: help;
 }
