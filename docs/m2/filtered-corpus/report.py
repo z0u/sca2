@@ -50,11 +50,12 @@ def fetch_all() -> tuple[dict, dict, dict, dict]:
     refs = [dose_ref(*k) for k in keys]
     json_refs = [ex.TRAJ_REF, ex.ALONG_REF, ac.FINISHED_TRAJ_REF, fc.FINISHED_TRAJ_REF]
     got = store.get_refs(refs + json_refs)
-    missing = [r for r, a in got.items() if a is None]
+    found = {r: a for r, a in got.items() if a is not None}
+    missing = [r for r in got if r not in found]
     assert not missing, f"not published: {missing}"
     with tempfile.TemporaryDirectory() as tmp:
         into = Path(tmp)
-        paths = store.get_many([(got[r], into / f"{i}.bin") for i, r in enumerate(refs + json_refs)])
+        paths = store.get_many([(found[r], into / f"{i}.bin") for i, r in enumerate(refs + json_refs)])
         dose = {}
         for k, path in zip(keys, paths, strict=False):
             with np.load(path) as z:
