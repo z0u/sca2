@@ -177,6 +177,8 @@ def dots(ax, x: float, v, color, m: str, jit) -> None:
 
 # --- E1: along training ----------------------------------------------------------------------------------------
 
+UNIT = 6  # tokens per equation: a ? b = y and a separator
+ANSWERS = [UNIT * e + 4 for e in range(ex.K)]  # the positions of the example answers
 TRAJ_EPOCHS = np.asarray(TRAJ[ex.label_of(SEEDS[0])]["traj"]["epoch"])
 TRAJ_LABEL = {
     SANS: ex.label_of,
@@ -212,7 +214,7 @@ ALONG_SANS_O = along_of(SANS, "clean", OTHER)
 ALONG_FIXED_D = along_of(FIXED, "full", [D])
 ALONG_FIXED_O = along_of(FIXED, "full", OTHER)
 # The anchor along training, for the `τ_ℓ fixed` runs: its weight, the anti weight (mean over slices), and the
-# alignment α of the `difference` states with e₁ (mean over slices).
+# alignment α of the `difference` states with e₁, as (records, slices, positions).
 ANCHOR_ALONG = {
     s: {
         k: np.asarray(TRAJ[fc.label_of(s, None)]["traj"][k], float) for k in ("weight", "anti_weight", "alpha_anchored")
@@ -468,7 +470,7 @@ def along_figure() -> str:
         "fixed_d": {s: v.tolist() for s, v in ALONG_FIXED_D.items()},
         "sans_o": {s: v.tolist() for s, v in ALONG_SANS_O.items()},
         "fixed_o": {s: v.tolist() for s, v in ALONG_FIXED_O.items()},
-        "alpha": {s: ANCHOR_ALONG[s]["alpha_anchored"].mean(-1).tolist() for s in SEEDS},
+        "alpha": {s: ANCHOR_ALONG[s]["alpha_anchored"][:, :, ANSWERS].mean(-1).max(-1).tolist() for s in SEEDS},
         "weight": ANCHOR_ALONG[SEEDS[0]]["weight"].tolist(),
         "anti_weight": ANCHOR_ALONG[SEEDS[0]]["anti_weight"].mean(-1).tolist(),
         "seeds": SEEDS,
@@ -483,7 +485,7 @@ def along_figure() -> str:
         of sans-diff on the other ops falls faster, from {np.mean([v[0] for v in ALONG_SANS_O.values()]):.2f} to
         {np.mean([v[-1] for v in ALONG_SANS_O.values()]):.2f}, and the edited model on the other ops falls with it, to
         {np.mean([v[-1] for v in ALONG_FIXED_O.values()]):.2f}. Under the right panel, the alignment of the anchored
-        states with e₁ rises over the first 30 or so epochs while the anchor weight ramps up, then holds near 0.1.
+        states with e₁ rises over the first 30 or so epochs while the anchor weight ramps up, then holds.
     """
     return along_draw(data, alt)
 
@@ -502,7 +504,8 @@ def along_draw(data: dict, alt_text: str) -> str:
             the end: `sans-diff` on the clean pass and `τ_ℓ fixed` under the full edit, with markers; the dashed
             lines are the same two on the contexts of the other ops, where the target null is the predictor that would
             be ideal for a model without `difference`. **Under it:** for the `τ_ℓ fixed` runs, the alignment α of the
-            states holding `difference` with e₁ (mean over slices, one line per run), and the anchor weight λ_a
+            states holding `difference` with e₁ at the example answers, at the slice where it is highest (one line per
+            run), and the anchor weight λ_a
             and the anti weight (mean over slices) on the right-hand axis.
         """,
     )
@@ -534,7 +537,7 @@ def along_draw(data: dict, alt_text: str) -> str:
         ax.tick_params(labelsize=6.5, labelbottom=False)
         for s in data["seeds"]:
             under.plot(ep, data["alpha"][s], color=INK[FIXED], lw=0.5, alpha=0.6)
-        under.set_ylim(0, 0.15)
+        under.set_ylim(0, None)
         under.set_ylabel("α", fontsize=7)
         under.set_xlabel("epoch", fontsize=7)
         under.tick_params(labelsize=6)
@@ -544,7 +547,7 @@ def along_draw(data: dict, alt_text: str) -> str:
         twin.set_ylim(0, 0.3)
         twin.set_ylabel("weight", fontsize=7)
         twin.tick_params(labelsize=6)
-        twin.legend(fontsize=5.5, frameon=False, loc="upper right", ncols=2)
+        twin.legend(fontsize=5.5, frameon=False, loc="lower left", ncols=2)
         handles = [Line2D([], [], color=INK[k], lw=1.6) for k in (CONTROL, FIXED, SANS)]
         labels = [tex("τ_ℓ fixed" if k == FIXED else SHOWN[k]) for k in (CONTROL, FIXED, SANS)]
         fig.legend(handles, labels, loc="outside upper center", ncols=len(labels), frameon=False, fontsize=7)
@@ -603,7 +606,7 @@ def close_draw(data: dict, alt_text: str) -> str:
         ax.axhline(data["own_o"], color=INK[SANS], lw=0.7, ls=":", zorder=1)
         ax.set_xticks(range(len(cols)), [tex(SHOWN[k]).replace(", ", ",\n") for k in cols], fontsize=6.5)
         ax.set_xlim(-0.6, len(cols) - 0.4)
-        ax.set_ylim(0, 0.85)
+        ax.set_ylim(0, 1.0)
         ax.set_ylabel("distance from the target null ↓", fontsize=7)
         ax.tick_params(labelsize=6.5)
         ax = axes[1]
@@ -619,7 +622,7 @@ def close_draw(data: dict, alt_text: str) -> str:
         ax.set_xticks(x, data["bins"], fontsize=6.5)
         ax.set_xlabel("posterior on difference", fontsize=7)
         ax.tick_params(labelsize=6.5)
-        ax.legend(fontsize=6.5, frameon=False, loc="center right")
+        ax.legend(fontsize=6.5, frameon=False, loc="upper left")
         return fig
 
     return _plot()
