@@ -438,7 +438,7 @@ rf"""
 ## Observations
 
 - [Where the evidence is written (E1)](#where-the-evidence-is-written-e1): block 1 is the first place the evidence for the op can be computed, and both recipes write about half of it there, whether or not block 1 is pulled. At block 1 each example answer gathers the colors of its own operands.
-- [What the later blocks add (E2)](#what-the-later-blocks-add-e2): the later blocks mostly carry the alignment forward. Under the edit at block 1 they put back only a little of it, though the operand colors are still there to compute it from.
+- [What the later blocks add (E2)](#what-the-later-blocks-add-e2): the later blocks mostly carry the alignment forward. Under the edit at block 1 they put back only a little of it, even though the operand colors are still there to compute it from.
 - [The reader, and the edits at one slice (E3)](#the-reader-and-the-edits-at-one-slice-e3): on each run one block reads the example answers from the query `=`, usually block 3. An edit at one slice removes the op when it sits between block 1 and that reader, which accounts for the seeds where the edit at blocks 2 to 4 fell short.
 
 ## Scope and method
@@ -488,7 +488,7 @@ The attention fits this account. Block 1 is the first block where an example ans
 
 {own_table()}
 
-The color probe at the answer shows what that attention brings. The operand colors are partly recoverable from the answer even at the embedding, since an answer says something about its operands under most ops. At the attention of block 1 that rises on every run, the controls included, then eases down through the later blocks. How far it rises varies a great deal from run to run, and it does not separate the anchored runs from the controls. So gathering the operands at the answer is something the model does for the task anyway, and the pull puts the judgement made from them onto e₁.
+The color probe at the answer shows what that attention brings. The operand colors are partly recoverable from the answer even at the embedding, since an answer says something about its operands under most ops. At the attention of block 1 that rises on every run, the controls included, then eases down through the later blocks. How far it rises varies a great deal from run to run, and it does not separate the anchored runs from the controls. So gathering the operands at the answer is something the model does for the task anyway, and the pull puts the evidence for the op, judged from them, onto e₁.
 """
 
 # %%
