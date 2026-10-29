@@ -63,6 +63,7 @@ SCORES = {e: [scores(r, e) for r in RUNS] for e in EDITS}
 REMOVAL = {e: np.array([s["removal"] for s in SCORES[e]]) for e in EDITS}
 SPILL = {e: np.array([s["spill"] for s in SCORES[e]]) for e in EDITS}
 GAIN = REMOVAL["both"] - REMOVAL["between blocks"]
+LOW_MID = SEEDS[int(np.argmin(REMOVAL["mid-block"]))]
 
 
 def raw_removal(r: dict, edit: str) -> float:
@@ -277,7 +278,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-Inside each block, the attention writes to the stream and the MLP of the same block reads it before the edit acts again. Editing that mid-block state as well gains nothing: the between-block edit already takes out nearly all of the op, and the extra sites cost selectivity, because the MLP of a block uses e₁ for the other ops too.
+Inside each block, the attention writes to the stream and the MLP of the same block reads it before the edit acts again. Editing that mid-block state as well gains nothing on the recipe of record: the between-block edit already takes out nearly all of the op, and the extra sites cost selectivity, because the MLPs seem to use e₁ for the other ops too. The anchor and anti terms act only between blocks, so nothing in training keeps e₁ clear at the mid-block states.
 ///
 
 The edit of record acts between blocks, at the same slices the anchor pulls. But each block adds to the residual stream twice, first with its attention and then with its MLP, and nothing touches the state in between. So a block could, in principle, write the op onto e₁ with its attention and use it in its own MLP before any edit sees it. The [block1-edit](/docs/m2/block1-edit/report.py) account says the op travels between positions, from the example answers to the query `=`, and every such move goes through attention, which takes in an edited slice. That route is covered. The route this report asks about stays within one position and one block.
@@ -340,9 +341,11 @@ Does editing the mid-block states as well remove more of the op? The main measur
 
 It does not. Adding the mid-block sites to the between-block edit lowers removal on every run, by a little ({rng(GAIN)}), and spill rises: {OVER["both"]} of the 8 runs go past the criterion, against {OVER["between blocks"]} under the between-block edit. The mid-block sites alone remove less than the between-block edit and spill the most.
 
+They still remove most of the op on their own: {rng(np.delete(REMOVAL["mid-block"], SEEDS.index(LOW_MID)))} on seven runs, and {num(REMOVAL["mid-block"][SEEDS.index(LOW_MID)])} on seed {LOW_MID}. That is because the edit takes out the whole e₁ component of the state, so a site in the middle of a block also clears everything the earlier blocks wrote, and only the MLP after it can add some back.
+
 Most of the gap between removal and 1 is the baseline. With no baseline subtracted, the between-block edit takes out {rng(RAW["between blocks"])} of the way to the target null, and the median edit along another axis takes out about a tenth. So there was little left for any extra site to find.
 
-The spill fits what E1 showed of block 1. The MLP of a block seems to read the e₁ component of its mid-block state on every op, so taking it away there changes what the MLP computes for the other ops as well. With no baseline, the worst drop on another op is {fmt(RAW_OTHER["between blocks"], ".3f")} under the between-block edit and {fmt(RAW_OTHER["both"], ".3f")} with the mid-block sites added.
+The spill fits what E1 showed of block 1. The MLP of a block seems to read the e₁ component of its mid-block state on every op, so taking it away there changes what the MLP computes for the other ops as well. The slice after block 1 holds about as much e₁ on the other ops ({fmt(CLEAN_OTHER[:, M1])}), and the between-block edit takes it away there with no spill, so what matters is which sublayer reads it next. With no baseline, the worst drop on another op is {fmt(RAW_OTHER["between blocks"], ".3f")} under the between-block edit and {fmt(RAW_OTHER["both"], ".3f")} with the mid-block sites added.
 
 {scores_table()}
 """
@@ -354,7 +357,7 @@ r"""
 
 The within-block route is there, in the sense that the attention of block 2 puts alignment back where its MLP could read it. But removing it gains nothing, so the MLP does not seem to carry the op past the edit through it. The between-block edit already removes nearly all of the op on its own, which fits the block1-edit account: the op reaches the query `=` through attention, from slices the edit has cleared.
 
-The mid-block state also has e₁ on every op, before the MLP of block 1 makes it specific to `difference`. That makes it a poorer place to edit than the slice after the block, which is where the anchor pulls and where the concept has settled. The same reasoning would apply to a pull at the mid-block states: it would ask block 1 to tell the ops apart before its MLP has done so.
+The mid-block state also has e₁ on every op, before the MLP of block 1 makes it specific to `difference`, and the spill suggests the MLPs use it. That makes it a poorer place to edit than the slice after the block, on models trained as these were. The anchor and anti terms see only the slices between blocks, so training never asks the mid-block states to keep e₁ for the op alone. With both terms at the mid-block states as well, the attention of block 1 might keep e₁ off the other ops, and the mid-block sites might then be as selective as the slices. That would not add removal on this model, where the between-block edit already takes out nearly all of the op, but it would make any point along the stream a place where the edit works.
 
 These results hold for this recipe and this small model. In a deeper model the attention and the MLP of one block might do more of the work between them; the scorer can now edit mid-block states, so the check is cheap to repeat there.
 """
