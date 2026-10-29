@@ -1016,14 +1016,20 @@ def report_styles(doc: Path | str) -> str:
 
     One lookup for everything that renders a report (``mini.lit`` for a render, the live server and the export; the site build re-inlines the current source on top), so a report page carries the same sheet however it was made.
     """
-    docs = _project_root(Path(doc)) / "docs"
+    docs = _shared_docs(doc)
     sheets = [docs / "report.css", *([docs / "md-prose.css"] if Path(doc).suffix == ".md" else [])]
     return "\n".join(css.read_text("utf-8") for css in sheets if css.exists())
 
 
 def report_glossary(doc: Path | str) -> Path:
     """Where *doc*'s project keeps its shared glossary, ``docs/glossary.md`` beside ``report.css`` (read by :func:`mini.lit.notes.load_glossary`, which takes a missing file as an empty glossary)."""
-    return _project_root(Path(doc)) / "docs" / "glossary.md"
+    return _shared_docs(doc) / "glossary.md"
+
+
+def _shared_docs(doc: Path | str) -> Path:
+    """The ``docs/`` holding the shared report sheets and glossary for *doc*: its own project's, or, for a page outside any project with one (a draft in a scratch or shared folder, rendered by ``./go render``), the project it is rendered from (the working directory), so the draft prints as the reports do."""
+    docs = _project_root(Path(doc)) / "docs"
+    return docs if docs.is_dir() else _project_root(Path.cwd()) / "docs"
 
 
 def set_report_styles(html: str, css: str) -> str:

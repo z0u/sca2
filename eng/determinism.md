@@ -37,6 +37,12 @@ The same probe shows what the flags buy. Both deterministic replicas of each cel
 
 It also answers the open question below about GPU models: the deterministic runs agree within a device class and differ across them (`m_line` 0.866 on L4, 0.866 on T4, 0.845 on A10, 0.857 on L40S, one seed throughout). Moving a role to another GPU is a numerics change in the same sense as a jax upgrade.
 
+## Seeds are draws
+
+Determinism makes a run repeatable. It does not make a seed mean the same thing under two conditions. A small change to a hyperparameter sends the runs of one seed apart early in training: in the *fixed-confirm* experiment, the two recipes differed by 0.6% in the slice temperature at epoch 32, and the runs of a seed were already up to 0.43 apart in removal. By epoch 400, removal under the two recipes correlated about 0.2 across eight seeds, and in the sans-diff report two runs at one seed were about as far apart as runs at different seeds. A change of GPU model does the same.
+
+So we keep the flags for what they buy on their own (a stable memo, exact reproductions of a run, and stopped-and-resumed runs that match runs trained straight through), and compare conditions as two samples rather than seed by seed. Pairing by seed is worth it only where runs branch from one stored state and are measured soon after. The rules for reports are in the design checks of the `sci-report` skill, and for the choice of card in the `mi-ni` authoring reference. Decided 2026-10-29, from a paper review of the sans-diff report; the comparison of costs and seed counts is in the project files under `determinism/`.
+
 ## What we set, and why only that
 
 `[tool.mini] env` in `pyproject.toml` carries the CPU scheduler flag plus:

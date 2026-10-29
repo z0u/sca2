@@ -5,6 +5,7 @@ A python-markdown extension (:class:`NotesExtension`) that rewrites the converte
 
 - **Footnotes.** Each footnote reference gets a copy of its footnote's text right after it, as a ``<span class="sidenote">``. The list at the end of the document stays, with each item that has a sidenote marked ``sidenoted`` and its number pinned (``value``), so the stylesheet can hide it where the sidenote shows and the remaining items keep their numbers.
 - **Defined terms.** The first use of a defined term in each ``h2`` section is wrapped in a ``<dfn class="term">`` and followed by the definition, as a ``<span class="sidenote glossnote">``. Definitions come from the definition lists in the document itself (:func:`local_terms`: a ``## Glossary``, and equally a ``## Measurements`` or a ``## References`` naming other experiments), which win, and then from a shared dictionary (:func:`load_glossary`, ``docs/glossary.md``); see :func:`dl_terms` for the syntax. A term is matched case-insensitively as a whole word, with a plural ``s``/``es``, in running prose and link text: not in code, headings, tables, captions, math, or the definition lists themselves. A link that holds a term is wrapped whole, and its note follows the link rather than sitting inside it. ``[text](term:key)`` marks a use the matcher would miss (other wording, or a term the dictionary keeps off auto-matching).
+- **Cited works.** A term whose name is a link (:attr:`Term.work`: another experiment, from a ``## References`` list) is the title of a work, so each use of it is a ``<cite>``, its first use in a section (inside the ``dfn``) and every later one, which has no note. In a link, the ``cite`` holds the name alone (``<a>the <cite>recipe-compare</cite> experiment</a>``), unless the link text has markup of its own.
 
 Where a note goes is the stylesheet's call (``lit.css``): in the margin on a wide screen and on paper, and on hover or focus of its marker on a narrow screen. A note whose marker sits where a margin float cannot reach (a table cell, a caption, a heading) is marked ``popover`` and only ever shows on hover; its footnote keeps its place in the list, so paper still has it. The floats stack rather than overlap because each one clears the one before it (``clear: right``).
 
@@ -46,6 +47,11 @@ class Term:
     def parts(self) -> tuple[str, str]:
         """The note as a gloss and the rest (empty when the gloss is all of it)."""
         return _split_html(self.definition)
+
+    @property
+    def work(self) -> bool:
+        """Whether the term names another document: its name is written as a link."""
+        return self.label.startswith("<a ")
 
     @property
     def key(self) -> str:
@@ -241,6 +247,7 @@ _SKIP_TAGS = {
     "style",
     "dfn",
     "abbr",
+    "cite",
     "table",
     "figcaption",
     "dl",
@@ -266,11 +273,12 @@ class _Match:
     term: Term
     start: int
     end: int
+    again: bool = False  # a later use in the section, of a term that is marked at every use
 
 
 @dataclass
 class _Scanner:
-    """First use per section, over the text nodes of the tree in document order."""
+    """First use per section (and every use of a cited work), over the text nodes of the tree in document order."""
 
     terms: dict[str, Term]
     pattern: re.Pattern[str] | None = None
@@ -290,8 +298,8 @@ class _Scanner:
             return None
         for m in self.pattern.finditer(text):
             t = self.forms[_norm(m[1])]
-            if t.key not in seen:
-                return _Match(t, m.start(), m.end())
+            if t.key not in seen or t.work:
+                return _Match(t, m.start(), m.end(), again=t.key in seen)
         return None
 
 
@@ -370,9 +378,15 @@ class _NotesTree(Treeprocessor):
             last = child  # what the rest of the text follows: the child, or the note placed after it
             if child.tag == "dfn" and "explicit" in _classes(child):
                 key = child.attrib.pop("data-term", None)
-                if key and key not in seen:
-                    seen.add(key)
-                    last = self._annotate(el, child, scan.terms[key])
+                term = scan.terms[key] if key else None
+                if term and term.key not in seen:
+                    seen.add(term.key)
+                    if term.work:
+                        _cite(child)
+                    last = self._annotate(el, child, term)
+                elif term and term.work:
+                    child.tag = "cite"
+                    child.attrib.clear()
             elif child.tag == "a":
                 last = self._link(el, child, scan, seen)
             elif not _skipped(child):
@@ -383,6 +397,10 @@ class _NotesTree(Treeprocessor):
         """Wrap link *a* in a ``dfn`` if its text holds the first use of a term, so the note follows the link instead of sitting in it; returns what the rest of the text follows."""
         m = scan.first("".join(a.itertext()), seen)
         if m is None:
+            return a
+        if m.term.work:
+            _cite(a, m)
+        if m.again:
             return a
         seen.add(m.term.key)
         dfn = etree.Element("dfn", {"class": "term"})
@@ -401,11 +419,20 @@ class _NotesTree(Treeprocessor):
         m = scan.first(text, seen)
         if m is None:
             return text
+        word, rest = text[m.start : m.end], text[m.end :]
+        idx = 0 if before is None else list(parent).index(before) + 1
+        if m.again:
+            cite = etree.Element("cite")
+            cite.text = word
+            parent.insert(idx, cite)
+            cite.tail = self._scan_text(parent, cite, rest, scan, seen)
+            return text[: m.start]
         seen.add(m.term.key)
         dfn = etree.Element("dfn", {"class": "term"})
-        dfn.text = text[m.start : m.end]
-        rest = text[m.end :]
-        idx = 0 if before is None else list(parent).index(before) + 1
+        if m.term.work:
+            etree.SubElement(dfn, "cite").text = word
+        else:
+            dfn.text = word
         parent.insert(idx, dfn)
         note = self._annotate(parent, dfn, m.term)
         # The rest of the string follows the note, and may hold another term's first use.
@@ -417,6 +444,8 @@ class _NotesTree(Treeprocessor):
         note = etree.Element("span", {"class": "sidenote glossnote", "role": "note", "tabindex": "-1"})
         name = etree.SubElement(note, "span", {"class": "glossnote-term"})
         name.text = self.stash.store(term.label) if term.label else term.name
+        if term.work:
+            _cite(name)
         name.tail = " "
         lead, rest = term.parts()
         etree.SubElement(note, "span", {"class": "gloss"}).text = self.stash.store(lead)
@@ -427,6 +456,20 @@ class _NotesTree(Treeprocessor):
         dfn.tail = None
         parent.insert(idx + 1, note)
         return note
+
+
+def _cite(el: etree.Element, m: _Match | None = None) -> None:
+    """Put what *el* holds in a ``<cite>``: the span of match *m* when *el* holds only text, and otherwise all of it."""
+    cite = etree.Element("cite")
+    if m is not None and len(el) == 0 and el.text:
+        text = el.text
+        el.text, cite.text, cite.tail = text[: m.start], text[m.start : m.end], text[m.end :]
+    else:
+        cite.text, el.text = el.text, None
+        cite.extend(list(el))
+        for child in list(el):
+            el.remove(child)
+    el.append(cite)
 
 
 def _footnote_note(number: str, li: etree.Element, *, floats: bool) -> etree.Element:

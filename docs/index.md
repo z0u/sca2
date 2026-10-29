@@ -180,7 +180,7 @@ D2.1 asked whether SCA works in a transformer at all. We designed a task where a
 
 ## D2.2: anchoring an operation
 
-D2.2 anchors an operation rather than a color. Since the [pivot](./m2/d2.2/pivot.md), the model infers which op a line uses from a few solved examples, so the op has no word of its own, like the abstract concepts we care about in language models. The anchor lands at little cost to the task, and removing the anchor direction takes the op out gradually. Under the edit, the model moves its answers onto the other ops about as much as an ideal predictor would, though context by context it doesn't always pick the same ones. On the recipe of record, chosen at fresh seeds, the edit removes most of the op and leaves the other ops within the selectivity criterion on every seed. Nearby recipes sometimes lose the anchor during the pull warm-up, and a pool that starts soft keeps it at some cost in spill. What is left to show is a bound on what an edit can write into the inferred op, that the removal on each context follows how much it depended on the op, and where the edited model lands against the target null. The [design doc](./m2/d2.2/design.md) has the current setup, the claims, and what comes next.
+D2.2 anchors an operation rather than a color. Since the [pivot](./m2/d2.2/pivot.md), the model infers which op a line uses from a few solved examples, so the op has no word of its own, like the abstract concepts we care about in language models. The anchor lands at little cost to the task, and removing the anchor direction takes the op out gradually. Under the edit, the model moves its answers onto the other ops about as much as an ideal predictor would, though context by context it doesn't always pick the same ones. On the recipe of record, which pools the pull over blocks 1 to 3, the anchor held on every run at fresh seeds, the edit removes most of the op, and the other ops stay within the selectivity criterion on every seed. What is left before the blog post is a model trained without the op, to show how far an edit could land, and the full set of measurements on the recipe of record. The [design doc](./m2/d2.2/design.md) has the recipe, the claims, and what comes next.
 
 ### Removing *red*
 
@@ -404,7 +404,7 @@ Once the op had no word, the first question was whether an un-anchored model cou
 
 ### Anchoring and removing the inferred op
 
-With the control near its best, we anchored `difference` on the new grammar. The anchor settles on the example answers, where the context shows the most about the op. Removing the anchor direction everywhere takes `difference` out gradually. At first the edit spilled onto the other ops on most fully trained runs. The spill came from a stand-in for the op in the color embedding table, where there is no context yet to infer it from. With the pull kept off the first two slices and the anti-subspace weight held high there, the edit removes `difference` and leaves the other ops within the criterion on every fresh seed. A pull that ramps with depth, and a pool that starts soft, each traded one of those for the other: the ramps lost the anchor on more seeds, and the soft pool kept it on every seed but spilled more.
+With the control near its best, we anchored `difference` on the new grammar. The anchor settles on the example answers, where the context shows the most about the op. Removing the anchor direction everywhere takes `difference` out gradually. At first the edit spilled onto the other ops on most fully trained runs. The spill came from a stand-in for the op in the color embedding table, where there is no context yet to infer it from. With the pull kept off the first two slices and the anti-subspace weight held high there, the edit removes `difference` and leaves the other ops within the criterion on every fresh seed. That recipe, `falloff`, was the recipe of record until late October.
 
 <details markdown="1" open="true"><summary>Reports</summary>
 
@@ -496,6 +496,62 @@ With the control near its best, we anchored `difference` on the new grammar. The
 
     <!-- mini:figures ./m2/split-anti-seeds/report.py -->
 
+</details>
+
+### What the edit does, and how we measure it
+
+With `falloff` in hand, we looked at what the edit does beyond removal and spill, and at the baseline the edit is measured against. The edit stays within the bound the geometry sets, and lands about half of the way to the target null. The anchor does not rely on e₁ being a coordinate axis, but the comparison with the control did, so the baseline is now the median over the other axes of the run.
+
+<details markdown="1" open="true"><summary>Reports</summary>
+
+- [What the edit does on the recipe of record](./m2/edit-effects/report.py)
+
+    A re-analysis of the stored `falloff` runs. The edit turns the states of the other ops no further than the clean geometry allows, and the loss on each `difference` context follows how much it needed the op. The edited answers go to the other ops in about the right overall proportions, but context by context they weigh them differently from the target null, and that is most of the distance left.
+
+    <span class="tags">`reanalysis` `in-context` `intervention` `grading`</span>
+
+    <!-- mini:figures ./m2/edit-effects/report.py -->
+
+- [Anchoring on an axis the optimizer does not favor](./m2/rotated-basis/report.py)
+
+    Adam makes the coordinate axes of the residual stream special, and e₁ is one of them. With the basis of the optimizer rotated, so that e₁ is an ordinary direction, the anchor held and the edit removed and spilled as before. Only the comparison with the control suffered, where e₁ happened to overlap the syntax direction of the control.
+
+    <span class="tags">`scout` `in-context` `anchoring` `methodology`</span>
+
+    <!-- mini:figures ./m2/rotated-basis/report.py -->
+
+- [Optimizers with no privileged basis](./m2/optimizer-scout/report.py)
+
+    The control under three optimizers that treat every direction alike. The coordinate axes became ordinary directions, but the stream was no more even for it: the syntax tokens still get a direction of their own. Muon learned the task as well as Adam once its learning rate was raised.
+
+    <span class="tags">`scout` `in-context` `training`</span>
+
+    <!-- mini:figures ./m2/optimizer-scout/report.py -->
+
+- [A baseline from the quiet axes](./m2/reference-baseline/report.py)
+
+    Removal and spill had been measured net of the same edit on the control, so they depended on where e₁ sat in the control. A re-analysis against the median drop over edits along the other coordinate axes of the run itself. The numbers barely move, and the short seeds of the rotated-basis runs come back beside the rest, so this median is now the baseline.
+
+    <span class="tags">`reanalysis` `in-context` `intervention` `methodology`</span>
+
+    <!-- mini:figures ./m2/reference-baseline/report.py -->
+
+- [Why editing block 1 alone removes the op](./m2/block1-edit/report.py)
+
+    A re-analysis of the stored `falloff` and `τ_ℓ fixed` runs, following the alignment through the model one sub-step at a time. Block 1 is the first block that can judge an example against its operands, and on both recipes it writes about half of the evidence for the op onto e₁, whether or not it is pulled; the later blocks mostly add to what arrives. One later block reads the example answers from the query `=`, usually block 3, so an edit removes the op when it sits between block 1 and that reader. That accounts for the seeds where the edit at blocks 2 to 4 fell short.
+
+    <span class="tags">`reanalysis` `in-context` `anchoring` `intervention`</span>
+
+    <!-- mini:figures ./m2/block1-edit/report.py -->
+
+</details>
+
+### A recipe that keeps the anchor on every run
+
+`falloff` lost the anchor on about one run in forty, and its close variants on more. A pull pooled over blocks 1 to 3, with a temperature that starts soft, kept the anchor on every run but spilled more. Sharpening the pool over slices took the spill away, and that recipe, `τ_ℓ fixed`, kept the anchor on every run at fresh seeds and is now the recipe of record.
+
+<details markdown="1" open="true"><summary>Reports</summary>
+
 - [An anchor weight that ramps with depth](./m2/anchor-ramp/report.py)
 
     A pull weight that rises in a straight line with depth, in place of the step at slice 2, to mirror the falloff of the anti weight. With the slice-4 weight of the step, the ramps lost the anchor on two or three of eight seeds, where the step lost none. Scaled up to the total of the step, the ramp from the embedding kept it on every seed but spilled a little more. The losses split off during the pull warm-up and followed how little pull the earlier slices got, so the step stays.
@@ -512,6 +568,22 @@ With the control near its best, we anchored `difference` on the new grammar. The
 
     <!-- mini:figures ./m2/soft-pool/report.py -->
 
+- [How often the anchor is lost](./m2/loss-rate/report.py)
+
+    32 new seeds each of `falloff` and `step, soft τ`, stopped early and called from how far the example answers had come onto e₁. `falloff` lost the anchor on one seed of 40, and `step, soft τ` on none.
+
+    <span class="tags">`scout` `in-context` `anchoring` `seed-sensitivity`</span>
+
+    <!-- mini:figures ./m2/loss-rate/report.py -->
+
+- [When the spill appears](./m2/spill-timing/report.py)
+
+    The edit applied every four epochs along training of the pool over blocks 1 to 3, to see when its spill appears. On most of the runs that end over the criterion it appears early, while the pool sharpens; on one it appears late, on an op that run learned late.
+
+    <span class="tags">`scout` `in-context` `intervention` `training-dynamics`</span>
+
+    <!-- mini:figures ./m2/spill-timing/report.py -->
+
 - [Three recipes side by side](./m2/recipe-compare/report.py)
 
     A re-analysis of the stored runs of `falloff`, `step, soft τ` and `pool 1–3, soft τ` at the same eight seeds, under the median baseline of the D2.2 design. The soft start on the step stays close to `falloff` on every measurement. The pool over slices 1 to 3 removes about as much and costs the task least, and the evidence for the op peaks at slice 3 on every seed, but its edit spills over the criterion on two seeds. That spill enters with the edit at block 1, the one slice the pool pulls and the step leaves alone.
@@ -519,5 +591,37 @@ With the control near its best, we anchored `difference` on the new grammar. The
     <span class="tags">`reanalysis` `in-context` `anchoring` `intervention`</span>
 
     <!-- mini:figures ./m2/recipe-compare/report.py -->
+
+- [Soft pool scout](./m2/soft-pool-scout/report.py)
+
+    Sixteen schedules of the pool over blocks 1 to 3, screened at epoch 64. The final temperature of the pool over slices decided the early spill, and at 0.1 no run spilled early. Holding that temperature at 0.1 from the start, finished to 400 epochs, kept every anchor and removed a little more than `falloff`.
+
+    <span class="tags">`scout` `in-context` `anchoring` `schedules`</span>
+
+    <!-- mini:figures ./m2/soft-pool-scout/report.py -->
+
+- [Late spill scout](./m2/late-spill-scout/report.py)
+
+    On the candidate from the soft pool scout, the spill that rises late in training follows the anneal of the anti-subspace weight. Holding that weight high keeps the spill off but costs removal, and sharpening the slice temperature late lowers it at no cost we could see.
+
+    <span class="tags">`scout` `in-context` `intervention` `schedules`</span>
+
+    <!-- mini:figures ./m2/late-spill-scout/report.py -->
+
+- [Anneal confirmation](./m2/anneal-confirm/report.py)
+
+    The pool with its slice temperature annealing slowly from 0.1 to 0.025, at fresh seeds. It kept the anchor on all eight runs and all forty of an early count, and stayed within the criteria, with one run at the spill line.
+
+    <span class="tags">`in-context` `anchoring` `intervention` `seed-sensitivity`</span>
+
+    <!-- mini:figures ./m2/anneal-confirm/report.py -->
+
+- [Fixed confirmation](./m2/fixed-confirm/report.py)
+
+    The pool with its slice temperature held at 0.1, paired seed by seed with the anneal. It kept the anchor on every run, removed about as much, and had no late spill. Seeds that did well under one recipe sometimes did poorly under the other, and parted early, so much of the variation between runs seems to come from how sensitive a run is to small changes. Adopted as the recipe of record.
+
+    <span class="tags">`in-context` `anchoring` `intervention` `seed-sensitivity`</span>
+
+    <!-- mini:figures ./m2/fixed-confirm/report.py -->
 
 </details>
