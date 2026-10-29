@@ -180,7 +180,7 @@ D2.1 asked whether SCA works in a transformer at all. We designed a task where a
 
 ## D2.2: anchoring an operation
 
-D2.2 anchors an operation rather than a color. Since the [pivot](./m2/d2.2/pivot.md), the model infers which op a line uses from a few solved examples, so the op has no word of its own, like the abstract concepts we care about in language models. The anchor lands at little cost to the task, and removing the anchor direction takes the op out gradually. Under the edit, the model moves its answers onto the other ops about as much as an ideal predictor would, though context by context it doesn't always pick the same ones. On the recipe of record, which pools the pull over blocks 1 to 3, the anchor held on every run at fresh seeds, the edit removes most of the op, and the other ops stay within the selectivity criterion on every seed. What is left before the blog post is a model trained without the op, to show how far an edit could land, and the full set of measurements on the recipe of record. The [design doc](./m2/d2.2/design.md) has the recipe, the claims, and what comes next.
+D2.2 anchors an operation rather than a color. Since the [pivot](./m2/d2.2/pivot.md), the model infers which op a line uses from a few solved examples, so the op has no word of its own, like the abstract concepts we care about in language models. The anchor lands at little cost to the task, and removing the anchor direction takes the op out gradually. Under the edit, the model moves its answers onto the other ops about as much as an ideal predictor would, though context by context it doesn't always pick the same ones. On the recipe of record, which pools the pull over blocks 1 to 3, the anchor held on every run at fresh seeds, the edit removes most of the op, and the other ops stay within the selectivity criterion on every seed. A model trained without the op lands only a little closer to the target null than the edited model, so most of the distance left is what a model of this size does on contexts like these. The [design doc](./m2/d2.2/design.md) has the recipe, the claims, and what comes next.
 
 ### Removing *red*
 
@@ -626,10 +626,18 @@ With `falloff` in hand, we looked at what the edit does beyond removal and spill
 
 - [What the edit does on τ_ℓ fixed](./m2/fixed-effects/report.py)
 
-    A re-analysis of the fixed confirmation's runs, scored as the edit-effects report scored `falloff`, with the confusion matrices added. Every measure comes out about as on `falloff`: removal grows with the dose and the other ops stay well within the spill criterion at every dose, the loss on each `difference` context follows how much it needed the op, and the edited answers get about half of the way to the target null. The clean bound at slice 3 is wider on the seed mean, set by a tail of about one state in a hundred.
+    A re-analysis of the fixed confirmation's runs. The fixed confirmation scored `τ_ℓ fixed` on the full edit alone, and edit-effects scored the earlier recipe; this report gives `τ_ℓ fixed` the scoring of edit-effects, and adds removal by dose and the confusion matrices. Every measure comes out about as on `falloff`. The clean bound at slice 3 is wider, set by a small tail rich in near misses for `difference`, which fits the account of block 1 in block1-edit. For where the edited answers land, it draws on the model trained without the op rather than repeating it.
 
     <span class="tags">`reanalysis` `in-context` `intervention` `grading`</span>
 
     <!-- mini:figures ./m2/fixed-effects/report.py -->
+
+- [A model trained without `difference`](./m2/filtered-corpus/report.py)
+
+    The control trained with no loss on `difference` contexts, so that it never learns the op, against the edited model of the recipe of record. It comes a little closer to the target null than the edited model, but still falls well short, and misses in the same way: the mass goes to the other ops, but it is shared among them differently from the target null on each context, and differently again at each seed.
+
+    <span class="tags">`in-context` `intervention` `grading` `seed-sensitivity`</span>
+
+    <!-- mini:figures ./m2/filtered-corpus/report.py -->
 
 </details>
