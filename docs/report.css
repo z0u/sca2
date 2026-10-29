@@ -329,6 +329,16 @@ main.lit details:not(:open) {
   dfn.term {
     text-decoration: none;
   }
+  /* A cited work keeps it, so the use with the note stands apart from the italic later
+   * ones; a link holding a work takes no link underline, so it does not read as a plain
+   * link. */
+  dfn.term:has(cite) {
+    text-decoration: underline dotted;
+    text-underline-offset: 0.2em;
+  }
+  main.lit a:not(.footnote-backref):has(cite) {
+    text-decoration: none;
+  }
 
   /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
    * scroll box and the nowrap that fed it. The table becomes a real table again, so

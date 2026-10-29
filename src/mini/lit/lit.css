@@ -198,6 +198,9 @@ dfn.term {
   text-underline-offset: 0.2em;
   cursor: help;
 }
+/* A cited work (another experiment) is italic at every use; the dfn above underlines the
+ * use that carries its note. */
+cite { font-style: italic; }
 .sidenote {
   display: none;
   position: absolute;
