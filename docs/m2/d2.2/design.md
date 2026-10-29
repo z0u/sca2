@@ -37,10 +37,12 @@ Edit {.manual}
 
 ## Scoring
 
-Every run is scored on held-out contexts, and each drop under the edit is net of a baseline: the median drop under the same edit along each of the other 63 coordinate axes of the run. A control trained without the anchor at the same seed gives the task change, and checks now and then that the baseline still agrees with it.
+Every run is scored on held-out contexts, and each drop under the edit is net of a baseline: the median drop under the same edit along each of the other 63 coordinate axes of the run. Controls trained without the anchor give the task change, and check now and then that the baseline still agrees with them.
 
 Task change
-:   The clean score per op, less that of the control. The task gate fails below −0.02 on the mean over ops, or below −0.05 on any one op.
+:   The clean score per op, less the mean of the controls. The task gate fails below −0.02 on the mean over ops, or below −0.05 on any one op. Reports up to and including *fixed-confirm* netted against the control at the same seed instead; by the end of training two runs at one seed are about as far apart as runs at different seeds, so a single control adds its own seed scatter.
+
+Two conditions are compared as two samples: the difference of their seed means, with a bootstrap or permutation interval, and Fisher's exact test for a difference in rates. Runs at the same seed are paired only when they branch from one stored state and are measured soon after.
 
 Removal
 :   The drop on `difference` under the full edit, as a share of the way to the target null. A run that removes less than half has lost the anchor.
@@ -82,7 +84,7 @@ We don't know whether half is short. A model trained without any `difference` co
 
 Claims (b) and (c) cover the side-effects on the answers. This one is about the states inside the model. Because we placed the axis, the clean model tells us in advance how much e₁ the states of the other ops carry, and so how far an edit can turn them. The claim to show is that the blocks after the edit put no more e₁ back on those states than the clean model has there, so the edit stays where we put it. On `falloff` the write stayed within that bound past the embedding. Under the pool it stays close to the bound, with a few sites over it at slice 1, where the bound is only a few degrees.
 
-On the recipe of record the evidence for the op peaks at slice 3 on every seed. A candidate account of where the op is held, not yet reviewed: block 1 writes the judgement of each example onto e₁, a later block (usually block 3) reads it at the query `=`, and an edit removes the op whenever it sits between the two. That would also explain why editing block 1 alone removed most of the op under the older step recipe.
+On the recipe of record the evidence for the op peaks at slice 3 on every seed. [Block1-edit](/docs/m2/block1-edit/report.py) gives an account of where the op is held: block 1 writes the evidence of each example onto e₁, a later block (usually block 3) reads it at the query `=`, and an edit removes the op whenever it sits between the two. That is why editing block 1 alone removes most of the op under both recipes, though nothing pulls block 1 under the older step recipe.
 
 ### (e) Scarce, noisy labels are enough
 

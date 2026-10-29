@@ -536,6 +536,14 @@ With `falloff` in hand, we looked at what the edit does beyond removal and spill
 
     <!-- mini:figures ./m2/reference-baseline/report.py -->
 
+- [Why editing block 1 alone removes the op](./m2/block1-edit/report.py)
+
+    A re-analysis of the stored `falloff` and `τ_ℓ fixed` runs, following the alignment through the model one sub-step at a time. Block 1 is the first block that can judge an example against its operands, and on both recipes it writes about half of the evidence for the op onto e₁, whether or not it is pulled; the later blocks mostly add to what arrives. One later block reads the example answers from the query `=`, usually block 3, so an edit removes the op when it sits between block 1 and that reader. That accounts for the seeds where the edit at blocks 2 to 4 fell short.
+
+    <span class="tags">`reanalysis` `in-context` `anchoring` `intervention`</span>
+
+    <!-- mini:figures ./m2/block1-edit/report.py -->
+
 </details>
 
 ### A recipe that keeps the anchor on every run

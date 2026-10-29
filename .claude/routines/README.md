@@ -14,7 +14,7 @@ The science desk has its own thread and prompt, and its brief is `.claude/agents
 
 ## How a run works (for the thread)
 
-1. Read this README and the routine's file from `origin/main` (`git fetch origin main`, then `git show origin/main:.claude/routines/<file>`), whatever this thread's own checkout holds. If the fetch fails, say so in the thread and stop.
+1. Read this README and the routine's file from `origin/main` (`git fetch origin main:refs/remotes/origin/main`, then `git show origin/main:.claude/routines/<file>`), whatever this thread's own checkout holds. If the fetch fails, say so in the thread and stop.
 2. Hand the job to one fresh helper so each run starts clean: start one Agent in the background with `isolation: "worktree"`, so runs that overlap don't share a checkout. Pass on the routine's brief as written, plus the environment note and branch rule below, and end your turn with a status checklist. Tell the helper not to call any `mcp__hearthbot__` tools.
 3. Where a routine's helper is an agent spec, start a general-purpose helper on opus and pass it the body of `.claude/agents/<name>.md` from `origin/main`: repo agent types don't load in project threads.
 4. When it finishes: if it opened a PR, subscribe to the PR's activity, reply in the thread with the link and what it needs from the user, and drive the PR to green as the thread's own. If it changed nothing, refresh the status checklist and skip the reply (housekeeping always replies, with the priority list). If the report has a Concerns section, pass it on to the user word for word.
@@ -22,7 +22,7 @@ The science desk has its own thread and prompt, and its brief is `.claude/agents
 
 ## Branch rule (for the helper)
 
-Run `git fetch origin main` first. Push to the routine's branch, named in its file: restart it from `origin/main` each run, unless an open PR already uses it, in which case build on that PR. If the remote branch is gone, push with `--force-with-lease=<branch>:`, else `--force-with-lease`.
+Run `git fetch origin main:refs/remotes/origin/main` first: a plain `git fetch origin main` in a worktree may update only `FETCH_HEAD`, leaving `origin/main` stale or missing. Push to the routine's branch, named in its file: restart it from `origin/main` each run, unless an open PR already uses it, in which case build on that PR. If the remote branch is gone, push with `--force-with-lease=<branch>:`, else `--force-with-lease`.
 
 ## Practical notes (for the helper)
 

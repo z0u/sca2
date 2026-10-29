@@ -99,10 +99,27 @@ class TestGlossary:
         html = to_html(text)
         assert '<dfn class="term" tabindex="0">removal</dfn>' in html
         assert (
-            '<dfn class="term" tabindex="0"><a href="/r.py">the recipe-compare experiment</a></dfn>'
-            '<span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">'
-            '<a href="/docs/m2/recipe-compare/report.py">recipe-compare</a></span>' in html
+            '<dfn class="term" tabindex="0"><a href="/r.py">the <cite>recipe-compare</cite> experiment</a></dfn>'
+            '<span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite>'
+            '<a href="/docs/m2/recipe-compare/report.py">recipe-compare</a></cite></span>' in html
         )
+
+    def test_a_cited_work_is_marked_at_every_use(self):
+        refs = "## References\n\n[late pull](/l.py)\n:   Pull on blocks 2 to 4.\n"
+        html = to_html(
+            f"## One\n\nThe late pull, and [late pull](/l.py), and late pull again.\n\n## Two\n\nLate pull.\n\n{refs}"
+        )
+        assert html.count("<dfn") == 2  # the first use in each section has the note
+        assert html.count("<cite>") == 6  # each use, and the name in each note
+        assert '<dfn class="term" tabindex="0"><cite>late pull</cite></dfn><span class="sidenote glossnote"' in html
+        assert ', and <a href="/l.py"><cite>late pull</cite></a>, and <cite>late pull</cite> again.' in html
+        assert '<dfn class="term" tabindex="0"><cite>Late pull</cite></dfn>' in html
+
+    def test_explicit_use_of_a_cited_work(self):
+        refs = "## References\n\n[late pull](/l.py)\n:   Pull on blocks 2 to 4.\n"
+        html = to_html(f"The [deep run](term:late pull), then [that run](term:late pull).\n\n{refs}")
+        assert '<dfn class="term explicit" tabindex="0"><cite>deep run</cite></dfn>' in html
+        assert ", then <cite>that run</cite>." in html
 
     def test_math_in_a_definition_is_rendered(self):
         html = to_html("Pull here.\n\n## Glossary\n\nPull\n:   Weight $\\lambda_a$ of the pull.\n")

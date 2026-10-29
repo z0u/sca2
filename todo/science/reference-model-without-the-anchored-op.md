@@ -1,8 +1,8 @@
 ---
-status: open
+status: done
+closed: 2026-10-29
 tags: [D2.2, intervention, in-context, ex-2.2.22]
 opened: 2026-10-06
-priority: high
 ---
 # How close does a model trained without `difference` come to the target null?
 
@@ -18,4 +18,9 @@ It needs one condition (the control recipe on a corpus without `difference`, at 
 
 **2026-10-24, backlog refresh** — On the shortlist. Claim (c) of the D2.2 design (the edited model answers in a predictable way) needs it to say whether half of the distance is short, and it is also the filtered-corpus comparison of the design. It trains controls only, so with the median baseline ([reference-baseline](/docs/m2/reference-baseline/report.py)) it can be scored without a paired control of its own.
 
+**2026-10-27, science desk** — Planned as [filtered-corpus](/docs/m2/filtered-corpus/report.py): the control recipe on the corpus of record with the `difference` lines dropped, at seeds 704 to 711. Leaving the noise answers of `difference` in the contexts of the other ops makes the target null the Bayes predictor of that corpus exactly, so the model is scored against what is ideal for what it trained on. Waiting on an OK for the plan.
+
 **2026-10-28, design refresh** — One of the two pieces of work the [D2.2 design](/docs/m2/d2.2/design.md) lists before the blog post, beside [the full scoring suite on the recipe of record](./full-scoring-suite-on-the-recipe-of-record.md); the two could share a report. The control recipe is unchanged by the switch to `τ_ℓ fixed`, since it has no anchor or anti term. Repeating this for each op is [its own item](./reference-models-for-each-anchored-op.md).
+
+
+**2026-10-29, done** — [filtered-corpus](/docs/m2/filtered-corpus/report.py) (PR #308) trained `sans-diff`, the control with no loss on `difference` contexts, at seeds 712 to 719. It comes about three-fifths of the way from the control to the target null on `difference` contexts, where the edited `τ_ℓ fixed` model comes half of the way, and both miss in how they share the mass among the other ops, mostly in a way that changes from seed to seed. On a scale from the control to a second `sans-diff` run, the edited model comes about 85% of the way to `sans-diff`.

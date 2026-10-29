@@ -325,8 +325,10 @@ main.lit details:not(:open) {
   .glossnote-term {
     font-weight: 700;
   }
-  /* A term with its definition beside it needs no underline on paper. */
-  dfn.term {
+  /* A term with its note beside it keeps its faint dotted underline (lit.css), and a link
+   * in one, or one naming another experiment, takes no link underline of its own, so it
+   * does not read as a plain link. */
+  main.lit :is(dfn.term a, a:has(cite)):not(.footnote-backref) {
     text-decoration: none;
   }
 
