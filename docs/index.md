@@ -632,6 +632,14 @@ With `falloff` in hand, we looked at what the edit does beyond removal and spill
 
     <!-- mini:figures ./m2/fixed-confirm/report.py -->
 
+</details>
+
+### The recipe of record, scored for the post
+
+With `τ_ℓ fixed` adopted, we gave it the full set of measurements and a reference model trained without the op. The edit does on `τ_ℓ fixed` what it did on `falloff`, and a model that never learned `difference` lands only a little closer to the target null than the edited model.
+
+<details markdown="1" open="true"><summary>Reports</summary>
+
 - [What the edit does on τ_ℓ fixed](./m2/fixed-effects/report.py)
 
     A re-analysis of the fixed confirmation's runs. The fixed confirmation scored `τ_ℓ fixed` on the full edit alone, and edit-effects scored the earlier recipe; this report gives `τ_ℓ fixed` the scoring of edit-effects, and adds removal by dose and the confusion matrices. Every measure comes out about as on `falloff`. The clean bound at slice 3 is wider, set by a small tail rich in near misses for `difference`, which fits the account of block 1 in block1-edit. For where the edited answers land, it draws on the model trained without the op rather than repeating it.
