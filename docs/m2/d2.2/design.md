@@ -90,7 +90,7 @@ The bound itself is wider at slice 3 than on `falloff`, though the difference is
 
 On the recipe of record the evidence for the op peaks at slice 3 on every seed. [Block1-edit](/docs/m2/block1-edit/report.py) gives an account of where the op is held: block 1 writes the evidence of each example onto e₁, a later block (usually block 3) reads it at the query `=`, and an edit removes the op whenever it sits between the two. That is why editing block 1 alone removes most of the op under both recipes, though nothing pulls block 1 under the older step recipe.
 
-Inside each block the MLP reads what the attention just wrote, before the next edit acts. [Mid-block-edit](/docs/m2/mid-block-edit/report.py) edited those mid-block states as well, and gained nothing: the op reaches the query `=` through attention, from slices the edit has already cleared. The extra sites spilled on four runs of eight, because the attention of block 1 puts e₁ on every op there and nothing in training keeps it clear. So the edit stays between blocks.
+Inside each block the MLP reads what the attention just wrote, before the next edit acts. [Mid-block-edit](/docs/m2/mid-block-edit/report.py) edited those mid-block states. On their own they removed most of the op (0.73 to 0.91 on seven runs of eight), since an edit there also clears what the earlier blocks wrote. But they spilled past the criterion on six runs of eight, and added to the edit between blocks they gained no removal and spilled on four. The attention of block 1 puts e₁ on every op at the mid-block state, and nothing in training keeps it clear there, because the anchor and anti terms act only between blocks. With those terms at the mid-block states too, the anti term especially, the mid-block sites might become selective and close some of the distance left. We keep the edit between blocks for the recipe of record, and leave that as future work.
 
 ### (e) Scarce, noisy labels are enough
 
@@ -101,13 +101,13 @@ About one `difference` context in fifty is labelled, which is the shape of label
 The reference model ([sans-diff](/docs/m2/filtered-corpus/report.py)) and the full scoring suite on the recipe of record, confusion matrices included ([fixed-effects](/docs/m2/fixed-effects/report.py)), are done, and their figures are meant for the post. One piece is left.
 
 Directions found after training
-:   Fit a direction for `difference` on the states of the controls, which were trained without the anchor, and edit along it through the same scorer. Three fits: the difference in means, a ridge probe, and LEACE (a linear eraser). No training is needed. Ex-2.2.1 did the same for *red*, where these directions cost the lines with no red about as much as they removed from red. To keep the comparison generous, each fit gets every label as well as the scarce ones, so a gap in favor of the anchor can't come from starving the other methods. Sans-diff is the filtered-corpus comparison; it masks the loss on `difference` contexts in place of dropping them, so its batches match those of the control. In the [backlog](/todo/science/baseline-comparisons-sca-plan-related-work-delta.md).
+:   Fit a direction for `difference` on the states of the controls, which were trained without the anchor, and edit along it through the same scorer. Three fits: the difference in means, a ridge probe, and LEACE (a linear eraser). No training is needed. Ex-2.2.1 did the same for *red*, where these directions cost the lines with no red about as much as they removed from red. To keep the comparison generous, each fit gets every label as well as the scarce ones, so a gap in favor of the anchor can't come from starving the other methods. In the [backlog](/todo/science/baseline-comparisons-sca-plan-related-work-delta.md).
 
 ## Future work
 
 These are leads, roughly in the order we would take them up.
 
-- The anchor and anti terms at the mid-block states as well, so that an edit anywhere along the stream might be selective, which matters for deeper models ([backlog](/todo/science/anchor-and-anti-at-mid-block-states.md)).
+- The anchor and anti terms at the mid-block states as well, so that an edit there might be selective and remove more of the op, perhaps with a second axis for the op at the mid-block states beside e₁ for its evidence between blocks ([backlog](/todo/science/anchor-and-anti-at-mid-block-states.md)).
 - A two-block model, where the reader of the op can only be block 2 ([backlog](/todo/science/two-block-model-for-the-writer-and-reader.md)).
 - A map of what e₁ holds along the context ([backlog](/todo/science/what-e1-holds-beside-the-op.md)).
 - Whether the soft start of $\tau_p$ is still needed now that $\tau_\ell$ is sharp.
