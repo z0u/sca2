@@ -544,6 +544,14 @@ With `falloff` in hand, we looked at what the edit does beyond removal and spill
 
     <!-- mini:figures ./m2/block1-edit/report.py -->
 
+- [Does the edit miss the mid-block state?](./m2/mid-block-edit/report.py)
+
+    Inside each block the MLP reads what the attention just wrote, before any edit between blocks acts. A re-analysis of the stored `τ_ℓ fixed` runs with the e₁ edit at those mid-block states too. It removes a little less of the op and spills on half the runs, since the mid-block state has e₁ on every op, so the edit between blocks stays.
+
+    <span class="tags">`reanalysis` `in-context` `intervention`</span>
+
+    <!-- mini:figures ./m2/mid-block-edit/report.py -->
+
 </details>
 
 ### A recipe that keeps the anchor on every run

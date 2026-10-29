@@ -4,7 +4,7 @@ Every method that claims to have located a concept, whether it placed the concep
 
 Four operators. `projection` removes a fraction γ of the concept component and re-projects onto the sphere — M1's suppression, with strength as a dose axis. `shaped_suppression` is M1's bounded falloff (`asec_intervention_lobes.tex`): a fraction of the component that leaves states below an alignment threshold untouched. `repulsion` is M1's other form from the same appendix: it sets where a state lands on the axis (a mapper from the arriving alignment to the leaving one) rather than how much is removed, so its write is a known function of its input. `ablate_weights` is the permanent form: it zeroes the subspace in every matrix that reads from or writes to the stream, then re-normalizes the weights, in that order.
 
-Where operators act: on the between-block stream, the same slices `NGPT.residual_stream` returns and the anchor term reads. The stream is unit-norm, so an operator's output goes back onto the sphere before the next block consumes it, and the re-projection is part of the write: removing a component of size α rescales what survives by `gain(α, γ)`, and the whole edit is a rotation by `write_angle(α, γ)`. Both are closed-form in the pre-intervention alignment, which is what makes a write bound computable from a published alignment map before any intervention runs.
+Where operators act: on the between-block stream, the same slices `NGPT.residual_stream` returns and the anchor term reads, and optionally on the mid-block state between a block's attention and its MLP (`mid`), which no slice shows. The stream is unit-norm, so an operator's output goes back onto the sphere before the next block consumes it, and the re-projection is part of the write: removing a component of size α rescales what survives by `gain(α, γ)`, and the whole edit is a rotation by `write_angle(α, γ)`. Both are closed-form in the pre-intervention alignment, which is what makes a write bound computable from a published alignment map before any intervention runs.
 """
 
 from __future__ import annotations
@@ -236,8 +236,9 @@ def _forward(
     operator: Operator,
     slices: tuple[int, ...],
     positions: Float[Array, " T"] | None,
+    mid: tuple[int, ...] = (),
 ) -> tuple[Float[Array, "L1 B T C"], Float[Array, "L1 B T C"], Float[Array, "B T V"]]:
-    """`NGPT.residual_stream` with the operator spliced in between blocks; see `apply`."""
+    """`NGPT.residual_stream` with the operator spliced in between blocks, and inside the blocks in *mid*; see `apply`."""
 
     def edit(x: Float[Array, "B T C"]) -> Float[Array, "B T C"]:
         out = operator(x)
@@ -247,8 +248,13 @@ def _forward(
     pre, post = [x], [edit(x) if 0 in slices else x]
     x = post[-1]
     allowed = model.attention_mask(idx)
+    enc = model.transformer.rotary_enc
     for i, block in enumerate(model.transformer.blocks, start=1):
-        x = block(x, model.transformer.rotary_enc, allowed)
+        if i in mid:
+            x = edit(block._step(x, block.attn(x, enc, allowed), block.s_attn))
+            x = block._step(x, block.mlp(x), block.s_mlp)
+        else:
+            x = block(x, enc, allowed)
         pre.append(x)
         post.append(edit(x) if i in slices else x)
         x = post[-1]
@@ -266,15 +272,16 @@ def apply(
     slices: tuple[int, ...],
     positions: np.ndarray | None = None,
     batch_size: int = 1024,
+    mid: tuple[int, ...] = (),
 ) -> Applied:
     """Score a triple: run *tokens* through *model* with *operator* applied at each of *slices* (0 = embedding).
 
-    *positions* is an optional (T,) mask of the positions the operator touches; None means all of them. An empty *slices* is the clean forward pass, and the scorer's own control: `pre` and `post` then both equal the residual stream and the logits equal `model(tokens)`.
+    *positions* is an optional (T,) mask of the positions the operator touches; None means all of them. *mid* names blocks (from 1) whose mid-block state, after the attention step and before the MLP, takes the operator too; `pre` and `post` keep only the between-block slices. An empty *slices* is the clean forward pass, and the scorer's own control: `pre` and `post` then both equal the residual stream and the logits equal `model(tokens)`.
     """
     pos = None if positions is None else jnp.asarray(np.asarray(positions, dtype=np.float32))
     pres, posts, logits = [], [], []
     for i in range(0, len(tokens), batch_size):
-        a, b, c = _forward_jit(model, jnp.asarray(tokens[i : i + batch_size]), operator, tuple(slices), pos)
+        a, b, c = _forward_jit(model, jnp.asarray(tokens[i : i + batch_size]), operator, tuple(slices), pos, tuple(mid))
         pres.append(np.asarray(a))
         posts.append(np.asarray(b))
         logits.append(np.asarray(c))
@@ -289,6 +296,7 @@ def logits_at(
     at: int,
     positions: np.ndarray | None = None,
     batch_size: int = 1024,
+    mid: tuple[int, ...] = (),
 ) -> Float[np.ndarray, "N V"]:
     """`apply`, keeping only the logits at position *at*: what a scorer that reads one answer needs, without
     copying the stream and every position's logits to the host. The last batch is padded to *batch_size*, so
@@ -302,7 +310,7 @@ def logits_at(
         n = len(chunk)
         if n < batch_size:
             chunk = np.concatenate([chunk, np.repeat(chunk[-1:], batch_size - n, axis=0)])
-        _, _, logits = _forward_jit(model, jnp.asarray(chunk), operator, tuple(slices), pos)
+        _, _, logits = _forward_jit(model, jnp.asarray(chunk), operator, tuple(slices), pos, tuple(mid))
         out.append(np.asarray(logits[:n, at]))
     return np.concatenate(out)
 

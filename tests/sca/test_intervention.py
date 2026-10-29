@@ -228,3 +228,23 @@ def test_repulsion_with_a_negative_landing_keeps_the_off_axis_direction():
             np.testing.assert_allclose(cos, 1.0, rtol=0, atol=1e-5)
         else:
             np.testing.assert_allclose(out[moved, 1:], 0.0, rtol=0, atol=1e-6)
+
+
+def test_apply_edits_the_mid_block_state_of_the_named_blocks():
+    from sca.model._shared import normalize
+
+    model = build_model(model_config(), key=jr.PRNGKey(0))
+    tokens = np.random.default_rng(7).integers(1, 16, size=(2, 8)).astype(np.int32)
+    op = projection(Subspace.axis(WIDTH))
+    out = apply(model, tokens, op, slices=(), mid=(1,))
+    # By hand: block 1's attention step, the edit, then its MLP step.
+    x = normalize(model.transformer.wte[jnp.asarray(tokens)])
+    block = model.transformer.blocks[0]
+    allowed = model.attention_mask(jnp.asarray(tokens))
+    x = op(block._step(x, block.attn(x, model.transformer.rotary_enc, allowed), block.s_attn))
+    x = block._step(x, block.mlp(x), block.s_mlp)
+    np.testing.assert_allclose(out.pre[1], np.asarray(x), rtol=0, atol=1e-5)
+    np.testing.assert_allclose(out.post, out.pre, rtol=0, atol=0)  # no between-block slice was named
+    # A mid-block edit of strength 0 is the clean pass.
+    same = apply(model, tokens, projection(Subspace.axis(WIDTH), gamma=0.0), slices=(), mid=(1, 2))
+    np.testing.assert_allclose(same.logits, np.asarray(model(jnp.asarray(tokens))), rtol=0, atol=1e-5)
