@@ -280,7 +280,7 @@ def smoke(ctx: Ctx) -> dict:
     return run(ctx, epochs=8, stop=6, seeds=SEEDS[:1], stop_keep=(2, 4), keep=(2, 4, 7), publishes=False, full=False)
 
 
-STAGE = "smoke"
+STAGE = "scout"
 """Which entry `main` runs: `smoke`, `scout`, or `full`. The scout's stopped run is a memo hit for the full run."""
 
 
