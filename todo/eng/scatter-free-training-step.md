@@ -19,7 +19,7 @@ It does change the code every anchored training task depends on, so re-ticking a
 
 The other three were only tried in the probe, as a patch made at run time (`_without_gathers` in `docs/m2/pack-timing/experiment.py`): the embedding as a product of a one-hot matrix with the table, and the cross-entropy as the sum of log-softmax times a one-hot target. Moving them into `sca.model.ngpt` and `sca.training.loop` is a numerics change. At full precision the forward pass selects the same values, but the embedding gradient sums the same terms in another order, so a run would not reproduce its earlier weights bit for bit. That makes it a change of the kind a jax upgrade is, best made between experiments rather than under one. `train_model` and the scoring passes share the model code and would move with it.
 
-A pack of 8 still costs about twice one seed per seed-step on the L4 (13.6 ms) with the scatter-free step, as on the L40S, so this change is about single runs.
+On the scatter-free step a pack of 8 still costs more per seed-step than one seed alone, on the L4 (13.6 ms against 7.6) and on the L40S (4.7 against 3.3), so this change is about single runs.
 
 ## Cost per step by card
 
