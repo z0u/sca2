@@ -557,6 +557,18 @@ def _check_step_options(  # noqa: C901 — one check per option
         raise ValueError("a scheduled temperature needs a finite tau (and a finite slice_tau, if set)")
 
 
+def _take_slices(states: Float[Array, "L1 B T C"], sel: tuple[int, ...] | None) -> Float[Array, "S B T C"]:
+    """The residual-stream slices *sel* (sorted, distinct) of *states*, by static slicing.
+
+    Indexing with an index array would be a gather, whose gradient is a scatter-add; under the GPU determinism flags (`eng/determinism.md`) a scatter-add runs serially, so a pack of several seeds (`jax.vmap`) would pay for it once per seed. A static slice has a pad for its gradient and selects the same values.
+    """
+    if sel is None:
+        return states
+    if sel == tuple(range(sel[0], sel[-1] + 1)):
+        return states[sel[0] : sel[-1] + 1]
+    return jnp.stack([states[i] for i in sel])
+
+
 def make_anchored_train_step(
     optimizer: optax.GradientTransformation,
     tau: float | None = None,
@@ -584,8 +596,8 @@ def make_anchored_train_step(
     *slices* restricts both terms to the named residual-stream slices (slice 0 is the embedding); `None` is every slice, the term as ex-2.1 and ex-2.2 trained it. *anti_slices* gives the anti-subspace term a slice set of its own, so the pull can leave a slice out while the anti term still acts there; `None` is the same set as *slices*. *axes* is where both terms read the alignment (`axes_alignment`): one axis, or the span of several. *clean_rows* names embeddings that may not carry the anchor axis: after each optimizer step and nGPT's re-normalization, the axis component of those embeddings is zeroed and they are re-normalized, the same kind of hard constraint as the unit norm. It is the tied-table fix for the syntax-embedding leak: those embeddings stay shared between the embedding table and the readout table, and training finds whatever solution it can with them held off the axis.
     """
     _check_step_options(tau, n_lines, slices, anti_slices, pool_slices, slice_tau, anchor_slice_w, scheduled_tau)
-    sel = None if slices is None else jnp.asarray(sorted(set(slices)))
-    anti_sel = sel if anti_slices is None else jnp.asarray(sorted(set(anti_slices)))
+    sel = None if slices is None else tuple(sorted(set(slices)))
+    anti_sel = sel if anti_slices is None else tuple(sorted(set(anti_slices)))
     rows = None if clean_rows is None else jnp.asarray(sorted(set(clean_rows)))
     pull_w = None if anchor_slice_w is None else jnp.asarray(anchor_slice_w, dtype=jnp.float32)
 
@@ -611,7 +623,7 @@ def make_anchored_train_step(
             states, logits = model.stream_and_logits(x)
             live = (x != 0).astype(states.dtype)
             task = cross_entropy(logits, y)
-            pulled = states if sel is None else states[sel]
+            pulled = _take_slices(states, sel)
             anchor = (
                 anchor_term(pulled, mask, axes)
                 if tau is None
@@ -630,7 +642,7 @@ def make_anchored_train_step(
                     pull_w,
                 )
             )
-            repelled = states if anti_sel is None else states[anti_sel]
+            repelled = _take_slices(states, anti_sel)
             anti = anti_subspace_term(repelled, live, axes)
             if anti_weight.ndim == 0:
                 return task + weight * anchor + anti_weight * anti, (task, anchor, anti)

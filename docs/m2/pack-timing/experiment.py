@@ -72,6 +72,9 @@ N_LINES = 60_000
 """A fifth of the recipe corpus: enough for an epoch longer than the timed span, and a quicker build. The corpus
 size sets the epoch length and nothing in the step."""
 N_REPLICAS = 3
+REPLICAS = {"L4": 1}
+"""Replicas by variant where not `N_REPLICAS`: the L4 ran a pack of 32 so slowly (about an hour a task) that one is
+enough."""
 PRICE_PER_HOUR = {"L4": 0.80, "A10G": 1.10, "L40S": 1.95, "A100": 2.10}
 """Modal list prices in USD (October 2026), for the cost per seed-step."""
 NONDET_CARDS: tuple[str, ...] = ("A100",)
@@ -80,10 +83,59 @@ cost per seed-step flat in the pack size; a deterministic scatter, as in an embe
 would cost the same per seed however many share the card."""
 NONDET_XLA_FLAGS = "--xla_cpu_enable_concurrency_optimized_scheduler=false"
 """The project's `XLA_FLAGS` with the two GPU determinism flags left out."""
-VARIANTS: dict[str, tuple[str, dict[str, str]]] = {card: (card, {}) for card in CARDS} | {
-    f"{card}-nondet": (card, {"XLA_FLAGS": NONDET_XLA_FLAGS}) for card in NONDET_CARDS
-}
+ONE_HOT_CARDS: tuple[str, ...] = ("L40S",)
+"""Cards timed in a third round, with the flags on, on the step with no scatter-add left in it: the slice selection
+already static in `sca.anchoring` (since the second round), and here the embedding lookup and the cross-entropy as
+products with a one-hot matrix in place of indexing (`_without_gathers`). The second round found the L40S's cost per
+seed-step rising most with the pack size."""
+VARIANTS: dict[str, tuple[str, dict[str, str]]] = (
+    {card: (card, {}) for card in CARDS}
+    | {f"{card}-nondet": (card, {"XLA_FLAGS": NONDET_XLA_FLAGS}) for card in NONDET_CARDS}
+    | {f"{card}-onehot": (card, {}) for card in ONE_HOT_CARDS}
+)
 """Role name → (card, environment over the project baseline)."""
+
+
+def _without_gathers() -> None:
+    """Swap the training step's two remaining gathers for one-hot products, in this process.
+
+    The embedding lookup and the cross-entropy's pick of the target logit are gathers, whose gradients are
+    scatter-adds. A product with a one-hot matrix selects the same values (at full precision, so no TF32 rounding) and
+    has a matrix product for its gradient. Only `time_packs` calls this, in the `-onehot` roles' own containers.
+    """
+    import jax
+    import jax.numpy as jnp
+
+    import sca.anchoring
+    from sca.model import ngpt
+
+    highest = jax.lax.Precision.HIGHEST
+
+    def embed(model, idx):
+        table = model.transformer.wte
+        return ngpt.normalize(
+            jnp.matmul(jax.nn.one_hot(idx, table.shape[0], dtype=table.dtype), table, precision=highest)
+        )
+
+    def stream_and_logits(self, idx):
+        x = embed(self, idx)
+        states = [x]
+        enc = self.transformer.rotary_enc
+        allowed = self.attention_mask(idx)
+        run_block = ngpt.eqx.filter_checkpoint(lambda block, h: block(h, enc, allowed))
+        for block in self.transformer.blocks:
+            x = run_block(block, x)
+            states.append(x)
+        return jnp.stack(states), (x @ self.transformer.readout.T) * self.s_z()
+
+    def cross_entropy(logits, targets):
+        logp = jax.nn.log_softmax(logits)
+        losses = -(logp * jax.nn.one_hot(targets, logits.shape[-1], dtype=logp.dtype)).sum(-1)
+        mask = targets != 0
+        return jnp.sum(losses * mask) / jnp.maximum(jnp.sum(mask), 1)
+
+    ngpt.NGPT.stream_and_logits = stream_and_logits
+    sca.anchoring.cross_entropy = cross_entropy
 
 
 def time_packs(corpus, labels, rows: list[dict], packs: tuple, variant: str, replica: int) -> dict:  # noqa: C901 — one setup, then two timings per pack
@@ -109,6 +161,8 @@ def time_packs(corpus, labels, rows: list[dict], packs: tuple, variant: str, rep
     from mini.progress import emit_progress
     from mini.store import get
 
+    if variant.endswith("-onehot"):
+        _without_gathers()
     workdir = get_data_dir() / "pack-timing" / f"r{replica}"
     corpus_dir = get(corpus, workdir / "corpus")
     config = rows[0]["config"]
@@ -274,17 +328,17 @@ def main(ctx: Ctx) -> dict:
     # variants after it, so every variant launches before the wake suspends.
     timed, waiting = {}, []
     for variant, (card, _) in VARIANTS.items():
-        packs = PACKS[card]
-        orders = [packs[r % len(packs) :] + packs[: r % len(packs)] for r in range(N_REPLICAS)]
+        packs, n = PACKS[card], REPLICAS.get(variant, N_REPLICAS)
+        orders = [packs[r % len(packs) :] + packs[: r % len(packs)] for r in range(n)]
         try:
             timed[variant] = ctx.map(
                 time_packs,
-                [prep["corpus"]] * N_REPLICAS,
-                [prep["labels"]] * N_REPLICAS,
-                [rows] * N_REPLICAS,
+                [prep["corpus"]] * n,
+                [prep["labels"]] * n,
+                [rows] * n,
                 orders,
-                [variant] * N_REPLICAS,
-                list(range(N_REPLICAS)),
+                [variant] * n,
+                list(range(n)),
                 role=variant,
                 allow_partial=True,
             )
