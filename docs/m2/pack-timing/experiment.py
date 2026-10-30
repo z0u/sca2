@@ -74,10 +74,22 @@ size sets the epoch length and nothing in the step."""
 N_REPLICAS = 3
 PRICE_PER_HOUR = {"L4": 0.80, "A10G": 1.10, "L40S": 1.95, "A100": 2.10}
 """Modal list prices in USD (October 2026), for the cost per seed-step."""
+NONDET_CARDS: tuple[str, ...] = ("A100",)
+"""Cards also timed without the GPU determinism flags (`eng/determinism.md`). The first round on the A100 found the
+cost per seed-step flat in the pack size; a deterministic scatter, as in an embedding gradient, runs serially and
+would cost the same per seed however many share the card."""
+NONDET_XLA_FLAGS = "--xla_cpu_enable_concurrency_optimized_scheduler=false"
+"""The project's `XLA_FLAGS` with the two GPU determinism flags left out."""
+VARIANTS: dict[str, tuple[str, dict[str, str]]] = {card: (card, {}) for card in CARDS} | {
+    f"{card}-nondet": (card, {"XLA_FLAGS": NONDET_XLA_FLAGS}) for card in NONDET_CARDS
+}
+"""Role name → (card, environment over the project baseline)."""
 
 
-def time_packs(corpus, labels, rows: list[dict], packs: tuple, replica: int) -> dict:  # noqa: C901 — one setup, then two timings per pack
-    """Time the scanned dispatch for each pack size in *packs*, in order, in this container."""
+def time_packs(corpus, labels, rows: list[dict], packs: tuple, variant: str, replica: int) -> dict:  # noqa: C901 — one setup, then two timings per pack
+    """Time the scanned dispatch for each pack size in *packs*, in order, in this container. *variant* names the
+    role, so that each card and flag set has its own memo key.
+    """
     import time
 
     import equinox as eqx
@@ -94,6 +106,7 @@ def time_packs(corpus, labels, rows: list[dict], packs: tuple, replica: int) -> 
     from sca.model import build_model
     from sca.training.optimizer import configure_optimizer
     from sca.training.scheduler import configure_schedule
+    from mini.progress import emit_progress
     from mini.store import get
 
     workdir = get_data_dir() / "pack-timing" / f"r{replica}"
@@ -152,6 +165,18 @@ def time_packs(corpus, labels, rows: list[dict], packs: tuple, replica: int) -> 
             per_seed.append(tuple(np.stack([b[f] for b in chunk]) for f in range(len(chunk[0]))))
         return tuple(np.stack(f) for f in zip(*per_seed, strict=True)) if packed else per_seed[0]
 
+    def n_dispatch_of(k: int) -> int:
+        return max(8, STEP_BUDGET // (SCAN_STEPS * k))
+
+    ks = [1 if p == "plain" else int(p) for p in packs]
+    total = sum(WARMUP + 2 * n_dispatch_of(k) for k in ks)
+    done = 0
+
+    def tick() -> None:
+        nonlocal done
+        done += 1
+        emit_progress(done, total)
+
     results = []
     for pack in packs:
         k = 1 if pack == "plain" else int(pack)
@@ -171,11 +196,12 @@ def time_packs(corpus, labels, rows: list[dict], packs: tuple, replica: int) -> 
         def dispatch(model, opt_state, batches, step=step):
             return step(model, opt_state, batches, weights, anti_weights, taus, live)
 
-        n_dispatch = max(8, STEP_BUDGET // (SCAN_STEPS * k))
+        n_dispatch = n_dispatch_of(k)
         t0 = time.perf_counter()
         for _ in range(WARMUP):
             model, opt_state, outs = dispatch(model, opt_state, draw(streams, pack != "plain"))
             np.asarray(outs)
+            tick()
         compile_s = time.perf_counter() - t0
 
         # device: the dispatch alone, on one stacked draw put on the device once.
@@ -187,6 +213,7 @@ def time_packs(corpus, labels, rows: list[dict], packs: tuple, replica: int) -> 
             model, opt_state, outs = dispatch(model, opt_state, on_device)
             jax.block_until_ready(outs)
             times.append(time.perf_counter() - t)
+            tick()
         device_ms = 1000 * float(np.median(times)) / (SCAN_STEPS * k)
 
         # loop: draw, stack, dispatch, read back, as train_anchored does per dispatch.
@@ -198,6 +225,7 @@ def time_packs(corpus, labels, rows: list[dict], packs: tuple, replica: int) -> 
             sample_s.append(time.perf_counter() - t)
             model, opt_state, outs = dispatch(model, opt_state, batches)
             np.asarray(outs)
+            tick()
         loop_ms = 1000 * (time.perf_counter() - t_loop) / (n_dispatch * SCAN_STEPS * k)
         sample_ms = 1000 * float(np.sum(sample_s)) / (n_dispatch * SCAN_STEPS * k)
 
@@ -223,7 +251,7 @@ def time_packs(corpus, labels, rows: list[dict], packs: tuple, replica: int) -> 
         )
         del model, opt_state, outs
 
-    return {"replica": replica, "device": jax.devices()[0].device_kind, "packs": results}
+    return {"variant": variant, "replica": replica, "device": jax.devices()[0].device_kind, "packs": results}
 
 
 def main(ctx: Ctx) -> dict:
@@ -242,21 +270,23 @@ def main(ctx: Ctx) -> dict:
         role="prep",
     )
     rows = fc.rows_of(prep["meta"], SEEDS, None)
-    # One map per card, each with its own role. A map in flight raises `Pending`, which would hold back the cards
-    # after it, so every card launches before the wake suspends.
+    # One map per variant, each with its own role. A map in flight raises `Pending`, which would hold back the
+    # variants after it, so every variant launches before the wake suspends.
     timed, waiting = {}, []
-    for card in CARDS:
+    for variant, (card, _) in VARIANTS.items():
         packs = PACKS[card]
         orders = [packs[r % len(packs) :] + packs[: r % len(packs)] for r in range(N_REPLICAS)]
         try:
-            timed[card] = ctx.map(
+            timed[variant] = ctx.map(
                 time_packs,
                 [prep["corpus"]] * N_REPLICAS,
                 [prep["labels"]] * N_REPLICAS,
                 [rows] * N_REPLICAS,
                 orders,
+                [variant] * N_REPLICAS,
                 list(range(N_REPLICAS)),
-                role=card,
+                role=variant,
+                allow_partial=True,
             )
         except Pending as p:
             waiting.append(p)
@@ -269,9 +299,10 @@ COMPUTE: dict[str, Any] = {
     # One corpus build of 60,000 contexts with its held-out set and probes.
     "prep": dict(cpu=2, timeout=1800),
 } | {
-    # Five packs, each a compile of about ten seconds and two timings of 4,096 seed-steps: a few minutes on an L4.
-    card: dict(gpu=card, timeout=1800, watchdog=600, watchdog_grace=900)
-    for card in CARDS
+    # Five or six packs, each a compile of 10 to 50 seconds and two timings of 4,096 seed-steps. The first round's
+    # L4 tasks ran past fifteen minutes, so a slow card gets room.
+    variant: dict(gpu=card, env=env, timeout=3600, watchdog=600, watchdog_grace=900)
+    for variant, (card, env) in VARIANTS.items()
 }
 
 experiment = Experiment(name="pack-timing", main=main, roles=COMPUTE)
