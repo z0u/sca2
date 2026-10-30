@@ -266,6 +266,8 @@ def merge_run_lineage(prev: dict[str, Any] | None, fresh: dict[str, Any]) -> dic
         merged["wakes"] = (prev.get("wakes") or 1) + 1
         if prev.get("upstreams") and not merged.get("upstreams"):
             merged["upstreams"] = prev["upstreams"]
+        if gpus := sorted({*(prev.get("gpus") or []), *(fresh.get("gpus") or [])}):
+            merged["gpus"] = gpus  # records expire, so cards seen in earlier wakes are kept
     else:
         merged["first_captured_at"] = fresh.get("captured_at")
         merged["first_captured_at_epoch"] = fresh.get("captured_at_epoch")
@@ -276,7 +278,7 @@ def merge_run_lineage(prev: dict[str, Any] | None, fresh: dict[str, Any]) -> dic
 def upstream_snapshot(name: str, meta: dict[str, Any]) -> dict[str, Any]:
     """A compact provenance record of an upstream experiment, for embedding downstream.
 
-    Given experiment *A*'s run *meta* (its stored ``lineage`` + Modal app ids), pull just enough to trace back to it — its name, code state, when it first ran, and the Modal apps that produced it — so a report for *B* can prove which *A* it was built on without carrying *A*'s whole record.
+    Given experiment *A*'s run *meta* (its stored ``lineage`` + Modal app ids), pull just enough to trace back to it — its name, code state, when it first ran, the GPU models its tasks ran on, and the Modal apps that produced it — so a report for *B* can prove which *A* it was built on without carrying *A*'s whole record.
     """
     lineage = meta.get("lineage") or {}
     git = lineage.get("git") or {}
@@ -289,6 +291,8 @@ def upstream_snapshot(name: str, meta: dict[str, Any]) -> dict[str, Any]:
         snap["git_dirty"] = True
     if run_at := lineage.get("first_captured_at"):
         snap["run_at"] = run_at
+    if gpus := lineage.get("gpus"):
+        snap["gpus"] = list(gpus)
     if app_ids := meta.get("modal_app_ids"):
         snap["modal_app_ids"] = list(app_ids)
     return snap

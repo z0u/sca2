@@ -1136,7 +1136,7 @@ def _provenance_entries(refs: dict[str, dict[str, Any] | None]) -> list[dict[str
 def set_provenance(html: str, refs: dict[str, dict[str, Any] | None]) -> str:
     """Give a published report a folded data-provenance footer.
 
-    *refs* is the bundle's provenance sidecar content (ref name → the producer stamped at ``set_ref`` time). Each producing experiment gets one line — name, code state, run date — with the resolved ref names beneath it, inside a ``<details>`` chip at the foot of the page, below the content column and lined up with it. A report whose refs carry no producer (or that read no refs at all) is left untouched. Content is derived only from the store's refs, so re-exporting unchanged data injects the same footer.
+    *refs* is the bundle's provenance sidecar content (ref name → the producer stamped at ``set_ref`` time). Each producing experiment gets one line — name, code state, run date, the GPU models it ran on — with the resolved ref names beneath it, inside a ``<details>`` chip at the foot of the page, below the content column and lined up with it. A report whose refs carry no producer (or that read no refs at all) is left untouched. Content is derived only from the store's refs, so re-exporting unchanged data injects the same footer.
     """
     entries = _provenance_entries(refs)
     if not entries:
@@ -1149,6 +1149,8 @@ def set_provenance(html: str, refs: dict[str, dict[str, Any] | None]) -> str:
             bits.append(f"<code>{code}</code>{' (dirty)' if e.get('git_dirty') else ''}")
         if run_at := e.get("run_at"):
             bits.append(f"run {str(run_at)[:10]}")
+        if gpus := e.get("gpus"):
+            bits.append(f"on {', '.join(gpus)}")
         via = f"<div>via {', '.join(e['refs'])}</div>"
         return f"<div>{' · '.join(bits)}{via}</div>"
 

@@ -372,13 +372,13 @@ def cmd_retry(args: argparse.Namespace) -> None:
     _run(exp, apparatus, args)
 
 
-def _detected_upstreams(exp: Experiment, store: MemoStore) -> dict[str, list[str]]:
+def _detected_upstreams(exp: Experiment, records: list[dict[str, Any]]) -> dict[str, list[str]]:
     """Upstream experiments detected from the refs this run's tasks resolved.
 
     Each settled task records the shared refs it read and the experiment stamped on each at ``set_ref`` time (``upstream_refs`` — see ``mini._taskworker``). Rolled up here to producer → the resolved ref names (the evidence), with self-reads dropped (an experiment reading its own refs is not a dependency).
     """
     found: dict[str, set[str]] = {}
-    for rec in store.records():
+    for rec in records:
         for item in rec.get("upstream_refs") or []:
             if (producer := item.get("experiment")) and producer != exp.name:
                 found.setdefault(producer, set()).add(item["ref"])
@@ -396,7 +396,10 @@ def _stamp_lineage(exp: Experiment, store: MemoStore, args: argparse.Namespace) 
         fresh = run_lineage()
     except Exception:  # lineage is diagnostic — never let it take a run down
         return
-    detected = _detected_upstreams(exp, store)
+    records = store.records()
+    detected = _detected_upstreams(exp, records)
+    if gpus := _exec_env_summary(records).get("gpus"):
+        fresh["gpus"] = gpus
     upstreams = []
     for dep in dict.fromkeys([*(exp.deps or []), *sorted(detected)]):
         try:
@@ -1051,7 +1054,7 @@ def _attempt_delta(prev: dict, cur: dict) -> str:
     return ", ".join(bits) or "retried (evidence unchanged)"
 
 
-def _exec_env_summary(store: MemoStore) -> dict[str, Any]:
+def _exec_env_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     """Aggregate the per-task execution environments a run actually ran on.
 
     Each settled task carries an ``env`` (see :func:`mini.runs.compute_env`); this rolls the fan-out up into the distinct GPUs / regions / clouds / hosts and the number of Modal containers, plus the summed execution wall time — the "what did this run *on*" companion to the driver-side lineage.
@@ -1059,7 +1062,7 @@ def _exec_env_summary(store: MemoStore) -> dict[str, Any]:
     # env field -> the distinct values seen across tasks (each rolled up below).
     seen: dict[str, set[str]] = {k: set() for k in ("gpu", "region", "cloud", "host", "modal_task_id")}
     wall = 0.0
-    for rec in store.records():
+    for rec in records:
         env = rec.get("env") or {}
         if gpu := env.get("gpu"):
             env = {**env, "gpu": f"{gpu}×{env['gpu_count']}" if env.get("gpu_count") else gpu}
@@ -1148,7 +1151,7 @@ def _print_upstreams(lin: dict[str, Any]) -> None:
 
 def _ran_on_line(store: MemoStore) -> str:
     """One-line rollup of what a run's tasks actually executed on (or empty)."""
-    s = _exec_env_summary(store)
+    s = _exec_env_summary(store.records())
     bits = []
     if s.get("gpus"):
         bits.append("gpu " + ", ".join(s["gpus"]))
