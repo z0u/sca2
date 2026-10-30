@@ -218,6 +218,10 @@ N_SYNTAX_OVER_DEGREE = sum(int((BOUND[n][OVER[n] & SYNTAX[None, None]] > 1).sum(
 assert N_SYNTAX_OVER_DEGREE <= 3, (
     "E3 says the bound at a symbol site over the tolerance is under a degree at all but a few"
 )
+N_OPERAND_OVER = sum(int((OVER[n] & OPERAND[None, None]).sum()) for n in RECIPES)
+N_OPERAND_UNDER = sum(int((OVER[n] & OPERAND[None, None] & (EXCESS[n] <= FLOOR)).sum()) for n in RECIPES)
+OPERAND_BOUND_MIN = min(float(BOUND[n][OVER[n] & OPERAND[None, None]].min()) for n in RECIPES)
+assert SYNTAX_BOUND_MAX < OPERAND_BOUND_MIN, "E3 says the bound separates the two kinds"
 OPERAND_EXCESS_MIN = min(float(EXCESS[n][OVER[n] & OPERAND[None, None]].min()) for n in RECIPES)
 POOL_EXCESS_MEDIAN = float(np.median(EXCESS[POOL][BOTH[POOL]]))
 SWEEP = np.linspace(0, 4.5, 91)
@@ -337,7 +341,7 @@ The bound and the write are each a {Q:.0%} quantile over about {N_STATES:,} stat
 
 {BOOT_TABLE}
 
-The spread is tiny next to the excess. At the sites over the tolerance it is a few hundredths of a degree at the median, and the excess there is about {Z_MEDIAN:.0f} times its own spread at the median. The closest case is an operand site with a bound of about 6°, where the spread is nearly a degree and the excess {Z_MIN:.1f} times that. So the excess at every site over the tolerance would survive another set of contexts drawn the same way.
+The spread is tiny next to the excess. At the sites over the tolerance it is a few hundredths of a degree at the median, and the excess there is about {Z_MEDIAN:.0f} times its own spread at the median. The closest case is an operand site with a bound of about 6°, where the spread is nearly a degree and the excess {Z_MIN:.1f} times that. The spread is wider on `step, soft τ` and the pool, which have more of their sites over the tolerance at operands, where the bound is a few degrees, but it stays at hundredths of a degree at the median there too. So the excess at every site over the tolerance would survive another set of contexts drawn the same way.
 
 Whether a site stays over the tolerance is a narrower question. The tolerance line is at an excess of a quarter of the bound, not at zero. {N_NEAR_LINE} of the {len(Z)} sites are within twice their spread of that line, and another draw could put those under it.
 """
@@ -481,7 +485,7 @@ The figure places each site over the tolerance by its bound and its excess, and 
 
 {keep_figure()}
 
-The sites over the tolerance are of two kinds, and the floor separates them. At the symbols and separators (`?`, `,` and ⏎) the bound is under a degree at all but {N_SYNTAX_OVER_DEGREE} of them and at most {SYNTAX_BOUND_MAX:.1f}°, the excess is at most {SYNTAX_EXCESS_MAX:.1f}°, and every one of them falls under the floor. They make up most of the sites over the tolerance on `τ_ℓ fixed` and `falloff` (the table below). At the operands the bound is a few degrees, and the excess ranges from {OPERAND_EXCESS_MIN:.1f}° to several degrees. No site at `=` or at an answer goes over the tolerance. Every site that clears the floor is at an operand, at slice {" or ".join(str(s) for s in sorted(set().union(*SLICES_WITH.values())))}.
+The sites over the tolerance are of two kinds. The bound separates them cleanly, and the floor does so only in part. At the symbols and separators (`?`, `,` and ⏎) the bound is under a degree at all but {N_SYNTAX_OVER_DEGREE} of them and at most {SYNTAX_BOUND_MAX:.1f}°, the excess is at most {SYNTAX_EXCESS_MAX:.1f}°, and every one of them falls under the floor. They make up most of the sites over the tolerance on `τ_ℓ fixed` and `falloff` (the table below). At the operands the bound is a few degrees, and the excess ranges from {OPERAND_EXCESS_MIN:.1f}° to several degrees. So the floor takes out every symbol site, and {N_OPERAND_UNDER} of the {N_OPERAND_OVER} operand sites, those with the smallest excess. No site at `=` or at an answer goes over the tolerance. Every site that clears the floor is at an operand, at slice {" or ".join(str(s) for s in sorted(set().union(*SLICES_WITH.values())))}.
 
 {KEEP_TABLE}
 
@@ -499,9 +503,9 @@ It also keeps {sum(PER_SITE_SYNTAX.values())} sites at symbols, with excesses of
 f"""
 ## Discussion
 
-The tolerance of ex-2.2.1, taken as a ratio alone, mixes two kinds of site: symbols and separators, where the clean model puts almost no e₁ and the write adds a fraction of a degree, and operands at the first slice or two, where the write adds a degree or more to a bound of a few degrees. A floor of about a degree removes the first kind and keeps the second.
+The tolerance of ex-2.2.1, taken as a ratio alone, mixes two kinds of site: symbols and separators, where the clean model puts almost no e₁ and the write adds a fraction of a degree, and operands at the first slice or two, where the write adds a degree or more to a bound of a few degrees. A floor of about a degree removes the first kind and keeps most of the second.
 
-We are fairly sure of the split under an absolute floor. It holds for any floor above the largest excess at a symbol, {SYNTAX_EXCESS_MAX:.1f}°, and the two kinds are apart on the left of the E3 figure. A rule relative to each site would draw the line elsewhere, flagging a few symbol sites whose small excess is unusual for that site. Which of the two a gate wants is a choice about what the tolerance is for.
+We are fairly sure of the split under an absolute floor. It holds for any floor above the largest excess at a symbol, {SYNTAX_EXCESS_MAX:.1f}°, and the two kinds are apart in bound on the left of the E3 figure, though their excesses overlap a little below the floor. A rule relative to each site would draw the line elsewhere, flagging a few symbol sites whose small excess is unusual for that site. Which of the two a gate wants is a choice about what the tolerance is for.
 
 We are less sure of the exact floor. It rests on eight runs per recipe, and on the choice of the {FLOOR_Q:.0%} quantile and the cut at {SMALL:.0f}°. It also rests on taking the quantile over the symbol and operand sites together. The operand sites alone would put it a few tenths of a degree higher (E2), and a few more sites would fall under it. A reference direction, edited at the same sites, would give a second scale for it that this report could not measure from stored data.
 
