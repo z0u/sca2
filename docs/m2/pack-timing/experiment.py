@@ -133,14 +133,14 @@ def _without_gathers() -> None:
             states.append(x)
         return jnp.stack(states), (x @ self.transformer.readout.T) * self.s_z()
 
-    def cross_entropy(logits, targets):
+    def cross_entropy(logits: jax.Array, targets: jax.Array) -> jax.Array:
         logp = jax.nn.log_softmax(logits)
         losses = -(logp * jax.nn.one_hot(targets, logits.shape[-1], dtype=logp.dtype)).sum(-1)
         mask = targets != 0
         return jnp.sum(losses * mask) / jnp.maximum(jnp.sum(mask), 1)
 
     ngpt.NGPT.stream_and_logits = stream_and_logits
-    sca.anchoring.cross_entropy = cross_entropy
+    sca.anchoring.cross_entropy = cross_entropy  # ty: ignore[invalid-assignment] — a patch for the probe alone
 
 
 def time_packs(corpus, labels, rows: list[dict], packs: tuple, variant: str, replica: int) -> dict:  # noqa: C901 — one setup, then two timings per pack
