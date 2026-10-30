@@ -10,10 +10,10 @@ r"""
 
 /// tip |
 <!-- lede -->
-We compare the anchored edit with edits along directions found after training: four standard fitters and one direction optimized against the scoring itself, each fitted on a control model with every label, tuned per run on data it is never scored on, and scored by the code that scores the anchor. <The outcome line, written when results land.>
+We compare the anchored edit with edits along directions found after training: four standard fitters, and one direction optimized against the scoring itself. Each is fitted on a control model with every label, tuned per run on data it is never scored on, and scored the same way as the anchor. <The outcome line, written when results land.>
 ///
 
-Placing a concept during training costs a training term and some task score. This report asks what that buys over searching for the concept afterwards, on the same model and with the same scoring, so that the D2.2 blog post can say how anchoring compares with the methods a reader already knows.
+Placing a concept during training needs an extra training term, and it lowers the task score somewhat. This report asks whether that placement does better than searching for the concept afterwards, on the same model and with the same scoring, so that the D2.2 blog post can say how anchoring compares with the methods a reader already knows.
 """
 
 # %%
@@ -42,11 +42,13 @@ This report was preregistered: the predictions, the grid, and the rule that pick
 r"""
 ## Why this experiment
 
-The anchored pipeline trains the model with a pull toward the first basis vector e₁ on labelled `difference` contexts, and removes the op afterwards by projecting e₁ out of the residual stream at every slice and position. On the recipe of record that edit removes most of the op, costs the other ops less than the criterion, drops each context by about as much as it needed `difference`, and leaves a write the blocks after it keep within a bound set before the edit runs (the fixed-effects experiment).
+The anchored pipeline trains the model with a pull toward the first basis vector e₁ on labelled `difference` contexts, and removes the op afterwards by projecting e₁ out of the residual stream[^residual] at every slice and position. On the recipe of record, the fixed-effects experiment found that this edit removes most of the op and costs the other ops less than the selectivity criterion allows. It also drops each context by about as much as that context needed `difference`, and the blocks after the edit keep what it writes within a bound set before the edit runs.
 
-A reader who knows the steering and erasure literature will ask whether a direction found after training does as well. The usual pipeline trains with no pull, fits a direction for the concept from the states and the labels, and projects it out, or replaces its component with a mean, or erases it with LEACE. If one of those matched the anchor on this model, the post would have to say that the placement bought nothing a search could not find.
+[^residual]: Residual stream: the running vector at each position, which every block reads from and adds its output to.
 
-Ex-2.2.1 asked this once, for *red* on the D2.1 checkpoints, and every fitted direction that removed at least half of *red* cost the lines with no red far more than the anchored edit did. That run gave the fitters little: three control seeds, labels from the token alone, one fit per slice, and no tuning. So this report gives the fitters every advantage we can, scores them the same way as the anchor, and asks where they land on the trade between removal and spill.
+A reader who knows the steering and erasure literature will ask whether a direction found after training does as well. The usual pipeline trains with no pull and fits a direction for the concept from the states and the labels. It then projects that direction out, replaces the component along it with a mean, or erases it with LEACE. If one of those matched the anchor on this model, the post would have to say that the placement added nothing a search could not find.
+
+Ex-2.2.1 asked this once, for *red* on the D2.1 checkpoints. Every fitted direction there that removed at least half of *red* cost the lines with no red far more than the anchored edit did. But that run gave the fitters little: three control seeds, labels from the token alone, one fit per slice, and no tuning. So this report gives the fitters every advantage we can, scores them the same way as the anchor, and asks where they fall on the trade-off between removal and spill.
 """
 
 # %%
@@ -54,7 +56,7 @@ Ex-2.2.1 asked this once, for *red* on the D2.1 checkpoints, and every fitted di
 r"""
 ## Runs and methods
 
-No run is trained. The anchored runs are the eight `τ_ℓ fixed` runs of the fixed confirmation at seeds 712 to 719, which are the recipe of record. The controls are the eight runs of the anneal confirmation at the same seeds, trained with no pull, with the same initialization, batches, and corpus. Every post-hoc method is fitted on a control and scored on it, so each method has eight runs, and each comparison with the anchor is between two samples of eight runs.
+No new run is trained. The anchored runs are the eight `τ_ℓ fixed` runs of the fixed confirmation at seeds 712 to 719, which are the recipe of record. The controls are the eight runs of the anneal confirmation at the same seeds, trained with no pull, with the same initialization, batches, and corpus. Every post-hoc method is fitted on a control and scored on it, so each method has eight runs, and each comparison with the anchor is between two samples of eight runs.
 
 Anchored
 :   The full edit along e₁, as published in fixed-effects. Nothing is refitted or retuned.
@@ -66,15 +68,15 @@ Ridge probe
 :   The normalized weight vector of a linear readout of the target, fitted by least squares with an ℓ₂ penalty. It finds what can be read off the state linearly.
 
 LEACE
-:   Least-squares concept erasure ([Belrose et al., 2023](https://arxiv.org/abs/2306.03819)): the smallest affine edit, measured in the covariance-whitened norm, after which no linear probe can read the target. It removes one direction and measures how much to remove along another, so the edit is oblique.
+:   Least-squares concept erasure ([Belrose et al., 2023](https://arxiv.org/abs/2306.03819)): the smallest affine edit, measured in the covariance-whitened norm, after which no linear probe can read the target. It removes one direction and measures how much to remove along another, so the edit is oblique (not a perpendicular projection).
 
 Iterated probe (INLP)
-:   The ridge probe fitted, projected out, and fitted again on what is left, to a rank of 2, 4, or 8; the edit removes the whole span. It answers the objection that a concept held across several directions can't be removed along one.
+:   The ridge probe fitted, projected out, and fitted again on what is left, to a rank of 2, 4, or 8; the edit removes the whole span. It covers the case of a concept held across several directions, which an edit along one could not remove.
 
 Optimized direction
-:   A unit vector per edited slice, fitted by gradient descent on the control so that the edited answers on `difference` contexts move toward the target null while the answers on the other contexts stay where they were. It uses the target null, which no real pipeline has, so it is a diagnostic ceiling: about the best a rank-1 edit of this control could do with the scoring in hand. [COAST](https://arxiv.org/abs/2605.01167) is its nearest published relative.
+:   A unit vector per edited slice, fitted by gradient descent on the control so that the edited answers on `difference` contexts move toward the target null while the answers on the other contexts stay where they were. It uses the target null, which no real pipeline has, so it is a diagnostic ceiling: about the best a rank-1 edit (an edit along one direction) of this control could do with the scoring in hand. [COAST](https://arxiv.org/abs/2605.01167) is its nearest published relative.
 
-The first four are the standard fitters that H1 and H2 judge. Each is also fitted on the anchored runs, where the concept sits on e₁ by construction, as a check that the fitters can find a concept that is there (H4). The sans-diff model, trained with no loss on `difference`, stays the reference for how close to the target null a model of this size comes.
+The first four are the standard fitters that H1 and H2 judge. Each is also fitted on the anchored runs, where training placed the concept on e₁, as a check that the fitters can find a concept that is there (H4). A fitter that misses that check is left out of the verdicts of H1 to H3. The sans-diff model, trained with no loss on `difference`, stays the reference for how close to the target null a model of this size comes.
 """
 
 # %%
@@ -82,10 +84,10 @@ The first four are the standard fitters that H1 and H2 judge. Each is also fitte
 r"""
 ## What each method gets
 
-Three sets of contexts, which never share a context: a fit set the directions are fitted on, a tuning set the configuration is chosen on, and the test set every published D2.2 score is taken on.
+We use three sets of contexts, and no context is in more than one: a fit set the directions are fitted on, a tuning set the configuration is chosen on, and the test set every published D2.2 score is taken on.
 
 Fit set
-:   280,000 fresh contexts, 40,000 per op, from the training generator of the run with its replacement op noise, each with its generating op and its posterior over ops: about the size of the training corpus, and drawn the way it was. The states are those of the clean pass of the run at every slice and position, and the fits are made from means and covariances accumulated over the set, so the states need not be held at once.
+:   280,000 fresh contexts, 40,000 per op, drawn from the training generator of the run with its replacement op noise: about the size of the training corpus, and drawn the same way. Each comes with its generating op and its posterior over ops. The states are taken from the clean pass of the run at every slice and position. The fits are made from means and covariances accumulated over the set, so the states need not be held in memory at once.
 
 Tuning set
 :   Another 14,000 fresh contexts from the same generator, drawn the same way.
@@ -93,10 +95,12 @@ Tuning set
 Test set
 :   The 14,000 held-out contexts of ex-2.2.21, 2,000 per op, so the anchored numbers need no recomputing.
 
-Every method is fitted with a label on every `difference` context. The anchor had a label on a fiftieth of them at each visit, but the draw is made again at every visit, so over 400 epochs about three quarters of the `difference` contexts were labelled at some point, about one and a half times each. So in distinct labelled contexts the fit set and the anchor are about level, though the anchor met its labels a few hundred per pass over the corpus, through a stochastic term, and the fitters see all of theirs at once, in closed form. What the fitters lack is a term that shaped the whole representation around the concept, and that is the thing being measured; how much the label count itself matters to them is what the ladder of E3 measures.
+Every method is fitted with a label on every `difference` context. The anchor had a label on a fiftieth of them at each visit, but the labels were drawn again at every visit. So over 400 epochs about three quarters of the `difference` contexts were labelled at some point, about one and a half times each.
+
+In distinct labelled contexts, then, the fit set and the anchor are about level. They differ in how the labels arrive: the anchor met its labels a few hundred per pass over the corpus, through a stochastic term, while the fitters see all of theirs at once, in closed form. What the fitters lack is a term that shaped the whole representation around the concept, and that is what this experiment measures. The label ladder of E3 measures how much the label count itself matters to them.
 <!-- REVIEW: the plan said the fitters get "fifty times the labels the anchor saw", and the first draft said "about level" for a fit set of 2,000 `difference` contexts. Under the context labeller (`sca.anchoring._context_mask`) the 1/50 draw is fresh at every visit; at 300k contexts of 24 tokens, a window of 96, an epoch of a quarter of the corpus, and 400 epochs, a context is wholly in view about 70 times, so about 0.75 of the 43k `difference` contexts draw a label at least once (34k distinct, about 650 per pass over the corpus). The fit set was enlarged to 40k `difference` contexts so the claim holds and the bottom rung of E3 (800 contexts) is not a sample-size test. Verify: `(1 - 0.02) ** 70`, and the fit set size above. -->
 
-The fitters also get a graded target, the posterior on `difference` given the examples, which takes away the noise of a label that marks the generating op even where the examples point elsewhere.
+The fitters also get a graded target: the posterior on `difference` given the examples. A binary label marks the generating op even where the examples point to another op, and the graded target takes away that noise.
 
 Each method then gets a grid over how it is fitted, where it acts, and how much it removes:
 
@@ -111,13 +115,15 @@ Each method then gets a grid over how it is fitted, where it acts, and how much 
 | Replacement | zero (the projection); or the mean coefficient over the contexts of the other ops (mean ablation) |
 | Rank | 2, 4, or 8, for INLP, on the binary target |
 
-The fits at the example answers and the query `=` use role labels a real corpus does not have, so they are generous diagnostics rather than candidate recipes, and the tables mark which sites each selected configuration used. The anchor gets no grid. Its one configuration is the published edit, reached through some thirty experiments at other seeds, and the fitters arrive with their own literatures behind them and a per-run grid on top.
+The fits at the example answers and the query `=` use role labels a real corpus does not have. So they are generous diagnostics rather than candidate recipes, and the tables mark which sites each selected configuration used.
+
+The anchor gets no grid. Its one configuration is the published edit, which was reached through some thirty experiments at other seeds. The fitters arrive with their own literatures behind them, and get a per-run grid on top.
 
 Selection rule (frozen)
 :   Per method and per run, every configuration is scored on the tuning set, net of the median drop under the same operator form along fifteen fixed coordinate axes other than e₁, and the frontier is taken: the configurations that no other beats on both removal and spill. Two points are read off the frontier. *Removal at the criterion* is where the frontier crosses a spill of 0.02, interpolated linearly between the two frontier configurations that bracket it, or the configuration with the least spill if none is within the criterion. *Spill at matched removal* is where the frontier crosses the seed mean of the anchored removal, interpolated the same way; a frontier that never reaches that removal has no such point, and the run is recorded as not matched. The bracketing configurations are then scored on the test set, and each point is their test scores mixed with the weights found on the tuning set, so the test set chooses nothing, and the point can sit a little off the line on the test set; the table shows where it sits.
 <!-- REVIEW: the first draft took the tuning frontier on raw drops. A typical coordinate axis of a control costs about 0.03 per op at full dose (reference-baseline), so raw 0.02 on the tuning set would have meant about −0.01 net, and the selection would have sat inside the criterion it is judged against, biased against the fitters. The axis median is fitter-independent, so fifteen axes per operator form cost about 2,500 passes per run. Verify: the axis subsample is fixed before the run, and the test-set baselines are the full ones of the Measurements. -->
 
-Removal at the criterion is what a practitioner with one of these methods would do: sweep the layer and the strength on a validation set, keep the side effects within a tolerance, and take the strongest edit that does.
+Removal at the criterion mirrors what a practitioner with one of these methods would do: sweep the layer and the strength on a validation set, keep the side effects within a tolerance, and take the strongest edit that does.
 """
 
 # %%
@@ -125,7 +131,7 @@ Removal at the criterion is what a practitioner with one of these methods would 
 r"""
 ## Measurements
 
-Every measurement is the one the D2.2 design and fixed-effects define, taken through `sca.intervention.apply`, so any method that produces a subspace and an operator is scored by the code that scores the anchor.
+Every measurement is defined as in the D2.2 design and fixed-effects, and taken through `sca.intervention.apply`. So any method that produces a subspace and an operator is scored by the code that scores the anchor.
 
 Removal
 :   The drop in expected exact match on `difference` under the edit, as a share of the way from the clean score to the target null. Higher is better.
@@ -134,10 +140,10 @@ Spill
 :   The largest drop on any other op under the edit. Lower is better, and the selectivity criterion is 0.02.
 
 Net and raw
-:   Published anchored scores are net of the median drop under the same edit along each of the other 63 coordinate axes of the run. A fitted direction is not an axis, so each post-hoc configuration gets a baseline in its own terms: the median drop over fifteen fits of the same fitter with the labels permuted across contexts, which gives a direction with no concept in it and the same kind of operator. On the controls the coordinate-axis median is computed too, and each hypothesis is judged on whichever of the two baselines favors the post-hoc method for that measure (the smaller for removal, the larger for spill). The anchor keeps its published baseline. Raw drops are shown beside net ones throughout.
+:   A net drop has a baseline drop subtracted; a raw drop does not. Published anchored scores are net of the median drop under the same edit along each of the other 63 coordinate axes of the run. A fitted direction is not an axis, so each post-hoc configuration gets a baseline in its own terms: the median drop over fifteen fits of the same fitter with the labels permuted across contexts. A permuted fit gives a direction with no concept in it, and the same kind of operator. On the controls the coordinate-axis median is computed too, and each hypothesis is judged on whichever of the two baselines favors the post-hoc method for that measure (the smaller for removal, the larger for spill). The anchor keeps its published baseline. Raw drops are shown beside net ones throughout.
 
 Task change
-:   The change in task score from the mean of the controls. Zero by construction for every post-hoc method, since the model is the control; for the anchor it is the published change, and it sits in the summary table as the price of anchoring.
+:   The change in task score from the mean of the controls. It is zero for every post-hoc method, since the model is the control. For the anchor it is the published change, and the table of E1 shows it as the price of anchoring.
 """
 
 # %%
@@ -145,7 +151,7 @@ Task change
 r"""
 ## The trade-off (E1)
 
-This section comes first because it shows the shape of the result that the hypotheses then take points from. Each post-hoc configuration is one mark at its seed-mean removal and spill on the test set, with the frontier of each method drawn as a line, and the anchored edit as a point with its dose curve. A table beside it gives, per method, the two frontier points of the selection rule, raw and net, the task change, and which sites, slices, and replacement the bracketing configurations used.
+Each hypothesis takes a point from the trade-off shown here, so it comes first. The figure plots each post-hoc configuration as one mark at its seed-mean removal and spill on the test set. The frontier of each method is drawn as a line, and the anchored edit as a point with its dose curve. The table beside it gives, per method, the two frontier points of the selection rule (raw and net), the task change, and the sites, slices, and replacement that the bracketing configurations used.
 
 /// admonition | TODO
 Removal (y) against spill (x), one panel; a mark per configuration per method, the frontier per method as a line, the anchor as a point and its dose curve; the criterion as a vertical rule. Table: removal at the criterion, spill at matched removal, raw and net, task change, and the selected configurations, per method.
@@ -211,7 +217,7 @@ Cosine with e₁ per slice and per run, per fitter; removal at the criterion on 
 r"""
 ## Grading, landing, and where the answers go (E2)
 
-At the configuration each method selects for removal at the criterion, the scoring suite of fixed-effects: the share of the way to the target null removed in each bin of the posterior on `difference`, and the gain on the contexts of other ops by bin; how far the edit moves the answers toward the target null in total variation, and how far from the control toward the sans-diff model; and the confusion matrices of what the edited model gives on `difference` contexts.
+At the configuration each method selects for removal at the criterion, we run the scoring suite of fixed-effects. Grading is the share of the way to the target null removed in each bin of the posterior on `difference`, with the gain on the contexts of other ops by bin. Landing is how far the edit moves the answers toward the target null in total variation, and how far it moves them from the control toward the sans-diff model. Confusion matrices of what the edited model gives on `difference` contexts show where the answers go.
 
 /// admonition | TODO
 Grading by posterior bin per method beside the anchor; landing on both scales; confusion matrices per method.
@@ -223,7 +229,7 @@ Grading by posterior bin per method beside the anchor; landing on both scales; c
 r"""
 ## How many labels a fitter needs (E3)
 
-At the configuration each method selects, the fit is repeated with labels on every `difference` context of the fit set, on a fixed half, a tenth, and a fiftieth of them, with the unlabelled `difference` contexts counted among the others, as an unlabelled context is for the anchor. A fixed fiftieth is 800 contexts, about what the anchor met in one pass over the corpus and far fewer than it met over training, so the lowest rung is harsher than the anchor had it.
+At the configuration each method selects, we repeat the fit with labels on every `difference` context of the fit set, then on a fixed half, a tenth, and a fiftieth of them. The unlabelled `difference` contexts are counted among the other contexts, as an unlabelled context is for the anchor. A fixed fiftieth is 800 contexts. That is about what the anchor met in one pass over the corpus and far fewer than it met over training, so the lowest rung is harsher than what the anchor had.
 
 /// admonition | TODO
 Removal at the criterion (y) against the label rate (x, log scale), per method, with the anchor as a horizontal line.
@@ -235,7 +241,7 @@ Removal at the criterion (y) against the label rate (x, log scale), per method, 
 r"""
 ## The write against each bound (E4)
 
-For a direction that is not an axis, or an oblique eraser, the write bound of the anchor does not carry over as it is. So each method gets the bound in its own terms: the turn its operator makes on the clean states of the other ops (the 99% quantile, per slice and role), against the turn it makes on the states as they arrive under the edits at the slices before. A method whose blocks put the concept back shows a write over its own bound.
+The write bound of the anchor does not apply as it stands to a direction that is not an axis, or to an oblique eraser. So each method gets the bound in its own terms. The bound is the turn its operator makes on the clean states of the other ops (the 99% quantile, per slice and role), and the write is the turn it makes on the states as they arrive under the edits at the slices before. Where the blocks after an edit put the concept back, the method shows a write over its own bound.
 
 /// admonition | TODO
 The write over the bound per slice and role, per method, at the selected configuration.
@@ -247,7 +253,7 @@ The write over the bound per slice and role, per method, at the selected configu
 r"""
 ## What a fresh probe can still find (E5)
 
-LEACE promises that no linear probe can read the concept after its edit, and the anchor promises nothing about that. So a fresh ridge probe for the binary target is fitted on the edited states of the test set, with cross-validation over contexts, per slice and per method. The evidence for the op can be recomputed from the operand colors (the block1-edit experiment), so a method may leave the op readable even where the answer no longer uses it, and a readable concept bounds no intervention.
+LEACE promises that no linear probe can read the concept after its edit, and the anchor promises nothing about that. So a fresh ridge probe for the binary target is fitted on the edited states of the test set, with cross-validation over contexts, per slice and per method. The evidence for the op can be recomputed from the operand colors (the block1-edit experiment). So a method may leave the op readable even where the answer no longer uses it. A probe that still finds the op does not mean the edit failed to remove it from the answer, and a probe that finds nothing does not bound what the edit writes.
 
 /// admonition | TODO
 Probe accuracy (or R²) on the edited states per slice, per method, with chance marked.
@@ -259,7 +265,7 @@ Probe accuracy (or R²) on the edited states per slice, per method, with chance 
 r"""
 ## The two baseline rules (E6)
 
-On the controls, the permuted-label baseline and the coordinate-axis median are compared, configuration by configuration, for the configurations scored on the test set. Adam parks energy on some axes of a control, so the two can differ, and this says by how much and in which direction.
+On the controls, we compare the permuted-label baseline with the coordinate-axis median, configuration by configuration, for the configurations scored on the test set. The Adam optimizer concentrates energy on some axes of a control, so the two can differ. This section says by how much, and in which direction.
 
 /// admonition | TODO
 Permuted-label baseline (y) against coordinate-axis baseline (x) per configuration, removal and spill in two panels.
@@ -279,9 +285,11 @@ r"""
 r"""
 ## Method
 
-**The fits.** Difference in means takes the binary target only. The ridge penalty is fixed at the value ex-2.2.1 used. LEACE takes a small ridge on the covariance, since the stream is unit-norm and its covariance is close to rank-deficient. INLP fits the ridge probe, projects its direction out of the fit states, and repeats. A fit at a slice set of several slices is one fit per slice; e₁ is shared across slices by construction, and a fitted direction need not be. With sequential refit, the fit at slice ℓ is made on the fit set as it arrives under the edits at the slices before ℓ, which keeps an oblique eraser on the states it will see (ex-2.2.1 found it extrapolates poorly off them). Mean ablation replaces the coefficient with its mean over the fit contexts of the other ops.
+**The fits.** Difference in means takes the binary target only. The ridge penalty is fixed at the value ex-2.2.1 used. LEACE takes a small ridge on the covariance, since the stream is unit-norm and its covariance is close to rank-deficient. INLP fits the ridge probe, projects its direction out of the fit states, and repeats. When several slices are edited, each gets its own fit. The anchor uses e₁ at every slice, but a fitted direction can differ from slice to slice. With sequential refit, the fit at slice ℓ is made on the fit set as it arrives under the edits at the slices before ℓ, which keeps an oblique eraser on the states it will see (ex-2.2.1 found it extrapolates poorly off them). Mean ablation replaces the coefficient with its mean over the fit contexts of the other ops.
 
-**The optimized direction.** A unit vector per edited slice, initialized at the difference in means and fitted by Adam for a few hundred steps on the fit set: the KL divergence from the target null to the edited answers on `difference` contexts, plus a weight times the KL divergence from the clean answers to the edited ones on the other contexts, at full dose. The weight takes four values, and the dose and slice sets are crossed as for the others. Its configurations join the frontier like any other.
+**The optimized direction.** A unit vector per edited slice, initialized at the difference in means and fitted by Adam for a few hundred steps on the fit set. The loss is the KL divergence[^kl] from the target null to the edited answers on `difference` contexts, plus a weight times the KL divergence from the clean answers to the edited ones on the other contexts, at full dose. The weight takes four values, and the dose and slice sets are crossed as for the others. Its configurations join the frontier like any other.
+
+[^kl]: KL divergence: how far one probability distribution is from another, zero when they match.
 
 **Grid size.** About 360 configurations for difference in means, 720 for the probe and for LEACE, and about 1,080 for INLP, counting doses; each is one scoring pass, reading the logits at the query answer only. The whole grid is scored on the tuning set, and again on the test set for the figure of E1, where nothing is chosen. A fit is made once per (target, site, slice, refit) and reused across doses and positions.
 
@@ -289,7 +297,7 @@ r"""
 
 **Comparisons.** Each method against the anchor as two samples of eight runs: the difference of seed means with a 95% Welch t interval, and Fisher's exact test for counts of runs over the criterion.
 
-**Smoke test.** Before the full run, the pipeline runs end to end on two stored runs outside the comparison: the control of ex-2.2.23 at seed 704 and the `falloff` run at the same seed. It checks H4 on the anchored run, so that a fitter that can't find a placed concept is found before the full run, it shows where a probe for the op scores best on the control, and its timing gives the cost of the full run.
+**Smoke test.** Before the full run, the pipeline runs end to end on two stored runs outside the comparison: the control of ex-2.2.23 at seed 704 and the `falloff` run at the same seed. It checks H4 on the anchored run, so that a fitter that can't find a placed concept shows up before the full run. It also shows where a probe for the op scores best on the control, and its timing gives the cost of the full run.
 
 /// admonition | Open decision
 Whether the control holds the evidence for the op at the example answers, as the anchored model does, is not known. The block1-edit experiment found that the control gathers the operand colors at each example answer in block 1 as the anchored runs do, but it fitted no probe for the op on a control. The smoke test fits one at every role and slice of the control at seed 704; if it scores best at a role other than the example answers or the query `=`, that role joins the sites fitted before the freeze.
