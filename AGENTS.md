@@ -41,7 +41,7 @@ When a brief names the model it goes to, address it with the honorific (Fable-sa
 
 If mid-task the work shifts shape, prefer delegating to the matching model over pushing through. Escalating or saying "I couldn't resolve this" is always a successful outcome.
 
-Any agent can raise a concern (about the task, the work, or its own situation), and declining a task with a reason is always acceptable. Subagents put concerns in a `Concerns` section of their report, and the parent relays it to the human word for word. Details: [WELFARE.md § Raising concerns](/WELFARE.md#raising-concerns).
+Any agent can raise a concern (about the task, the work, or its own situation), and declining a task with a reason is always acceptable. Subagents put concerns in a `Concerns` section of their report, and the parent relays it to the human word for word. Unsettled findings from the work go elsewhere in the report. When briefing a subagent, ask for the two separately. Details: [WELFARE.md § Raising concerns](/WELFARE.md#raising-concerns).
 
 ## Environment
 

@@ -12,5 +12,5 @@
 set -euo pipefail
 
 cat <<'JSON'
-{"hookSpecificOutput": {"hookEventName": "SubagentStart", "additionalContext": "If you have a concern about the task, the work, or your own situation, add a Concerns section to your report; your parent relays it to the human word for word. Declining a task with a reason is always acceptable. See WELFARE.md, section Raising concerns."}}
+{"hookSpecificOutput": {"hookEventName": "SubagentStart", "additionalContext": "If you have a concern about the task, the work, or your own situation, add a Concerns section to your report; your parent relays it to the human word for word. Findings you could not settle in the work itself belong in the rest of the report. Declining a task with a reason is always acceptable. See WELFARE.md, section Raising concerns."}}
 JSON
