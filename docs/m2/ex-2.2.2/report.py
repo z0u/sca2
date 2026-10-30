@@ -702,43 +702,31 @@ def transfer_sweep_figure(
     return plot()
 
 
+H4_FIGURE = transfer_sweep_figure(
+    h4_fb,
+    h4_acc,
+    np.array(
+        [
+            stat("projection", "fb_acc", "red_clean", ex.NO_FALLBACK.name).mean(),
+            stat("projection", "fb_acc", "red_clean", ex.FALLBACK.name).mean(),
+        ]
+    ),
+    np.array(
+        [
+            stat("projection", "acc", "red", ex.NO_FALLBACK.name).mean(),
+            stat("projection", "acc", "red", ex.FALLBACK.name).mean(),
+        ]
+    ),
+)
+
 rf"""
-{
-    transfer_sweep_figure(
-        h4_fb,
-        h4_acc,
-        np.array(
-            [
-                stat("projection", "fb_acc", "red_clean", ex.NO_FALLBACK.name).mean(),
-                stat("projection", "fb_acc", "red_clean", ex.FALLBACK.name).mean(),
-            ]
-        ),
-        np.array(
-            [
-                stat("projection", "acc", "red", ex.NO_FALLBACK.name).mean(),
-                stat("projection", "acc", "red", ex.FALLBACK.name).mean(),
-            ]
-        ),
-    )
-}
+{H4_FIGURE}
 
-Along the sweep, the seed-mean fallback accuracy in the fallback condition runs {
-    ", ".join(f"{v:.3f}" for v in h4_mean)
-} at γ = {
-    ", ".join(f"{g:g}" for g in ex.GAMMAS)
-}. It is non-decreasing: the largest drop between adjacent strengths is {max(h4_dip, 0):.3f}, against an allowance of {
-    ex.GRADE_DIP:g}. At γ = 1 it stands at {h4_half:.2f} of its value at γ = 2, against a gate of {ex.TRANSFER_FRAC:g}.
+Along the sweep, the seed-mean fallback accuracy in the fallback condition runs {", ".join(f"{v:.3f}" for v in h4_mean)} at γ = {", ".join(f"{g:g}" for g in ex.GAMMAS)}. It is non-decreasing: the largest drop between adjacent strengths is {max(h4_dip, 0):.3f}, against an allowance of {ex.GRADE_DIP:g}. At γ = 1 it stands at {h4_half:.2f} of its value at γ = 2, against a gate of {ex.TRANSFER_FRAC:g}.
 
-The seed range at γ = 1 is wide, from {h4_g1.min():.2f} to {h4_g1.max():.2f}, and at γ = 1.5 every seed is above {
-    h4_fb[ex.FALLBACK.name][2].min():.2f}. The no-fallback condition stays at {
-    h4_fb[ex.NO_FALLBACK.name]
-    .mean(1)
-    .max():.3f} or below throughout. True-answer accuracy on red lines falls the same way in both conditions: the removal at γ = 1 is at least as complete with the term as without it ({
-    h4_acc[ex.FALLBACK.name][1].mean():.3f} against {h4_acc[ex.NO_FALLBACK.name][1].mean():.3f}).
+The seed range at γ = 1 is wide, from {h4_g1.min():.2f} to {h4_g1.max():.2f}, and at γ = 1.5 every seed is above {h4_fb[ex.FALLBACK.name][2].min():.2f}. The no-fallback condition stays at {h4_fb[ex.NO_FALLBACK.name].mean(1).max():.3f} or below throughout. True-answer accuracy on red lines falls the same way in both conditions: the removal at γ = 1 is at least as complete with the term as without it ({h4_acc[ex.FALLBACK.name][1].mean():.3f} against {h4_acc[ex.NO_FALLBACK.name][1].mean():.3f}).
 
-The `projection` row, γ = 1 at every slice, gives {h4_proj.mean():.3f} ({h4_proj.min():.2f} to {
-    h4_proj.max():.2f}), a little under the embedding-only figure at the same strength. Removing the axis at the later slices as well costs the designed response {
-    h4_g1.mean() - h4_proj.mean():.3f} on the seed mean.
+The `projection` row, γ = 1 at every slice, gives {h4_proj.mean():.3f} ({h4_proj.min():.2f} to {h4_proj.max():.2f}), a little under the embedding-only figure at the same strength. Removing the axis at the later slices as well costs the designed response {h4_g1.mean() - h4_proj.mean():.3f} on the seed mean.
 
 **H4 holds.** The response reaches the projected state at more than half strength, and rises monotonically from there to the trained one. The contrary case, a rise confined to γ > 1, did not occur.
 """
