@@ -215,7 +215,9 @@ N_SYNTAX_OVER = {n: int((OVER[n] & SYNTAX[None, None]).sum()) for n in RECIPES}
 SYNTAX_EXCESS_MAX = max(float(EXCESS[n][OVER[n] & SYNTAX[None, None]].max()) for n in RECIPES)
 SYNTAX_BOUND_MAX = max(float(BOUND[n][OVER[n] & SYNTAX[None, None]].max()) for n in RECIPES)
 N_SYNTAX_OVER_DEGREE = sum(int((BOUND[n][OVER[n] & SYNTAX[None, None]] > 1).sum()) for n in RECIPES)
-assert N_SYNTAX_OVER_DEGREE <= 3, "E3 says the bound at a symbol site over the tolerance is under a degree at all but a few"
+assert N_SYNTAX_OVER_DEGREE <= 3, (
+    "E3 says the bound at a symbol site over the tolerance is under a degree at all but a few"
+)
 OPERAND_EXCESS_MIN = min(float(EXCESS[n][OVER[n] & OPERAND[None, None]].min()) for n in RECIPES)
 POOL_EXCESS_MEDIAN = float(np.median(EXCESS[POOL][BOTH[POOL]]))
 SWEEP = np.linspace(0, 4.5, 91)
