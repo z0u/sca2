@@ -616,6 +616,7 @@ def train_one(
             prefix_ok=(z[pull] if variant == "prefix" else None),
             sample_prob=(z["sample_prob"] if variant == "sampled" else None),
             context_len=z["context_len"],
+            fixed_draw=z["fixed_draw"] if "fixed_draw" in z.files else None,
         )
         loss_mask = z["loss_mask"] if "loss_mask" in z.files else None
     with np.load(get(probes, workdir / "probes.npz")) as z:
