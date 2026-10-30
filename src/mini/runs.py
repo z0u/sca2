@@ -68,7 +68,7 @@ def cache_root() -> Path:
 
 
 def _gpus() -> tuple[str | None, int]:
-    """Best-effort GPU model + count, dependency-free. NVIDIA exposes a per-GPU info file on Linux; we don't import torch/jax just to name the card."""
+    """Best-effort GPU model + count, dependency-free. NVIDIA exposes a per-GPU info file on Linux, with ``nvidia-smi`` as the fallback where a sandbox hides it; we don't import torch/jax just to name the card."""
     model, count = None, 0
     for info in sorted(Path("/proc/driver/nvidia/gpus").glob("*/information")):
         count += 1
@@ -80,7 +80,21 @@ def _gpus() -> tuple[str | None, int]:
                     model = line.split(":", 1)[1].strip()
         except OSError:
             continue
-    return model, count
+    if count:
+        return model, count
+    # gVisor (Modal) has /proc/driver/nvidia but leaves `gpus/` empty; nvidia-smi still works there.
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        ).stdout
+    except OSError, subprocess.SubprocessError:
+        return None, 0
+    names = [line.strip() for line in out.splitlines() if line.strip()]
+    return (names[0] if names else None), len(names)
 
 
 def _mem_total_gb() -> float | None:
