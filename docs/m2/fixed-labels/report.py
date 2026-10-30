@@ -92,7 +92,11 @@ BLOCK1 = {n: np.array([float(net_of(_RESTRICTED[_LABEL[n](s)]["drop"]["block 1"]
 BLOCK1_OVER = {n: int((BLOCK1[n] > CRITERION).sum()) for n in COLUMNS}
 
 # How many `difference` contexts each run had labelled: the fixed draws count theirs; the redraw labelled a new
-# 1/50 at every visit, and the post-hoc comparison plan puts its distinct count over 400 epochs at about 34,000.
+# 1/50 at every visit. Its distinct count over 400 epochs is an estimate: an epoch covers oversample / batch_size
+# (16 / 64) of the training split (nine tenths of the corpus), so a context is in view about a hundred times, and
+# 1 − 0.98^100 ≈ 0.87 of the visited contexts are labelled at least once: 0.9 × 0.87 × 42,891 ≈ 34,000.
+# REVIEW: the estimate was attributed to the post-hoc comparison plan, which does not carry it; it is now derived
+# here. Verify: `batches_per_epoch` in `sca.data.batches` and the DataConfig in ex-2.2.3 (`OVERSAMPLE, TRAIN_SPLIT`).
 _DRAWS = {(r["rate"], r["model_seed"]): r for r in fetch_json(ex.DRAWS_REF)["runs"]}
 N_LABELLED = {t: np.array([_DRAWS[(t, s)]["n_labelled"] for s in SEEDS]) for t in RATES}
 N_ANCHORED = int(_DRAWS[(RATES[0], SEEDS[0])]["n_anchored"])
@@ -278,8 +282,8 @@ def end_figure() -> str:
         ({r[REDRAW].min():.2f} to {r[REDRAW].max():.2f}), fixed 1/10 {r["r10"].mean():.2f} ({r["r10"].min():.2f} to
         {r["r10"].max():.2f}), fixed 1/25 {r["r25"].mean():.2f} ({r["r25"].min():.2f} to {r["r25"].max():.2f}), and
         fixed 1/50 {r["r50"].mean():.2f} ({r["r50"].min():.2f} to {r["r50"].max():.2f}). Spill stays below the
-        criterion in every condition, with {", ".join(f"{OVER[n]}" for n in COLUMNS)} runs over it in that order, and
-        the task change sits near zero.
+        criterion in every run but one, with {", ".join(f"{OVER[n]}" for n in COLUMNS)} runs over it in that order,
+        and the task change sits near zero.
     """
     return end_draw(data, alt)
 
@@ -364,7 +368,8 @@ def end_table() -> str:
         **Removal, spill and task at epoch 400**, seed mean and range over eight runs at seeds 712 to 719, net of the
         median drop over the other 63 coordinate axes of the run. "Contexts labelled" is the number of `difference`
         contexts that carried the label at some point in the run, the mean over seeds for a fixed draw and an
-        estimate for the per-visit draw. "Removal less per-visit" is a 95% Welch t interval on the difference of the
+        estimate for the per-visit draw; both count over the whole corpus, of which training visits the first nine
+        tenths. "Removal less per-visit" is a 95% Welch t interval on the difference of the
         seed means. "Over, block 1" counts the runs over the criterion under the same edit restricted to block 1. The
         task change is the mean over ops of the clean score less that of the control at the seed.
         """,
@@ -460,7 +465,7 @@ rf"""
 Every anchored run so far drew its labels afresh on each visit to a context, so over a run the anchor saw labels on most `difference` contexts. Holding one draw fixed for the run, as a real labelled set would be, still keeps the anchor at every rate we tried. But the edit removes the op less reliably: a few runs end well below the rest, and more labels in the fixed set did not cure it.
 ///
 
-The [post-hoc comparison plan](/docs/m2/d2.2/post-hoc-comparison.md) compares the edit along the anchored axis with directions found after training on a control. Writing it up, we noticed that the anchor labeller (inherited from M1) redraws its 1/50 draw on every visit to a context. Over 400 epochs that labels about three quarters of the {N_ANCHORED:,} `difference` contexts at some point, about {REDRAW_DISTINCT:,}, so the anchor had far more distinct labels than "one context in fifty" suggests. A real pipeline labels a fixed set once.
+The [post-hoc comparison plan](/docs/m2/d2.2/post-hoc-comparison.md) compares the edit along the anchored axis with directions found after training on a control. Writing it up, we noticed that the anchor labeller (inherited from M1) redraws its 1/50 draw on every visit to a context. An epoch covers about a quarter of the training split, so over 400 epochs a context is in view about a hundred times, and a fresh draw on each visit labels about three quarters of the {N_ANCHORED:,} `difference` contexts at some point, about {REDRAW_DISTINCT:,}. So the anchor had far more distinct labels than "one context in fifty" suggests. A real pipeline labels a fixed set once.
 
 This report trains the recipe of record, `τ_ℓ fixed`, with one draw per run held for the whole run, at three rates: 1/50 (about {int(round(N_LABELLED["r50"].mean(), -1)):,} labelled `difference` contexts), 1/25 (about {int(round(N_LABELLED["r25"].mean(), -1)):,}), and 1/10 (about {int(round(N_LABELLED["r10"].mean(), -1)):,}). Each rate runs at the eight seeds of the [fixed confirmation](/docs/m2/fixed-confirm/report.py) (712 to 719), whose runs of the same recipe with the per-visit draw are the comparison.
 """
@@ -480,7 +485,7 @@ This is an exploratory study, with no preregistration and no gate. It started as
 
 Every run is `τ_ℓ fixed` as the fixed confirmation trained it, with one change: in place of the per-visit draw, a context carries the label on every visit if a draw made once before training picked it, and on no visit otherwise. The draw comes from a stream of its own per seed, and the draws are nested, so every context labelled at 1/50 is also labelled at 1/25 and at 1/10. The per-visit draw is still taken and set aside, so each run trains on the same batches from the same initialization as the per-visit run at its seed. Only which contexts carry the pull differs.
 
-The pull is a mean over the labelled contexts in each batch, so the label rate does not change how hard the anchor pulls. At 1/50 it also leaves the number of labelled contexts per batch unchanged. What the rate changes is how many distinct contexts the pull ever falls on, and how much the pull in a batch varies from one batch to the next.
+The pull is a mean over the labelled contexts in each batch, so the label rate does not change how hard the anchor pulls. At 1/50 it also leaves the number of labelled contexts per batch unchanged on average. What the rate changes is how many distinct contexts the pull ever falls on, and how much the pull in a batch varies from one batch to the next.
 
 We compare conditions as two samples of eight runs (the D2.2 rule since the determinism decision), with a 95% Welch t interval on the difference of seed means. Over eight seeds, removal under the per-visit draw spreads by about {SPAN[REDRAW]:.2f}. All runs trained and were measured on L4 GPUs, as the fixed confirmation's were, and share that experiment's controls (no pull and no anti term, at the same seed).
 
@@ -530,9 +535,15 @@ Every run keeps the anchor, and the task change sits near zero in every conditio
 
 Removal does not climb with the label count. At 1/50 and at 1/10 most runs remove about as much as the per-visit runs, but a few end below {LOW_LINE}, where the lowest per-visit run is {REMOVAL[REDRAW].min():.2f}: {WORD[len(LOW_RUNS["r50"])]} at 1/50 ({LOW_RANGE["r50"][0]:.2f} to {LOW_RANGE["r50"][1]:.2f}) and {WORD[len(LOW_RUNS["r10"])]} at 1/10 ({LOW_RANGE["r10"][0]:.2f} to {LOW_RANGE["r10"][1]:.2f}). Those runs pull the seed mean down by about the same amount at both rates. At 1/25 every run sits within the per-visit range, and the seed means match.
 
-The low runs fall mostly at different seeds for the two rates, sharing only seed {SHARED_LOW[0]}. The per-visit runs at those seeds are among its lower ones, but still within its range (the grey lines in the figure). So they look more like runs that went one way than seeds that are hard for the recipe. All three low runs at 1/10 are at seeds 717 to 719, which is why the first look at four seeds missed them.
+The low runs fall mostly at different seeds for the two rates, sharing only seed {SHARED_LOW[0]}. The per-visit runs at those seeds range from its lowest (seed {LOW[REDRAW]}) to its second highest (seed 717; the grey lines in the figure). So they look more like runs that went one way than seeds that are hard for the recipe.
+<!-- REVIEW: the draft said the per-visit runs at the low seeds were "among its lower ones, but still within its
+range". Within its range is true of any per-visit run, and 717 (0.90) and 718 (0.88) are not among its lower ones;
+only 715 and 719 are. Verify: REMOVAL[REDRAW] by seed. The conclusion of the paragraph stands either way. --> All three low runs at 1/10 are at seeds 717 to 719, which is why the first look at four seeds missed them.
 
-At 1/25, one run (seed {SPILL_RUN}) ends over the spill criterion, on `{SPILL_OP}`, and over it again under the edit at block 1 alone. No other run of any condition does. Its spill rises late, from about epoch {SPILL_RISE}, as the late rise the soft pool scout saw on one seed of `τ_ℓ fixed`.
+At 1/25, one run (seed {SPILL_RUN}) ends over the spill criterion, on `{SPILL_OP}`, and over it again under the edit at block 1 alone. No other run of any condition does. Its spill rises late, from about epoch {SPILL_RISE} (after one reading just over the criterion at epoch 32, while the anchor was still settling), as the late rise the soft pool scout saw on one seed of `τ_ℓ fixed`.
+<!-- REVIEW: added the epoch-32 reading (0.032, the only kept checkpoint of this run over the criterion before
+epoch 192), which SPILL_RISE skips by starting after epoch 64. Verify: _SPILL_RUN_ALONG. "Rises late" stands as the
+account of the end value, since the run is back under the criterion from epoch 64 to 160. -->
 
 How sure can we be? The intervals on removal against the per-visit draw are wide: at 1/10 it just excludes zero, and at 1/50 it does not. With eight runs each, a difference set by two or three low runs is hard to pin down. So the three fixed rates are not separable, and 1/25 looking best may well be the luck of its eight seeds.
 """
@@ -577,5 +588,5 @@ r"""
 :   The pool over slices 1 to 3 with $\tau_\ell$ held at 0.1 keeps the anchor on all eight seeds with no early spill, and one seed rises late to near the criterion.
 
 [post-hoc comparison plan](/docs/m2/d2.2/post-hoc-comparison.md)
-:   Plans a comparison of the edit along e₁ with directions fitted after training on the controls at seeds 712 to 719, and notes that the per-visit draw showed the anchor most `difference` contexts.
+:   Plans a comparison of the edit along e₁ with directions fitted after training on the controls at seeds 712 to 719, with the anchor's tolerance of scarce labels among the claims it tests.
 """
