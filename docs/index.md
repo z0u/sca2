@@ -636,7 +636,7 @@ With `falloff` in hand, we looked at what the edit does beyond removal and spill
 
 ### The recipe of record, scored for the post
 
-With `τ_ℓ fixed` adopted, we gave it the full set of measurements and a reference model trained without the op. The edit does on `τ_ℓ fixed` what it did on `falloff`, and a model that never learned `difference` lands only a little closer to the target null than the edited model.
+With `τ_ℓ fixed` adopted, we gave it the full set of measurements and a reference model trained without the op. The edit does on `τ_ℓ fixed` what it did on `falloff`, and a model that never learned `difference` lands only a little closer to the target null than the edited model. The last piece before the post is a comparison with directions found after training, planned in the [post-hoc comparison](./m2/d2.2/post-hoc-comparison.md) page.
 
 <details markdown="1" open="true"><summary>Reports</summary>
 

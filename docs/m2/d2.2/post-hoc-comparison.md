@@ -169,7 +169,7 @@ Activation steering (adding a vector) is not a removal and has no dose axis that
 Preregistered, with few hypotheses and the rest exploratory. A methods comparison for the post is a claim that has to stand without the reader trusting how we chose to look at the data, and the frozen selection rule is what makes the tuning fair rather than ours to adjust. Each hypothesis names its contrary case and what that case would mean.
 
 H1, spill at matched removal
-:   Where the frontier of each standard fitter crosses the seed mean of the anchored removal, the fitter (difference in means, probe, LEACE, INLP) spills past the criterion on most runs, by Fisher's test against the count for the anchor. A run whose frontier never reaches that removal counts as not matched, which is the stronger shortfall, and is recorded as such. Contrary: a fitter matches the anchor on both, and the post says that a searched direction serves as well as a placed one on this model.
+:   Where the frontier of each standard fitter crosses the seed mean of the anchored removal (or at its least-spill end, if the whole frontier removes more), the fitter (difference in means, probe, LEACE, INLP) spills past the criterion on most runs, by Fisher's test against the count for the anchor. A run of a method (one seed) whose frontier never reaches that removal counts as not matched, which is the stronger shortfall, and is recorded as such. Contrary: a fitter matches the anchor on both, and the post says that a searched direction serves as well as a placed one on this model.
 
 H2, removal at the spill criterion
 :   Where its frontier crosses the spill criterion, each standard fitter removes less than the anchor, with the 95% Welch interval on the difference of seed means clear of zero. Contrary as for H1.
@@ -196,7 +196,7 @@ Development time: the fitters, the operator and the scorer exist (`sca.intervent
 Settled in the first paper round: the shape is preregistered; the optimized direction is included, labelled as a ceiling; the role-keyed fits are included as a generous diagnostic, said so in the report; and the hypotheses are judged net of the reference-direction baseline of each method, with raw numbers beside.
 
 /// admonition | Open decision
-Whether the control holds the op at the example answers as the anchored model does is not known. The block1-edit experiment found that the control gathers the operand colors at each example answer in block 1 as the anchored runs do, but it fitted no probe for the op itself on a control. The role-keyed fits are a generous arm either way, and the smoke test on a control would show where a probe for the op reads best; if it reads elsewhere, that site joins the sites fitted.
+Whether the control holds the evidence for the op at the example answers as the anchored model does is not known. The block1-edit experiment found that the control gathers the operand colors at each example answer in block 1 as the anchored runs do, but it fitted no probe for the op itself on a control. The role-keyed fits are a generous arm either way, and the smoke test on a control would show where a probe for the op reads best; if it reads elsewhere, that site joins the sites fitted.
 ///
 
 /// admonition | Open decision

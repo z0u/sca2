@@ -98,7 +98,7 @@ About one `difference` context in fifty is labelled, which is the shape of label
 
 ## Before the blog post
 
-The reference model ([sans-diff](/docs/m2/filtered-corpus/report.py)) and the full scoring suite on the recipe of record, confusion matrices included ([fixed-effects](/docs/m2/fixed-effects/report.py)), are done, and their figures are meant for the post. One piece is left.
+The reference model ([sans-diff](/docs/m2/filtered-corpus/report.py)) and the full scoring suite on the recipe of record, confusion matrices included ([fixed-effects](/docs/m2/fixed-effects/report.py)), are done, and their figures are meant for the post. One piece is left, and its plan is written: the [post-hoc comparison](post-hoc-comparison.md), agreed 2026-10-30 after three paper rounds.
 
 Directions found after training
 :   Fit a direction for `difference` on the states of the controls, which were trained without the anchor, and edit along it through the same scorer. Three fits: the difference in means, a ridge probe, and LEACE (a linear eraser). No training is needed. Ex-2.2.1 did the same for *red*, where these directions cost the lines with no red about as much as they removed from red. To keep the comparison generous, each fit gets every label as well as the scarce ones, so a gap in favor of the anchor can't come from starving the other methods. In the [backlog](/todo/science/baseline-comparisons-sca-plan-related-work-delta.md).
