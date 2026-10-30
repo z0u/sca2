@@ -27,6 +27,7 @@ __all__ = [
     "compute_env",
     "data_root",
     "describe_numerics_drift",
+    "gpu_name",
     "in_declared_phase",
     "installed_numerics",
     "is_queued",
@@ -95,6 +96,14 @@ def _gpus() -> tuple[str | None, int]:
         return None, 0
     names = [line.strip() for line in out.splitlines() if line.strip()]
     return (names[0] if names else None), len(names)
+
+
+def gpu_name() -> str | None:
+    """The model of the GPU this process runs on, or ``None`` without one.
+
+    For a task that returns its card in its result: task records expire, so a report that tabulates the mix of cards per condition reads it from the results.
+    """
+    return _gpus()[0]
 
 
 def _mem_total_gb() -> float | None:
