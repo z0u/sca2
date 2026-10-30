@@ -68,6 +68,6 @@
  "m2/spill-timing": "a316a13eee0dcb6f06af8d24bf3f3cec0fb6c8c7",
  "m2/split-anti-seeds": "a3ff9a255cb1ad313959d55e3ccd621993349b76",
  "m2/tau-lambda-sweep": "ed7b86d8e8d42f0dcea5754689fb7985192658dd",
- "m2/write-floor": "1be6240e2f37a7fdd28c101ed3841f4a2ba5a5dd",
+ "m2/write-floor": "3552fcfdb4950f07f080ed221acea88d677479f2",
  "ngpt-scaling": "d52e5304724b031b784e6fabc9fcaec9aec7f9bc"
 }
