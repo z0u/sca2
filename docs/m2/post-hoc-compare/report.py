@@ -24,7 +24,8 @@ r"""
 - [The trade-off (E1)](#the-trade-off-e1) — <what we saw, in one sentence>.
 - [Spill at matched removal (H1)](#spill-at-matched-removal-h1) — **<verdict>**. <One sentence.>
 - [Removal at the spill criterion (H2)](#removal-at-the-spill-criterion-h2) — **<verdict>**. <One sentence.>
-- [The optimized direction (H3)](#the-optimized-direction-h3) — **<verdict>**. <One sentence.>
+- [The ceiling against the fitters (H3a)](#the-ceiling-against-the-fitters-h3a) — **<verdict>**. <One sentence.>
+- [The ceiling against the anchor (H3b)](#the-ceiling-against-the-anchor-h3b) — **<verdict>**. <One sentence.>
 - [The fitters find a placed concept (H4)](#the-fitters-find-a-placed-concept-h4) — **<verdict>**. <One sentence.>
 - [Grading, landing, and where the answers go (E2)](#grading-landing-and-where-the-answers-go-e2) — <one sentence>.
 - [How many labels a fitter needs (E3)](#how-many-labels-a-fitter-needs-e3) — <one sentence>.
@@ -76,7 +77,7 @@ Iterated probe (INLP)
 Optimized direction
 :   A unit vector per edited slice, fitted by gradient descent on the control so that the edited answers on `difference` contexts move toward the target null while the answers on the other contexts stay where they were. It uses the target null, which no real pipeline has, so it is a diagnostic ceiling: about the best a rank-1 edit (an edit along one direction) of this control could do with the scoring in hand. [COAST](https://arxiv.org/abs/2605.01167) is its nearest published relative.
 
-The first four are the standard fitters that H1 and H2 judge. Each is also fitted on the anchored runs, where training placed the concept on e₁, as a check that the fitters can find a concept that is there (H4). A fitter that misses that check is left out of the verdicts of H1 to H3. The sans-diff model, trained with no loss on `difference`, stays the reference for how close to the target null a model of this size comes.
+The first four are the standard fitters that H1 and H2 judge. Each is also fitted on the anchored runs, where training placed the concept on e₁, as a check that the fitters can find a concept that is there (H4). A fitter that misses that check is left out of the verdicts of H1 to H3b. The sans-diff model, trained with no loss on `difference`, stays the reference for how close to the target null a model of this size comes.
 """
 
 # %%
@@ -185,16 +186,25 @@ Removal at the criterion per run, per fitter and for the anchor, with seed means
 # %%
 
 r"""
-## The optimized direction (H3)
+## The ceiling against the fitters (H3a)
 
-**What we expect.** The optimized direction comes closer to the anchor than any standard fitter does, on both measures: its removal at the criterion is at least the highest seed mean among the standard fitters, and its count over the criterion at matched removal is at most the lowest. It passes if both hold, and misses if neither does; one without the other would be outside the plan, and the verdict would be Unresolved. Beside the verdict we say how it stands against the anchor. If its Welch interval on removal at the criterion contains zero and the Fisher test does not separate its count from the anchor, it matches the anchor, and the advantage of placing the concept is that no search is needed. If the interval lies above zero, it falls short too, and the control holds the op in a way no rank-1 edit removes cleanly, which is the stronger claim for the anchor.
-
-/// admonition | Open decision
-The verdict here sits on the clause that changes the post least (the ceiling beats the standard fitters), while the clause that decides how the post is framed (whether the ceiling matches the anchor) carries none. The alternative is to split it: H3a, the ceiling against the standard fitters as above; H3b, the ceiling against the anchor, with "matches" (interval contains zero and Fisher does not separate) and "falls short" (interval above zero) as the two named outcomes, and anything else Unresolved. Proposed: split, so a reader of the Findings meets the outcome that matters.
-///
+**What we expect.** The optimized direction comes closer to the anchor than any standard fitter does, on both measures: its removal at the criterion is at least the highest seed mean among the standard fitters, and its count over the criterion at matched removal is at most the lowest. It passes if both hold, and misses if neither does; one without the other would be outside the plan, and the verdict would be Unresolved.
 
 /// admonition | TODO
-The two measures for the optimized direction beside the standard fitters and the anchor, per run.
+The two measures for the optimized direction beside the standard fitters, per run.
+///
+"""
+
+# %%
+
+r"""
+## The ceiling against the anchor (H3b)
+
+**What we expect.** This hypothesis names two outcomes, and which one holds decides how the post is framed. The ceiling *matches* the anchor if the 95% Welch interval on the difference of seed means in removal at the criterion contains zero and the Fisher test does not separate its count over the criterion at matched removal from the anchored count; then the advantage of placing the concept is that no search is needed. The ceiling *falls short* if the interval lies above zero; then the control holds the op in a way no rank-1 edit removes cleanly, which is the stronger claim for the anchor. Any other result (the interval below zero, or an interval that contains zero beside a count the Fisher test separates) would be outside the plan, and the verdict would be Unresolved.
+<!-- REVIEW: H3 was split in two at the paper round before the freeze. As one hypothesis, its verdict sat on the clause that changes the post least (the ceiling beats the fitters), and the comparison with the anchor, which decides the framing, carried none. Verify: H3b names both outcomes and the Findings show its verdict. -->
+
+/// admonition | TODO
+The two measures for the optimized direction beside the anchor, per run, with the interval and the Fisher p.
 ///
 """
 
@@ -205,7 +215,7 @@ r"""
 
 **What we expect.** On the anchored runs, each standard fitter finds e₁. Restricted to fits on the pooled positions or at the example answers, take the configuration selected for removal at the criterion. Its target and site give a clean-state fit at each of slices 1 to 3, whichever slices the configuration edits, and each of those directions should be within a cosine of 0.9 of e₁ (the seed mean of its absolute value; for INLP, the largest cosine between e₁ and the span). Its removal at the criterion should be within 0.1 of what the edit along e₁ removes at full dose on the same runs. A fitter passes if both hold, and misses if either does not. A fitter that finds e₁ but has to stop short of it to stay within the criterion, as INLP may when its extra directions cost spill, misses: it would not be a fair stand-in for its method on the controls either. The query `=` is left out: the clean alignment there is near zero in the anchored runs (the mid-block-edit experiment), so a fit at that site is not expected to find e₁.
 
-The rule for a miss, frozen here: a fitter that misses H4 is left out of the verdicts of H1 to H3, its rows stay in the tables marked as such, and the report names it as a method the comparison could not fairly score.
+The rule for a miss, frozen here: a fitter that misses H4 is left out of the verdicts of H1 to H3b, its rows stay in the tables marked as such, and the report names it as a method the comparison could not fairly score.
 
 /// admonition | TODO
 Cosine with e₁ per slice and per run, per fitter; removal at the criterion on the anchored runs against the edit along e₁.
@@ -303,9 +313,7 @@ r"""
 Whether the control holds the evidence for the op at the example answers, as the anchored model does, is not known. The block1-edit experiment found that the control gathers the operand colors at each example answer in block 1 as the anchored runs do, but it fitted no probe for the op on a control. The smoke test fits one at every role and slice of the control at seed 704; if it scores best at a role other than the example answers or the query `=`, that role joins the sites fitted before the freeze.
 ///
 
-/// admonition | Open decision
-Whether to run the same comparison for *red* on the D2.1 checkpoints, where ex-2.2.1 gave the fitters far less. The code would carry over as it is. Proposed: not in this report, which is about the inferred op; a backlog item, to take up if the post or the paper shows the *red* result beside this one.
-///
+**Left out.** The same comparison for *red* on the D2.1 checkpoints, where ex-2.2.1 gave the fitters far less, is not run here: this report is about the inferred op.
 
 **Cost.** No training. Each run takes about 6,000 scoring passes: the grid on the tuning and test sets, the axis baseline on the tuning set, the permuted fits, and the ladder. The anchored runs take the same for H4, so sixteen runs come to about 100,000 passes, plus the state passes over the fit set and for sequential refit, and the optimized direction. The plan estimates eight to ten L4-hours as eight containers in parallel, about \$15, with \$25 as the ceiling; the smoke test gives the figure for the full run before it starts.
 """
