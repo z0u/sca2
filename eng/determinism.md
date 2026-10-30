@@ -43,7 +43,7 @@ Determinism makes a run repeatable. It does not make a seed mean the same thing 
 
 So we keep the flags for what they buy on their own (a stable memo, exact reproductions of a run, and stopped-and-resumed runs that match runs trained straight through), and compare conditions as two samples rather than seed by seed. Pairing by seed is worth it only where runs branch from one stored state and are measured soon after. The rules for reports are in the design checks of the `sci-report` skill, and for the choice of card in the `mi-ni` authoring reference. Decided 2026-10-29, from a paper review of the sans-diff report; the comparison of costs and seed counts is in the project files under `determinism/`.
 
-That view also settles the choice of card. Since about 2026-10-27, L4s on Modal have been scarce: a training task waited a median of 12 to 28 minutes for one, with a tail past an hour, while A10Gs and L40Ss scheduled in seconds. If a card change counts as seed noise, a condition can run on a mix of cards, so training roles list `["L4", "A10G", "L40S"]` and Modal picks the first one free. The mix then depends on when a condition launched, so each report shows the cards per condition, and a close comparison is checked again on the L4 runs alone. Arms that branch from one stored state and are compared in pairs stay on one card. Decided 2026-10-30.
+That view also settles the choice of card. Since about 2026-10-27, L4s on Modal have been scarce: a training task waited a median of 12 to 28 minutes for one, with a tail past an hour, while A10Gs and L40Ss scheduled in seconds. If a card change counts as seed noise, a condition can run on a mix of cards, so training roles list `["L4", "L40S", "A10G"]` and Modal picks the first one free. The mix then depends on when a condition launched, so each report shows the cards per condition, and a close comparison is checked again on the L4 runs alone. Arms that branch from one stored state and are compared in pairs stay on one card. Decided 2026-10-30; the L40S went ahead of the A10G the same day, when the seed-pack probe found it the cheaper of the two per step.
 
 ## What we set, and why only that
 
@@ -56,7 +56,7 @@ The pair was measured on its own (last row) rather than inferred from the three-
 
 **Autotuning stays on.** It's the other classic source of GPU nondeterminism — the algorithm pick comes from measured timings, so a noisy host can pick differently — but turning it off changed neither the digest nor the time here. It has a plausible cost on larger models (a worse GEMM), so we're not paying it for a benefit this project hasn't observed. If a future run drifts *with* the flags above, `--xla_gpu_autotune_level=0` is the next thing to reach for.
 
-The digest does not hold across GPU *models* (measured in the full-length probe above): determinism is a per-device-class property. Training roles list `["L4", "A10G", "L40S"]`, so a re-run can land on another card and give another digest; the card is recorded on every attempt and returned in training results (see [Seeds are draws](#seeds-are-draws)).
+The digest does not hold across GPU *models* (measured in the full-length probe above): determinism is a per-device-class property. Training roles list `["L4", "L40S", "A10G"]`, so a re-run can land on another card and give another digest; the card is recorded on every attempt and returned in training results (see [Seeds are draws](#seeds-are-draws)).
 
 ## Why the environment, and not a line of Python
 
