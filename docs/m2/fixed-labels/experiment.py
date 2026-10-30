@@ -4,12 +4,13 @@ Every anchored run so far has drawn its labels afresh on each visit to a context
 keying, a per-visit draw at 1/50, as in M1), so over 400 epochs about three quarters of the `difference` contexts were
 labelled at some point. A real pipeline labels a fixed set once. This experiment trains the recipe of record, the
 fixed confirmation's `τ_ℓ fixed`, at its seeds 712 to 719 with one draw per run at the same rate, held for the run
-(`LabelSpec.fixed_draw`), and scores the finished runs with the fixed confirmation's suite.
+(`LabelSpec.fixed_draw`), and again with a fixed draw at 1/10, and scores the finished runs with the fixed
+confirmation's suite.
 
 The per-visit draw is still taken from the stream, so each run sees the batches of the fixed confirmation's run at its
 seed, from the same initialization: only which contexts carry the pull differs. The expected number of labelled
-visits per batch is unchanged, so the dose of the pull is the same; it falls on about 860 contexts instead of
-34,000.
+visits per batch is unchanged at 1/50, and the pull is a mean over the labelled contexts in a batch at either rate,
+so its strength is the same; at 1/50 it falls on about 900 contexts instead of 34,000, and at 1/10 on about 4,300.
 
     bin/mini run docs/m2/fixed-labels/experiment.py:scout --app modal --budget 30m
     bin/mini run docs/m2/fixed-labels/experiment.py --app modal --max-containers 8 --budget 1h
@@ -60,14 +61,19 @@ KEEP = tuple(sorted({*fc.STOP_KEEP, *fc.FINISH_KEEP}))
 """The checkpoints the fixed confirmation's runs kept, over both of their stages."""
 DRAW_SALT = 50
 """Folded into the model seed for the label draw, so it is a stream of its own."""
+RATES: dict[str, float] = {"r50": lean.ex2216.LABEL_RATE, "r10": 0.1}
+"""The fixed draw's rates by tag: the recipe's 1/50, and 1/10, about the geometric middle between the 1/50 draw's
+count of labelled `difference` contexts (about 900) and the per-visit redraw's over a run (about 34,000)."""
+DEFAULT_RATE = "r50"
 
-BUDGET_USD = 5
-"""From the fixed confirmation's task times on L4s: eight runs to epoch 400 at about twenty minutes each (\\$2), their
-end measurements and the axis scoring of their kept checkpoints (\\$1), and room for a retry."""
+BUDGET_USD = 10
+"""From the fixed confirmation's task times on L4s, per rate: eight runs to epoch 400 at about twenty minutes each
+(\\$2), their end measurements and the axis scoring of their kept checkpoints (\\$1); and room for a retry."""
 
 
-def label_of(model_seed: int, stop: int | None = None) -> str:
-    return f"{NAME}-s{model_seed}" + (f"-e{stop}" if stop is not None else "")
+def label_of(model_seed: int, stop: int | None = None, rate: str = DEFAULT_RATE) -> str:
+    tag = "" if rate == DEFAULT_RATE else f"-{rate}"
+    return f"{NAME}{tag}-s{model_seed}" + (f"-e{stop}" if stop is not None else "")
 
 
 # =============================================================================================
@@ -89,15 +95,17 @@ RESTRICTED_REF = PREFIX + "/restricted-axes"
 ALONG_REF = PREFIX + "/along"
 
 
-def draw_labels(labels, model_seed: int, rate: float) -> dict:
+def draw_labels(labels, model_seed: int, rate: float, tag: str = "") -> dict:
     """The corpus labels of ex-2.2.21 with a `fixed_draw` beside them: one draw per context at *rate*, from a stream
-    of the model seed's own. Returns the new labels and the count of `difference` contexts the draw labels.
+    of the model seed's own (the same stream at every rate, so a context labelled at one rate is labelled at every
+    higher one). *tag* names the rate in the artifact. Returns the new labels and the count of `difference` contexts
+    the draw labels.
     """
     import numpy as np
 
     from mini.store import get, put
 
-    workdir = ex2221.get_data_dir() / NAME / "draws" / str(model_seed)
+    workdir = ex2221.get_data_dir() / NAME / "draws" / f"{model_seed}{tag}"
     with np.load(get(labels, workdir / "labels.npz")) as z:
         arrays = {k: z[k] for k in z.files}
     rng = np.random.default_rng([model_seed, DRAW_SALT])
@@ -107,17 +115,18 @@ def draw_labels(labels, model_seed: int, rate: float) -> dict:
     is_anchored = arrays["op_ids"] == OP_NAMES.index(ANCHORED_OP)
     return {
         "model_seed": model_seed,
-        "labels": put(out, name=f"{NAME}-labels-s{model_seed}.npz"),
+        "labels": put(out, name=f"{NAME}{tag}-labels-s{model_seed}.npz"),
         "n_labelled": int((drawn & is_anchored).sum()),
         "n_anchored": int(is_anchored.sum()),
     }
 
 
-def rows_of(meta, seeds: tuple[int, ...], stop: int | None, epochs: int = EPOCHS) -> list[dict]:
-    """One row per run at *seeds*: the fixed confirmation's row of `τ_ℓ fixed`, stopped at *stop* (`None` for the
-    full schedule).
+def rows_of(meta, runs: list[tuple[str, int]], stop: int | None, epochs: int = EPOCHS) -> list[dict]:
+    """One row per (rate tag, seed) in *runs*: the fixed confirmation's row of `τ_ℓ fixed`, stopped at *stop*
+    (`None` for the full schedule).
     """
-    return [r | {"kind": NAME, "label": label_of(r["model_seed"], stop)} for r in fc.rows_of(meta, seeds, stop, epochs)]
+    base = {r["model_seed"]: r for r in fc.rows_of(meta, tuple(sorted({s for _, s in runs})), stop, epochs)}
+    return [base[s] | {"kind": NAME, "rate": t, "label": label_of(s, stop, t)} for t, s in runs]
 
 
 def train(ctx: Ctx, resolved: dict, rows: list[dict], labels: list, keep: tuple[int, ...],
@@ -160,7 +169,7 @@ def design() -> dict[str, Any]:
         "base_experiment": "fixed-confirm",
         "seeds": list(SEEDS),
         "keep": list(KEEP),
-        "label_rate": lean.ex2216.LABEL_RATE,
+        "rates": RATES,
         "draw_salt": DRAW_SALT,
     }
 
@@ -174,11 +183,11 @@ def publish(rows: list[dict], draws: list[dict], trained: list[dict], measured: 
 
     from mini.store import put, set_ref
 
-    meta = {r["label"]: {"kind": r["kind"], "model_seed": r["model_seed"]} for r in rows}
+    meta = {r["label"]: {"kind": r["kind"], "rate": r["rate"], "model_seed": r["model_seed"]} for r in rows}
     for t in trained:
         set_ref(CHECKPOINT_REF.format(label=t["label"]), t["checkpoint"])
         set_ref(KEPT_REF.format(label=t["label"]), t["kept_checkpoints"])
-    slim_draws = [{k: v for k, v in d.items() if k != "labels"} for d in draws]
+    slim_draws = [{"rate": r["rate"]} | {k: v for k, v in d.items() if k != "labels"} for r, d in zip(rows, draws, strict=True)]  # fmt: skip
     set_ref(DRAWS_REF, put(json.dumps({"design": design(), "runs": slim_draws}).encode(), name=f"{NAME}-draws.json"))
     traj = {t["label"]: meta[t["label"]] | {k: t[k] for k in ("traj", "val_loss", "train_loss")} for t in trained}
     set_ref(FINISHED_TRAJ_REF, put(json.dumps(traj).encode(), name=f"{NAME}-finished-trajectories.json"))
@@ -203,16 +212,26 @@ def publish(rows: list[dict], draws: list[dict], trained: list[dict], measured: 
     return {"n_finished": len(trained), "n_labelled": [d["n_labelled"] for d in draws]}
 
 
-def screen(ctx: Ctx, seeds: tuple[int, ...] = SEEDS, epochs: int = EPOCHS, stop: int = STOP_EPOCH,
+def runs_of(rates: tuple[str, ...], seeds: tuple[int, ...]) -> list[tuple[str, int]]:
+    return [(t, s) for t in rates for s in seeds]
+
+
+def draw_all(ctx: Ctx, resolved: dict, runs: list[tuple[str, int]]) -> list[dict]:
+    """Each run's labels (the default rate's artifacts carry no tag, as the scout drew them)."""
+    n = len(runs)
+    tags = ["" if t == DEFAULT_RATE else f"-{t}" for t, _ in runs]
+    return ctx.map(draw_labels, [resolved["labels"]] * n, [s for _, s in runs], [RATES[t] for t, _ in runs], tags, role="prep")  # fmt: skip
+
+
+def screen(ctx: Ctx, runs: list[tuple[str, int]], epochs: int = EPOCHS, stop: int = STOP_EPOCH,
            stop_keep: tuple[int, ...] = fc.STOP_KEEP) -> tuple[dict, list[dict], list[dict], list[dict]]:  # fmt: skip
-    """Draw each run's labels and train the recipe at *seeds* to *stop*, with its resume state. Returns the resolved
-    inputs, the draws, the stopped rows and the stopped runs.
+    """Draw each run's labels and train the recipe at each (rate tag, seed) in *runs* to *stop*, with its resume
+    state. Returns the resolved inputs, the draws, the stopped rows and the stopped runs.
     """
     resolved = ctx.run(ex2222.resolve_reused, [], role="prep")
-    n = len(seeds)
-    rate = lean.ex2216.LABEL_RATE
-    draws = ctx.map(draw_labels, [resolved["labels"]] * n, list(seeds), [rate] * n, role="prep")
-    rows = rows_of(resolved["meta"], seeds, stop, epochs)
+    n = len(runs)
+    draws = draw_all(ctx, resolved, runs)
+    rows = rows_of(resolved["meta"], runs, stop, epochs)
     stopped = train(ctx, resolved, rows, [d["labels"] for d in draws], stop_keep, [None] * n)
     return resolved, draws, rows, stopped
 
@@ -230,14 +249,15 @@ def calls_of(rows: list[dict], draws: list[dict], stopped: list[dict]) -> list[d
 
 
 def run(ctx: Ctx, epochs: int = EPOCHS, stop: int = STOP_EPOCH, seeds: tuple[int, ...] = SEEDS,
-        stop_keep: tuple[int, ...] = fc.STOP_KEEP, keep: tuple[int, ...] = KEEP, publishes: bool = True,
+        rates: tuple[str, ...] = tuple(RATES), stop_keep: tuple[int, ...] = fc.STOP_KEEP, keep: tuple[int, ...] = KEEP, publishes: bool = True,
         full: bool = True) -> dict:  # fmt: skip
-    """Train the recipe at every seed to *stop*, carry each run on to *epochs*, and measure the finished runs. The
-    arguments let a smoke run take the same path at a fraction of the size, and leave the refs alone.
+    """Train the recipe at every rate and seed to *stop*, carry each run on to *epochs*, and measure the finished runs.
+    The arguments let a smoke run take the same path at a fraction of the size, and leave the refs alone.
     """
-    resolved, draws, stopped_rows, stopped = screen(ctx, seeds, epochs, stop, stop_keep)
-    n = len(seeds)
-    rows = rows_of(resolved["meta"], seeds, None, epochs)
+    runs = runs_of(rates, seeds)
+    resolved, draws, _, stopped = screen(ctx, runs, epochs, stop, stop_keep)
+    n = len(runs)
+    rows = rows_of(resolved["meta"], runs, None, epochs)
     done = train(ctx, resolved, rows, [d["labels"] for d in draws], keep, stopped)
 
     labels = [r["label"] for r in rows]
@@ -265,22 +285,30 @@ def run(ctx: Ctx, epochs: int = EPOCHS, stop: int = STOP_EPOCH, seeds: tuple[int
     return ctx.run(publish, rows, draws, done, measured, dosed, axes, written, restricted, along, role="prep")
 
 
-
-
 def scout(ctx: Ctx) -> dict:
     """The first seed alone, to the stop, with its call: a look at whether the fixed draw keeps the anchor at all
     before the other seeds are trained. Its stopped run is the one `main` carries on.
     """
-    _, draws, rows, stopped = screen(ctx, SEEDS[:1])
+    _, draws, rows, stopped = screen(ctx, runs_of((DEFAULT_RATE,), SEEDS[:1]))
     return {"calls": calls_of(rows, draws, stopped)}
 
 
 def smoke(ctx: Ctx) -> dict:
     """One seed for eight epochs, stopped at six, carried on and measured."""
-    return run(ctx, epochs=8, stop=6, seeds=SEEDS[:1], stop_keep=(2, 4), keep=(2, 4, 7), publishes=False, full=False)
+    return run(
+        ctx,
+        epochs=8,
+        stop=6,
+        seeds=SEEDS[:1],
+        rates=(DEFAULT_RATE,),
+        stop_keep=(2, 4),
+        keep=(2, 4, 7),
+        publishes=False,
+        full=False,
+    )
 
 
-STAGE = "scout"
+STAGE = "full"
 """Which entry `main` runs: `smoke`, `scout`, or `full`. The scout's stopped run is a memo hit for the full run."""
 
 
