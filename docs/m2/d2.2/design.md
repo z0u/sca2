@@ -56,6 +56,9 @@ Landing
 Write bound
 :   How much e₁ the blocks after an edit put back on the states of the other ops, against what the clean model has there.
 
+Over the write bound
+:   A site (a slice and a position) where the write passes the bound by more than both tolerances: the relative tolerance, a quarter over the bound, and the absolute tolerance, about a degree. The absolute tolerance comes from how much the bound itself varies between runs ([write-floor](/docs/m2/write-floor/report.py)); without it, a turn of a fraction of a degree counts wherever the bound is small. A condition passes when at most one run in eight has any site over. Runs are counted rather than sites, since the sites over on one run tend to come together.
+
 The comparison with this baseline leans on Adam giving the coordinate axes a privileged role: the model parks its syntax tokens on a few axes and leaves the rest quiet, so the other axes make a fair reference. The anchor itself does not need this; it held even with the basis of the optimizer rotated.
 
 ## The claims
@@ -84,7 +87,7 @@ Once `difference` is removed, the model should answer as an ideal predictor that
 
 ### (d) The model does not route around the edit
 
-Claims (b) and (c) cover the side-effects on the answers. This one is about the states inside the model. Because we placed the axis, the clean model tells us in advance how much e₁ the states of the other ops carry, and so how far an edit can turn them. The claim is that the blocks after the edit put no more e₁ back on those states than the clean model has there, so the edit stays where we put it. On the recipe of record the write stays within that bound past the embedding, as it did on `falloff` ([fixed-effects](/docs/m2/fixed-effects/report.py)).
+Claims (b) and (c) cover the side-effects on the answers. This one is about the states inside the model. Because we placed the axis, the clean model tells us in advance how much e₁ the states of the other ops carry, and so how far an edit can turn them. The claim is that the blocks after the edit put no more e₁ back on those states than the clean model has there, so the edit stays where we put it. On the recipe of record the write stays within that bound past the embedding, as it did on `falloff` ([fixed-effects](/docs/m2/fixed-effects/report.py)). With both tolerances, one run of eight on each has sites over, all at operands at slice 1, so both pass ([write-floor](/docs/m2/write-floor/report.py)).
 
 The bound itself is wider at slice 3 than on `falloff`, though the difference is only suggestive (wider by 18.8° on the seed mean at the example answers, with an interval of 0.2° to 37.5°). It is set by a tail of about one state of another op in a hundred, and many of those sit on near misses for `difference`, example answers one grid step from an answer `difference` could give. The model seems to take a near miss as weak evidence for the op, so some of that turn is removal rather than a side effect.
 
@@ -166,8 +169,11 @@ The verification measurements (D2.3), though verification lines are allowed in t
 [sans-diff](/docs/m2/filtered-corpus/report.py)
 :   The control trained with no loss on `difference` contexts lands 0.58 of the way to the target null, against 0.50 for the edited model, and misses in the same kind of way.
 
+[write-floor](/docs/m2/write-floor/report.py)
+:   An absolute tolerance of about a degree, from the spread of the bound between runs, takes out every site over the write bound at a symbol or separator; what stays is at operands at slice 1, on one run of the recipe of record and every run of `pool 1–3, soft τ`.
+
 <details markdown="1"><summary>About this page</summary>
 
-Updated 2026-10-29 for the reference model (sans-diff), the full scoring suite (fixed-effects), the account of where the op is held (block1-edit, mid-block-edit), and the comparison of conditions as two samples. Rewritten 2026-10-28 for the recipe of record `τ_ℓ fixed`, and simplified: the provenance of each setting moved to the reports, the claims say where they stand, and the open work is split into what comes before the blog post and what is future work. The longer version, with its history of the recipe, is in git (as of `a299178`), and the plan through ex-2.2.22 is [archived](design-2026-10.md).
+Updated 2026-10-30 for the absolute tolerance on the write bound (write-floor). Updated 2026-10-29 for the reference model (sans-diff), the full scoring suite (fixed-effects), the account of where the op is held (block1-edit, mid-block-edit), and the comparison of conditions as two samples. Rewritten 2026-10-28 for the recipe of record `τ_ℓ fixed`, and simplified: the provenance of each setting moved to the reports, the claims say where they stand, and the open work is split into what comes before the blog post and what is future work. The longer version, with its history of the recipe, is in git (as of `a299178`), and the plan through ex-2.2.22 is [archived](design-2026-10.md).
 
 </details>
