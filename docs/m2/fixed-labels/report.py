@@ -465,9 +465,9 @@ rf"""
 Every anchored run so far drew its labels afresh on each visit to a context, so over a run the anchor saw labels on most `difference` contexts. Holding one draw fixed for the run, as a real labelled set would be, still keeps the anchor at every rate we tried. But the edit removes the op less reliably: a few runs end well below the rest, and more labels in the fixed set did not cure it.
 ///
 
-The [post-hoc comparison plan](/docs/m2/d2.2/post-hoc-comparison.md) compares the edit along the anchored axis with directions found after training on a control. Writing it up, we noticed that the anchor labeller (inherited from M1) redraws its 1/50 draw on every visit to a context. An epoch covers about a quarter of the training split, so over 400 epochs a context is in view about a hundred times, and a fresh draw on each visit labels about three quarters of the {N_ANCHORED:,} `difference` contexts at some point, about {REDRAW_DISTINCT:,}. So the anchor had far more distinct labels than "one context in fifty" suggests. A real pipeline labels a fixed set once.
+The [post-hoc comparison plan](/docs/m2/d2.2/post-hoc-comparison.md) compares the edit along the anchored axis with directions found after training on a control. Writing it up, we noticed that the anchor labeller (inherited from M1) makes a fresh 1/50 draw on every visit to a context. An epoch covers about a quarter of the training split, so over 400 epochs a context is in view about a hundred times. With a fresh draw on each visit, about three quarters of the {N_ANCHORED:,} `difference` contexts carry a label at some point (about {REDRAW_DISTINCT:,}). So the anchor had far more distinct labels than "one context in fifty" suggests. A real pipeline labels a fixed set once.
 
-This report trains the recipe of record, `τ_ℓ fixed`, with one draw per run held for the whole run, at three rates: 1/50 (about {int(round(N_LABELLED["r50"].mean(), -1)):,} labelled `difference` contexts), 1/25 (about {int(round(N_LABELLED["r25"].mean(), -1)):,}), and 1/10 (about {int(round(N_LABELLED["r10"].mean(), -1)):,}). Each rate runs at the eight seeds of the [fixed confirmation](/docs/m2/fixed-confirm/report.py) (712 to 719), whose runs of the same recipe with the per-visit draw are the comparison.
+This report trains the recipe of record, `τ_ℓ fixed`, with one draw made per run and held for the whole run. We try three rates: 1/50 (about {int(round(N_LABELLED["r50"].mean(), -1)):,} labelled `difference` contexts), 1/25 (about {int(round(N_LABELLED["r25"].mean(), -1)):,}), and 1/10 (about {int(round(N_LABELLED["r10"].mean(), -1)):,}). Each rate runs at the eight seeds of the [fixed confirmation](/docs/m2/fixed-confirm/report.py) (712 to 719). That experiment trained the same recipe with the per-visit draw, so its runs are the comparison.
 """
 
 # %%
@@ -476,22 +476,24 @@ rf"""
 ## Observations
 
 - [The anchor settles at every rate (E1)](#the-anchor-settles-at-every-rate-e1): all 24 runs are called kept at epoch 64, and α at the example answers settles about as fast as under the per-visit draw.
-- [Removal and spill at the end (E2)](#removal-and-spill-at-the-end-e2): every run keeps the anchor and passes the task gate as often as the per-visit runs do. At 1/50 and at 1/10, a few runs end well below the lowest per-visit run, so the seed mean falls. At 1/25 removal matches the per-visit draw, but one run spills late, over the criterion.
+- [Removal and spill at the end (E2)](#removal-and-spill-at-the-end-e2): every run keeps the anchor, and runs pass the task gate as often as the per-visit runs do. At 1/50 and at 1/10, a few runs end well below the lowest per-visit run, so the seed mean falls. At 1/25 removal matches the per-visit draw, but one run spills late, over the criterion.
 - [When the low runs part (E3)](#when-the-low-runs-part-e3): some low runs sit low from early in training, and others slide down after the anchor has settled. Neither kind tracks the label count.
 
 ## Scope and method
 
-This is an exploratory study, with no preregistration and no gate. It started as a scout of one seed at 1/50 to epoch 64, then 1/50 and 1/10 at four seeds to the end. Those two differed at four seeds, so they were carried to eight seeds, and 1/25 was added between them. The three rates were each chosen before their runs, and none was chosen by how it scored.
+This is an exploratory study, with no preregistration and no gate. It started as a scout: one seed at 1/50, trained to epoch 64. Then 1/50 and 1/10 ran at four seeds to the end of training. Those two differed at four seeds, so they were carried to eight seeds, and 1/25 was added between them. The three rates were each chosen before their runs, and none was chosen by how it scored.
 
-Every run is `τ_ℓ fixed` as the fixed confirmation trained it, with one change: in place of the per-visit draw, a context carries the label on every visit if a draw made once before training picked it, and on no visit otherwise. The draw comes from a stream of its own per seed, and the draws are nested, so every context labelled at 1/50 is also labelled at 1/25 and at 1/10. The per-visit draw is still taken and set aside, so each run trains on the same batches from the same initialization as the per-visit run at its seed. Only which contexts carry the pull differs.
+Every run is `τ_ℓ fixed` as the fixed confirmation trained it, with one change to the labels. In place of the per-visit draw, a single draw made before training picks the labelled contexts. A picked context carries the label on every visit, and any other context never does. Each seed has its own random stream for this draw, and the draws are nested, so every context labelled at 1/50 is also labelled at 1/25 and at 1/10. The per-visit draw is still taken and set aside, so each run trains on the same batches from the same initialization as the per-visit run at its seed. Only which contexts carry the pull differs.
 
 The pull is a mean over the labelled contexts in each batch, so the label rate does not change how hard the anchor pulls. At 1/50 it also leaves the number of labelled contexts per batch unchanged on average. What the rate changes is how many distinct contexts the pull ever falls on, and how much the pull in a batch varies from one batch to the next.
 
-We compare conditions as two samples of eight runs (the D2.2 rule since the determinism decision), with a 95% Welch t interval on the difference of seed means. Over eight seeds, removal under the per-visit draw spreads by about {SPAN[REDRAW]:.2f}. All runs trained and were measured on L4 GPUs, as the fixed confirmation's were, and share that experiment's controls (no pull and no anti term, at the same seed).
+We compare conditions as two samples of eight runs (the D2.2 rule since the determinism decision), with a 95% Welch t interval on the difference of seed means.[^welch] Over eight seeds, removal under the per-visit draw spreads by about {SPAN[REDRAW]:.2f}. All runs trained and were measured on L4 GPUs, as in the fixed confirmation. They share the controls of that experiment (no pull and no anti term, at the same seed).
+
+[^welch]: Welch t interval: a confidence interval for a difference of two means that does not assume the two samples have equal variance.
 
 ## The measurements
 
-Every edit below is the e₁ edit. Each score is the drop under that edit, less a baseline: the median drop when the same edit is made along each of the other 63 coordinate axes of the run (the rule of the D2.2 design).
+Every edit below is the e₁ edit. Each score is the drop under that edit, less a baseline. The baseline is the median drop when the same edit is made along each of the other 63 coordinate axes of the run (the rule of the D2.2 design).
 
 Removal
 :   The drop on `difference` under the full edit at every position and slice, as a share of the way from the clean score to the target null. Higher is better, and a run below 0.5 has lost the anchor.
@@ -515,9 +517,9 @@ With the pull confined to a few hundred contexts, does the anchor still settle o
 
 {alpha_figure()}
 
-Every run is called kept, at every rate, with a wide margin. The rise over the first 40 epochs looks much the same in all four conditions. Over the call window, the fixed 1/50 runs sit a little lower than the per-visit runs on the seed mean, and the 1/25 and 1/10 runs a little higher and closer together, all near the spread of the per-visit runs.
+Every run is called kept, at every rate, with a wide margin. The rise over the first 40 epochs looks much the same in all four conditions. Over the call window, the seed mean of the fixed 1/50 runs sits a little below that of the per-visit runs. The 1/25 and 1/10 runs sit a little above it, and closer together. All of them are near the spread of the per-visit runs.
 
-So a fixed set of under a thousand labelled contexts is enough for the anchor to settle. Across the fixed-label runs, the window mean says little about how much a run removes at the end (r = {R_WINDOW:.2f} over the 24 runs), which is why the end measurements below are needed.
+So a fixed set of under a thousand labelled contexts is enough for the anchor to settle. But across the fixed-label runs, mean α over the call window says little about how much a run removes at the end (r = {R_WINDOW:.2f} over the 24 runs). So we need the end measurements below.
 """
 
 # %%
@@ -531,21 +533,21 @@ Does a fixed labelled set remove `difference` as well as the per-visit draw, at 
 
 {end_table()}
 
-Every run keeps the anchor, and the task change sits near zero in every condition, with no more gate misses than under the per-visit draw. The differences are in removal and in one run of spill.
+Every run keeps the anchor, and the task change sits near zero in every condition, with no more gate misses than under the per-visit draw. The differences are in removal, and in spill on one run.
 
-Removal does not climb with the label count. At 1/50 and at 1/10 most runs remove about as much as the per-visit runs, but a few end below {LOW_LINE}, where the lowest per-visit run is {REMOVAL[REDRAW].min():.2f}: {WORD[len(LOW_RUNS["r50"])]} at 1/50 ({LOW_RANGE["r50"][0]:.2f} to {LOW_RANGE["r50"][1]:.2f}) and {WORD[len(LOW_RUNS["r10"])]} at 1/10 ({LOW_RANGE["r10"][0]:.2f} to {LOW_RANGE["r10"][1]:.2f}). Those runs pull the seed mean down by about the same amount at both rates. At 1/25 every run sits within the per-visit range, and the seed means match.
+Removal does not climb with the label count. At 1/50 and at 1/10 most runs remove about as much as the per-visit runs. But a few end below {LOW_LINE}, while the lowest per-visit run is at {REMOVAL[REDRAW].min():.2f}: {WORD[len(LOW_RUNS["r50"])]} at 1/50 ({LOW_RANGE["r50"][0]:.2f} to {LOW_RANGE["r50"][1]:.2f}) and {WORD[len(LOW_RUNS["r10"])]} at 1/10 ({LOW_RANGE["r10"][0]:.2f} to {LOW_RANGE["r10"][1]:.2f}). Those runs pull the seed mean down by about the same amount at both rates. At 1/25 every run sits within the per-visit range, and the seed means match.
 
-The low runs fall mostly at different seeds for the two rates, sharing only seed {SHARED_LOW[0]}. The per-visit runs at those seeds range from its lowest (seed {LOW[REDRAW]}) to its second highest (seed 717; the grey lines in the figure). So they look more like runs that went one way than seeds that are hard for the recipe.
+The two rates have their low runs mostly at different seeds, and share only seed {SHARED_LOW[0]}. At those seeds, the per-visit runs range from the lowest per-visit run (seed {LOW[REDRAW]}) to the second highest (seed 717; the grey lines in the figure). So the low runs look more like single runs that happened to end low than like seeds that are hard for the recipe.
 <!-- REVIEW: the draft said the per-visit runs at the low seeds were "among its lower ones, but still within its
 range". Within its range is true of any per-visit run, and 717 (0.90) and 718 (0.88) are not among its lower ones;
 only 715 and 719 are. Verify: REMOVAL[REDRAW] by seed. The conclusion of the paragraph stands either way. --> All three low runs at 1/10 are at seeds 717 to 719, which is why the first look at four seeds missed them.
 
-At 1/25, one run (seed {SPILL_RUN}) ends over the spill criterion, on `{SPILL_OP}`, and over it again under the edit at block 1 alone. No other run of any condition does. Its spill rises late, from about epoch {SPILL_RISE} (after one reading just over the criterion at epoch 32, while the anchor was still settling), as the late rise the soft pool scout saw on one seed of `τ_ℓ fixed`.
+At 1/25, one run (seed {SPILL_RUN}) ends over the spill criterion, on `{SPILL_OP}`. It is also over the criterion under the edit at block 1 alone. No other run in any condition goes over. Its spill rises late, from about epoch {SPILL_RISE}, like the late rise the soft pool scout saw on one seed of `τ_ℓ fixed`. Before that, it was over the criterion at only one checkpoint, just barely, at epoch 32 while the anchor was still settling.
 <!-- REVIEW: added the epoch-32 reading (0.032, the only kept checkpoint of this run over the criterion before
 epoch 192), which SPILL_RISE skips by starting after epoch 64. Verify: _SPILL_RUN_ALONG. "Rises late" stands as the
 account of the end value, since the run is back under the criterion from epoch 64 to 160. -->
 
-How sure can we be? The intervals on removal against the per-visit draw are wide: at 1/10 it just excludes zero, and at 1/50 it does not. With eight runs each, a difference set by two or three low runs is hard to pin down. So the three fixed rates are not separable, and 1/25 looking best may well be the luck of its eight seeds.
+How sure can we be? The intervals on the removal difference from the per-visit draw are wide. At 1/10 the interval just excludes zero, and at 1/50 it does not. With eight runs each, a difference set by two or three low runs is hard to pin down. So we can't tell the three fixed rates apart, and 1/25 may look best only through the luck of its eight seeds.
 """
 
 # %%
@@ -559,9 +561,9 @@ Do the low runs fail to settle, or settle and then lose ground? The answer says 
 
 Both happen. Some low runs are already behind at epoch 32 and never catch up, sitting at about 0.6 for the rest of training. Others come close to the per-visit level by epoch 100 or so and then slide down over the rest of the run, while the anti weight anneals. Under the per-visit draw, slow starters (such as seed 717, still near zero at epoch 32) catch up by the end.
 
-Neither kind lines up with the rate. Both appear at 1/50 and at 1/10, and the 1/25 runs have neither; they also reach their final level sooner than any other condition, by about epoch 64. With eight runs a condition, that may be the same luck of the seeds as in E2.
+Neither kind lines up with the rate. Both appear at 1/50 and at 1/10, and the 1/25 runs show neither. The 1/25 runs also reach their final level sooner than any other condition, by about epoch 64. With eight runs a condition, that may be the same luck of the seeds as in E2.
 
-One account that fits, without our having tested it: with a fixed set, the pull keeps returning to the same few hundred or thousand contexts, so what the anchor learns depends on which contexts the draw happened to pick. A draw whose contexts sit unevenly over the examples or the replacement noise could anchor the op only partly, and keep it that way. The per-visit draw averages over almost every context, which would explain why its runs spread less. Telling this apart from plain run-to-run sensitivity would take several draws at the same seed.
+One account fits, though we have not tested it. With a fixed set, the pull keeps returning to the same few hundred or thousand contexts, so what the anchor learns depends on which contexts the draw happened to pick. A draw whose contexts cover the examples or the replacement noise unevenly could anchor the op only partly, and keep it that way. The per-visit draw averages over almost every context, which would explain why its runs spread less. Telling this apart from plain run-to-run sensitivity would take several draws at the same seed.
 """
 
 # %%
@@ -573,7 +575,7 @@ A fixed labelled set at one context in fifty is enough for the anchor to settle 
 
 But removal is less reliable with a fixed set: a few runs in eight end well short of the rest (E2), either from early in training or after a late slide (E3). Since a fixed set five times larger did no better, more labels of the same kind do not seem to be the fix, at least between about 900 and 4,300 contexts. The per-visit draw spreads less, and that may come from the variety of contexts it sees rather than their number.
 
-If this holds, a comparison against post-hoc methods with fixed labels should expect a wider spread on the anchored side than the fixed confirmation showed, and eight runs give a noisy seed mean. The intermediate rate looking best is within what eight seeds can show by chance, so it would need fresh seeds before it counts for more.
+If this holds, a comparison against post-hoc methods with fixed labels should expect a wider spread on the anchored side than the fixed confirmation showed. With that spread, eight runs give a noisy seed mean. That the intermediate rate looks best is within what eight seeds can show by chance, so it would need fresh seeds before it counts for more.
 """
 
 # %%
