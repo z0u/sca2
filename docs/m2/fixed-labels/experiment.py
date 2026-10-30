@@ -308,12 +308,17 @@ def smoke(ctx: Ctx) -> dict:
     )
 
 
-STAGE = "full"
-"""Which entry `main` runs: `smoke`, `scout`, or `full`. The scout's stopped run is a memo hit for the full run."""
+def half(ctx: Ctx) -> dict:
+    """Both rates at the first four seeds, to the end. Whichever rate goes on to eight seeds reuses its four."""
+    return run(ctx, seeds=SEEDS[:4])
+
+
+STAGE = "half"
+"""Which entry `main` runs: `smoke`, `scout`, `half`, or `full`. Each stage's runs are memo hits for the next."""
 
 
 def main(ctx: Ctx) -> dict:
-    return {"smoke": smoke, "scout": scout, "full": run}[STAGE](ctx)
+    return {"smoke": smoke, "scout": scout, "half": half, "full": run}[STAGE](ctx)
 
 
 COMPUTE = ac.COMPUTE
