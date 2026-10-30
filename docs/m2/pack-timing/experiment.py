@@ -72,7 +72,7 @@ N_LINES = 60_000
 """A fifth of the recipe corpus: enough for an epoch longer than the timed span, and a quicker build. The corpus
 size sets the epoch length and nothing in the step."""
 N_REPLICAS = 3
-REPLICAS = {"L4": 1}
+REPLICAS = {"L4": 1, "L4-static": 2, "L4-onehot": 2}
 """Replicas by variant where not `N_REPLICAS`: the L4 ran a pack of 32 so slowly (about an hour a task) that one is
 enough."""
 PRICE_PER_HOUR = {"L4": 0.80, "A10G": 1.10, "L40S": 1.95, "A100": 2.10}
@@ -83,17 +83,22 @@ cost per seed-step flat in the pack size; a deterministic scatter, as in an embe
 would cost the same per seed however many share the card."""
 NONDET_XLA_FLAGS = "--xla_cpu_enable_concurrency_optimized_scheduler=false"
 """The project's `XLA_FLAGS` with the two GPU determinism flags left out."""
-ONE_HOT_CARDS: tuple[str, ...] = ("L40S",)
+ONE_HOT_CARDS: tuple[str, ...] = ("L40S", "L4")
 """Cards timed in a third round, with the flags on, on the step with no scatter-add left in it: the slice selection
 already static in `sca.anchoring` (since the second round), and here the embedding lookup and the cross-entropy as
 products with a one-hot matrix in place of indexing (`_without_gathers`). The second round found the L40S's cost per
-seed-step rising most with the pack size."""
+seed-step rising most with the pack size; the L4 followed in a fourth round."""
 VARIANTS: dict[str, tuple[str, dict[str, str]]] = (
     {card: (card, {}) for card in CARDS}
     | {f"{card}-nondet": (card, {"XLA_FLAGS": NONDET_XLA_FLAGS}) for card in NONDET_CARDS}
     | {f"{card}-onehot": (card, {}) for card in ONE_HOT_CARDS}
+    | {"L4-static": ("L4", {})}
 )
-"""Role name → (card, environment over the project baseline)."""
+"""Role name → (card, environment over the project baseline). A fourth round timed the L4 on the static slice selection
+alone (`L4-static`, the code every variant but the first rounds' runs) and with no scatter-add (`L4-onehot`), at the
+small packs only, since the third round found the scatter-free step faster for one seed."""
+VARIANT_PACKS: dict[str, tuple[int | str, ...]] = {"L4-static": ("plain", 1), "L4-onehot": ("plain", 1, 8)}
+"""Pack sizes by variant where not the card's (`PACKS`)."""
 
 
 def _without_gathers() -> None:
@@ -328,7 +333,7 @@ def main(ctx: Ctx) -> dict:
     # variants after it, so every variant launches before the wake suspends.
     timed, waiting = {}, []
     for variant, (card, _) in VARIANTS.items():
-        packs, n = PACKS[card], REPLICAS.get(variant, N_REPLICAS)
+        packs, n = VARIANT_PACKS.get(variant, PACKS[card]), REPLICAS.get(variant, N_REPLICAS)
         orders = [packs[r % len(packs) :] + packs[: r % len(packs)] for r in range(n)]
         try:
             timed[variant] = ctx.map(
