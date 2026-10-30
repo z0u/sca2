@@ -1,5 +1,5 @@
 # ruff: noqa: B018
-# title: A floor in degrees for the write tolerance
+# title: An absolute tolerance for the write
 
 # An exploratory re-analysis of stored alignment arrays, with no new training and no new measurement pass: the
 # alignment with e₁ at every slice and position, clean and under the full edit, that the fixed confirmation stored for
@@ -93,8 +93,8 @@ OPERAND = np.array([POS_LABEL[p] in ("a", "b") for p in range(N_POS)])
 Q = 0.99  # the quantile the bound and the write are taken at, as in H4 of ex-2.2.1
 TOLERANCE = 1.25  # the tolerance of H4 in ex-2.2.1: the write at most a quarter over the bound
 N_BOOT = 200  # resamples of the held-out contexts, per run
-SMALL = 10.0  # degrees: the bounds of the sites that go over the tolerance are all well under this
-FLOOR_Q = 0.95  # the quantile of the seed spread of the bound that sets the floor
+SMALL = 10.0  # degrees: the bounds of the sites that go over the relative tolerance are all well under this
+ATOL_Q = 0.95  # the quantile of the seed spread of the bound that sets the absolute tolerance
 N_SITES = 4 * N_POS  # slice and position pairs past the embedding, per run
 
 # The contexts each position is scored over: those of the other ops, and at the answers only the answers that do not
@@ -154,14 +154,16 @@ BOOT_MEDIAN = float(np.median(np.concatenate(list(BOOT_AT_OVER.values()))))
 EXCESS_MIN = min(float(EXCESS[n][OVER[n]].min()) for n in RECIPES)
 Z = np.concatenate([EXCESS[n][OVER[n]] / BOOT_SD[n][OVER[n]] for n in RECIPES])
 Z_MIN, Z_MEDIAN, N_Z_UNDER_4 = float(Z.min()), float(np.median(Z)), int((Z < 4).sum())
-assert Z_MIN > 2 and N_Z_UNDER_4 <= 2, "E1 says every site over the tolerance is past the spread from the contexts"
+assert Z_MIN > 2 and N_Z_UNDER_4 <= 2, (
+    "E1 says every site over the relative tolerance is past the spread from the contexts"
+)
 # How far each site sits past the ratio line itself (the write less 1.25× the bound), against the same spread. A site
 # near the line can cross it on another draw even where its excess over the bound is many spreads wide.
 MARGIN_Z = np.concatenate(
     [(EXCESS[n][OVER[n]] - (TOLERANCE - 1) * BOUND[n][OVER[n]]) / BOOT_SD[n][OVER[n]] for n in RECIPES]
 )
 N_NEAR_LINE = int((MARGIN_Z < 2).sum())
-# REVIEW: E1 said nearly every site over the tolerance would still be over on another draw. That holds for the excess
+# REVIEW: E1 said nearly every site over the relative tolerance would still be over on another draw. That holds for the excess
 # over the bound (Z_MIN above 2) but not for the ratio: the margin past 1.25× the bound is under twice its spread at
 # about a fifth of the sites. The text now says both. Verify: MARGIN_Z against Z.
 assert 15 <= N_NEAR_LINE <= 40, "E1 says about a fifth of the sites sit near the ratio line"
@@ -173,36 +175,40 @@ SEED_MEAN = {n: BOUND[n].mean(axis=0) for n in RECIPES}
 POOLED_SD = np.concatenate([SEED_SD[n].ravel() for n in RECIPES])
 POOLED_MEAN = np.concatenate([SEED_MEAN[n].ravel() for n in RECIPES])
 IS_SMALL = POOLED_MEAN < SMALL
-FLOOR = float(np.quantile(POOLED_SD[IS_SMALL], FLOOR_Q))
+ATOL = float(np.quantile(POOLED_SD[IS_SMALL], ATOL_Q))
 SD_SMALL_MEDIAN = float(np.median(POOLED_SD[IS_SMALL]))
 # The same quantile taken one recipe at a time, and over the operand sites alone (the symbol sites are two fifths of
 # the pool and spread by much less, so they pull the pooled quantile down).
-RECIPE_FLOOR = {n: float(np.quantile(SEED_SD[n].ravel()[SEED_MEAN[n].ravel() < SMALL], FLOOR_Q)) for n in RECIPES}
+RECIPE_ATOL = {n: float(np.quantile(SEED_SD[n].ravel()[SEED_MEAN[n].ravel() < SMALL], ATOL_Q)) for n in RECIPES}
 RECIPE_MEDIAN = {n: float(np.median(SEED_SD[n].ravel()[SEED_MEAN[n].ravel() < SMALL])) for n in RECIPES}
-OPERAND_FLOOR = float(np.quantile(np.concatenate([SEED_SD[n][:, OPERAND].ravel() for n in RECIPES]), FLOOR_Q))
+OPERAND_ATOL = float(np.quantile(np.concatenate([SEED_SD[n][:, OPERAND].ravel() for n in RECIPES]), ATOL_Q))
 # REVIEW: E2 said the four recipes give about the same spread one at a time, so pooling changes little. The medians
 # agree, but the 95% quantiles run from about 1.0° to 1.4° per recipe, and over the operand sites alone the pooled
 # quantile is about 1.4°, so the text now gives those and the discussion names the pool composition among the choices
-# the exact floor rests on. The split of E3 is unchanged by any of them, since no symbol site has an excess past
-# 0.81° (SYNTAX_EXCESS_MAX), and the discussion now says that instead of "from a degree to the floor of E2".
-# Verify: RECIPE_FLOOR, OPERAND_FLOOR, and the counts at floors of 0.9° to 1.5°.
+# the exact absolute tolerance rests on. The split of E3 is unchanged by any of them, since no symbol site has an excess past
+# 0.81° (SYNTAX_EXCESS_MAX), and the discussion now says that instead of "from a degree to the absolute tolerance of E2".
+# Verify: RECIPE_ATOL, OPERAND_ATOL, and the counts at absolute tolerances of 0.9° to 1.5°.
 assert max(RECIPE_MEDIAN.values()) - min(RECIPE_MEDIAN.values()) < 0.05, "E2: the medians agree across recipes"
-assert FLOOR < OPERAND_FLOOR < 1.5, "E2: the operand-only quantile is higher than the pooled one"
+assert ATOL < OPERAND_ATOL < 1.5, "E2: the operand-only quantile is higher than the pooled one"
 SD_TINY_MEDIAN = float(np.median(POOLED_SD[POOLED_MEAN < 1]))
 SD_LARGE_MEDIAN = float(np.median(POOLED_SD[~IS_SMALL]))
 OVER_BOUND_MAX = max(float(BOUND[n][OVER[n]].max()) for n in RECIPES)
-assert OVER_BOUND_MAX < SMALL, "every site over the tolerance has a bound under the cut"
+assert OVER_BOUND_MAX < SMALL, "every site over the relative tolerance has a bound under the cut"
 # The same rule taken site by site: the write is over the bound by more than twice the seed spread of the bound there.
 PER_SITE = {n: OVER[n] & (EXCESS[n] > 2 * SEED_SD[n][None]) for n in RECIPES}
 
-# --- E3: what the floor keeps ---------------------------------------------------------------------------------
+# --- E3: what the absolute tolerance keeps ---------------------------------------------------------------------------------
 
-BOTH = {n: OVER[n] & (EXCESS[n] > FLOOR) for n in RECIPES}
+BOTH = {n: OVER[n] & (EXCESS[n] > ATOL) for n in RECIPES}
 RUNS_WITH = {n: [s for i, s in enumerate(SEEDS_OF[n]) if BOTH[n][i].any()] for n in RECIPES}
 SLICES_WITH = {n: sorted({int(sl) + 1 for sl in np.nonzero(BOTH[n])[1]}) for n in RECIPES}
 for _n in RECIPES:
-    assert not (BOTH[_n] & SYNTAX[None, None]).any(), "E3 says no site at a symbol or separator clears the floor"
-    assert (BOTH[_n] <= OPERAND[None, None]).all(), "E3 says every site that clears the floor is at an operand"
+    assert not (BOTH[_n] & SYNTAX[None, None]).any(), (
+        "E3 says no site at a symbol or separator clears the absolute tolerance"
+    )
+    assert (BOTH[_n] <= OPERAND[None, None]).all(), (
+        "E3 says every site that clears the absolute tolerance is at an operand"
+    )
     assert (OVER[_n] <= (SYNTAX | OPERAND)[None, None]).all(), "E3 says no site at `=` or an answer goes over"
 assert BOTH[FIXED].sum() == 1 and len(RUNS_WITH[FIXED]) == len(RUNS_WITH[FALLOFF]) == 1, "the discussion text"
 PER_SITE_SHARED = {n: int((PER_SITE[n] & BOTH[n]).sum()) for n in RECIPES}
@@ -216,10 +222,10 @@ SYNTAX_EXCESS_MAX = max(float(EXCESS[n][OVER[n] & SYNTAX[None, None]].max()) for
 SYNTAX_BOUND_MAX = max(float(BOUND[n][OVER[n] & SYNTAX[None, None]].max()) for n in RECIPES)
 N_SYNTAX_OVER_DEGREE = sum(int((BOUND[n][OVER[n] & SYNTAX[None, None]] > 1).sum()) for n in RECIPES)
 assert N_SYNTAX_OVER_DEGREE <= 3, (
-    "E3 says the bound at a symbol site over the tolerance is under a degree at all but a few"
+    "E3 says the bound at a symbol site over the relative tolerance is under a degree at all but a few"
 )
 N_OPERAND_OVER = sum(int((OVER[n] & OPERAND[None, None]).sum()) for n in RECIPES)
-N_OPERAND_UNDER = sum(int((OVER[n] & OPERAND[None, None] & (EXCESS[n] <= FLOOR)).sum()) for n in RECIPES)
+N_OPERAND_UNDER = sum(int((OVER[n] & OPERAND[None, None] & (EXCESS[n] <= ATOL)).sum()) for n in RECIPES)
 OPERAND_BOUND_MIN = min(float(BOUND[n][OVER[n] & OPERAND[None, None]].min()) for n in RECIPES)
 assert SYNTAX_BOUND_MAX < OPERAND_BOUND_MIN, "E3 says the bound separates the two kinds"
 OPERAND_EXCESS_MIN = min(float(EXCESS[n][OVER[n] & OPERAND[None, None]].min()) for n in RECIPES)
@@ -263,14 +269,14 @@ def rule() -> str:
 MARK = {FIXED: "D", FALLOFF: "o", STEP_SOFT: "s", POOL: "^"}
 
 r"""
-# A floor in degrees for the write tolerance
+# An absolute tolerance for the write
 
 /// tip |
 <!-- lede -->
-The write tolerance of ex-2.2.1 counts a site as over when the write is more than a quarter over the bound. So where the bound is a fraction of a degree, a tiny turn counts. We looked for a floor in degrees that the data could set, and found one in how much the bound varies from run to run: about a degree. With that floor, every site at a symbol or separator drops out. What stays are the operands at the first slice or two, chiefly on `pool 1–3, soft τ`.
+The write tolerance of ex-2.2.1, which we call the relative tolerance here, counts a site as over when the write is more than a quarter over the bound. So where the bound is a fraction of a degree, a tiny turn counts. We looked for an absolute tolerance in degrees that the data could set, and found one in how much the bound varies from run to run: about a degree. With that absolute tolerance, every site at a symbol or separator drops out. What stays are the operands at the first slice or two, chiefly on `pool 1–3, soft τ`.
 ///
 
-The paper review of the [recipe-compare report](/docs/m2/recipe-compare/report.py) asked whether the tolerance should ignore small shifts. In that report and the [fixed-effects report](/docs/m2/fixed-effects/report.py), every site over the tolerance has a bound of a few degrees or less, so a ratio over 1.25 can be a turn of a fraction of a degree. With a floor, a site would count only when the write is past both the ratio and the bound plus some number of degrees. The backlog item behind this report asked for that number to come from the measurement rather than be picked by eye.
+The paper review of the [recipe-compare report](/docs/m2/recipe-compare/report.py) asked whether the tolerance should ignore small shifts. In that report and the [fixed-effects report](/docs/m2/fixed-effects/report.py), every site over the relative tolerance has a bound of a few degrees or less, so a ratio over 1.25 can be a turn of a fraction of a degree. With an absolute tolerance, a site would count only when the write is past both the ratio and the bound plus some number of degrees. The backlog item behind this report asked for that number to come from the measurement rather than be picked by eye.
 
 This report needs no new runs. It uses the stored alignment with e₁ at every slice and position, clean and under the full edit, on the eight runs of each of four recipes: `τ_ℓ fixed` from the [fixed confirmation](/docs/m2/fixed-confirm/report.py), `falloff` from the [edit-effects report](/docs/m2/edit-effects/report.py), and `step, soft τ` and `pool 1–3, soft τ` from the recipe-compare report.
 """
@@ -280,17 +286,17 @@ This report needs no new runs. It uses the stored alignment with e₁ at every s
 f"""
 ## Observations
 
-- [The spread from the choice of contexts (E1)](#the-spread-from-the-choice-of-contexts-e1): drawing the held-out contexts again moves the excess of the write over the bound by a few hundredths of a degree, far less than any excess past the tolerance. So that spread cannot set the floor. The excess at the sites over the tolerance is a real feature of each run.
-- [The spread of the bound between runs (E2)](#the-spread-of-the-bound-between-runs-e2): where the bound is small, it differs from run to run by about half a degree, and by about a degree at the {FLOOR_Q:.0%} quantile. We take that degree as the floor.
-- [What the floor keeps (E3)](#what-the-floor-keeps-e3): every site at a `?`, `,` or ⏎ falls under the floor. The sites that clear it are all at operands, at slice 1 (and slice 2 on `step, soft τ`): one to three runs of the other recipes, and every run of the pool. A rule taken site by site (an excess over twice the seed spread at that site) flags about as many sites. But some of them are at symbols, where the bound hardly varies between runs.
+- [The spread from the choice of contexts (E1)](#the-spread-from-the-choice-of-contexts-e1): drawing the held-out contexts again moves the excess of the write over the bound by a few hundredths of a degree, far less than any excess past the relative tolerance. So that spread cannot set the absolute tolerance. The excess at the sites over the relative tolerance is a real feature of each run.
+- [The spread of the bound between runs (E2)](#the-spread-of-the-bound-between-runs-e2): where the bound is small, it differs from run to run by about half a degree, and by about a degree at the {ATOL_Q:.0%} quantile. We take that degree as the absolute tolerance.
+- [What the absolute tolerance keeps (E3)](#what-the-absolute-tolerance-keeps-e3): every site at a `?`, `,` or ⏎ falls under the absolute tolerance. The sites that clear it are all at operands, at slice 1 (and slice 2 on `step, soft τ`): one to three runs of the other recipes, and every run of the pool. A rule taken site by site (an excess over twice the seed spread at that site) flags about as many sites. But some of them are at symbols, where the bound hardly varies between runs.
 
 ## Scope and method
 
 This is an exploratory re-analysis, with no preregistration and no gate. It covers {sum(len(v) for v in SEEDS_OF.values())} runs: `τ_ℓ fixed` at seeds {SEEDS_OF[FIXED][0]} to {SEEDS_OF[FIXED][-1]}, and `falloff`, `step, soft τ` and `pool 1–3, soft τ` at seeds {SEEDS_OF[FALLOFF][0]} to {SEEDS_OF[FALLOFF][-1]}. Each run is scored on the {len(OP_IDS):,} held-out contexts of ex-2.2.21, under the full edit, which takes the e₁ component out of the state at every position and every slice.
 
-The bound and the write are computed as in the fixed-effects report, and give the same counts over the tolerance for its two recipes. A site is one slice past the embedding and one position, {N_SITES} per run. At the embedding the write equals the bound by construction, so it is left out.
+The bound and the write are computed as in the fixed-effects report, and give the same counts over the relative tolerance for its two recipes. A site is one slice past the embedding and one position, {N_SITES} per run. At the embedding the write equals the bound by construction, so it is left out.
 
-We left out one source the item suggested for the floor: the write that an edit along a reference direction gives at the same sites. The stored arrays hold the alignment with e₁ only, so that would need a new measurement pass.
+We left out one source the item suggested for the absolute tolerance: the write that an edit along a reference direction gives at the same sites. The stored arrays hold the alignment with e₁ only, so that would need a new measurement pass.
 
 ## The measurements
 
@@ -303,8 +309,11 @@ Write
 Excess
 :   The write less the bound, in degrees. Positive when the blocks after the edit put more e₁ on the other ops than the clean model has there.
 
-Over the tolerance
-:   A site where the write is more than {TOLERANCE}× the bound, the tolerance of H4 in ex-2.2.1, each run taken on its own.
+Over the relative tolerance
+:   A site where the write is more than {TOLERANCE}× the bound, the tolerance of H4 in ex-2.2.1, each run taken on its own. We call this the relative tolerance.
+
+Absolute tolerance
+:   An excess in degrees that a site must also pass to count. A site over both counts; one over the relative tolerance alone does not.
 
 Seed spread
 :   The standard deviation of the bound at one site over the eight runs of one recipe.
@@ -328,7 +337,7 @@ boot_rows = [
 BOOT_TABLE = table_html(
     ["recipe", "sites over", "excess there", "spread there, median", "spread there, largest"],
     boot_rows,
-    f"""**The excess at the sites over the tolerance, against its spread from the choice of contexts.** The sites
+    f"""**The excess at the sites over the relative tolerance, against its spread from the choice of contexts.** The sites
     over count slice and position pairs past the embedding over the eight runs of each recipe, each run taken on
     its own. The spread is the standard deviation of the excess over {N_BOOT} draws of the held-out contexts with
     replacement, at each of those sites.""",
@@ -337,27 +346,27 @@ BOOT_TABLE = table_html(
 f"""
 ## The spread from the choice of contexts (E1)
 
-The bound and the write are each a {Q:.0%} quantile over about {N_STATES:,} states, so they would move a little on another set of contexts. If that movement were as large as the excess at the sites over the tolerance, it would be the natural floor: an excess within it could be an accident of which contexts were held out. We drew the contexts again with replacement {N_BOOT} times per run, took the bound and the write on the same draw, and measured the spread of the excess at each site.
+The bound and the write are each a {Q:.0%} quantile over about {N_STATES:,} states, so they would move a little on another set of contexts. If that movement were as large as the excess at the sites over the relative tolerance, it would be the natural absolute tolerance: an excess within it could be an accident of which contexts were held out. We drew the contexts again with replacement {N_BOOT} times per run, took the bound and the write on the same draw, and measured the spread of the excess at each site.
 
 {BOOT_TABLE}
 
-The spread is tiny next to the excess. At the sites over the tolerance it is a few hundredths of a degree at the median, and the excess there is about {Z_MEDIAN:.0f} times its own spread at the median. The closest case is an operand site with a bound of about 6°, where the spread is nearly a degree and the excess {Z_MIN:.1f} times that. The spread is wider on `step, soft τ` and the pool, which have more of their sites over the tolerance at operands, where the bound is a few degrees, but it stays at hundredths of a degree at the median there too. So the excess at every site over the tolerance would survive another set of contexts drawn the same way.
+The spread is tiny next to the excess. At the sites over the relative tolerance it is a few hundredths of a degree at the median, and the excess there is about {Z_MEDIAN:.0f} times its own spread at the median. The closest case is an operand site with a bound of about 6°, where the spread is nearly a degree and the excess {Z_MIN:.1f} times that. The spread is wider on `step, soft τ` and the pool, which have more of their sites over the relative tolerance at operands, where the bound is a few degrees, but it stays at hundredths of a degree at the median there too. So the excess at every site over the relative tolerance would survive another set of contexts drawn the same way.
 
-Whether a site stays over the tolerance is a narrower question. The tolerance line is at an excess of a quarter of the bound, not at zero. {N_NEAR_LINE} of the {len(Z)} sites are within twice their spread of that line, and another draw could put those under it.
+Whether a site stays over the relative tolerance is a narrower question. The tolerance line is at an excess of a quarter of the bound, not at zero. {N_NEAR_LINE} of the {len(Z)} sites are within twice their spread of that line, and another draw could put those under it.
 """
 
 # %%
 
 
 @memo
-def spread_draw(sd: dict, mean: dict, floor: float, small: float, alt_text: str) -> str:
+def spread_draw(sd: dict, mean: dict, atol: float, small: float, alt_text: str) -> str:
     @themed(
         name="write-floor-spread",
         alt_text=alt_text,
         caption=f"""
             **How much the bound varies between runs, by how wide it is.** Each point is one site (a slice past the
             embedding and a position) of one recipe: the seed mean of the bound on the horizontal axis, and its
-            standard deviation over the eight runs on the vertical. Both axes are logarithmic. The solid line is the floor, the {FLOOR_Q:.0%} quantile
+            standard deviation over the eight runs on the vertical. Both axes are logarithmic. The solid line is the absolute tolerance, the {ATOL_Q:.0%} quantile
             of the spread over the sites with a seed-mean bound under {small:.0f}° (left of the dotted line).
         """,
     )
@@ -365,7 +374,7 @@ def spread_draw(sd: dict, mean: dict, floor: float, small: float, alt_text: str)
         fig, ax = plt.subplots(figsize=(5.6, 3.2), layout="constrained")
         for n in RECIPES:
             ax.scatter(mean[n], sd[n], s=9, marker=MARK[n], color=ink(n), alpha=0.7, lw=0, label=SHOWN[n])
-        ax.axhline(floor, color=rule(), lw=1.0)
+        ax.axhline(atol, color=rule(), lw=1.0)
         ax.axvline(small, color=rule(), lw=0.8, ls=":")
         ax.set_xscale("log")
         ax.set_yscale("log")
@@ -381,28 +390,28 @@ def spread_draw(sd: dict, mean: dict, floor: float, small: float, alt_text: str)
 def spread_figure() -> str:
     alt = (
         f"The seed spread rises with the bound across three clusters (symbols about {SD_TINY_MEDIAN:.1f}°, operands "
-        f"half a degree to a degree, answers about {SD_LARGE_MEDIAN:.0f}°); the floor at {FLOOR:.1f}° is above nearly every "
+        f"half a degree to a degree, answers about {SD_LARGE_MEDIAN:.0f}°); the absolute tolerance at {ATOL:.1f}° is above nearly every "
         "small-bound site."
     )
     data_sd = {n: SEED_SD[n].ravel() for n in RECIPES}
     data_mean = {n: np.maximum(SEED_MEAN[n].ravel(), 1e-2) for n in RECIPES}
-    return spread_draw(data_sd, data_mean, FLOOR, SMALL, alt)
+    return spread_draw(data_sd, data_mean, ATOL, SMALL, alt)
 
 
 f"""
 ## The spread of the bound between runs (E2)
 
-The bound differs from one trained run to the next, by much more than it does from one set of contexts to another. An excess smaller than that seed spread is within what training alone moves the bound by, so the seed spread is a candidate for the floor. The figure shows it at every site, against how wide the bound is there.
+The bound differs from one trained run to the next, by much more than it does from one set of contexts to another. An excess smaller than that seed spread is within what training alone moves the bound by, so the seed spread is a candidate for the absolute tolerance. The figure shows it at every site, against how wide the bound is there.
 
 {spread_figure()}
 
-The spread grows with the bound, and the sites fall into three groups. At the symbols and separators the bound is under a degree, and it spreads by about {SD_TINY_MEDIAN:.1f}° between runs. At the operands it is a few degrees, and spreads by about half a degree to a degree. At the answers it is tens of degrees and spreads by about {SD_LARGE_MEDIAN:.0f}°, but no site there goes over the tolerance: every site that does has a bound under {OVER_BOUND_MAX:.0f}°.
+The spread grows with the bound, and the sites fall into three groups. At the symbols and separators the bound is under a degree, and it spreads by about {SD_TINY_MEDIAN:.1f}° between runs. At the operands it is a few degrees, and spreads by about half a degree to a degree. At the answers it is tens of degrees and spreads by about {SD_LARGE_MEDIAN:.0f}°, but no site there goes over the relative tolerance: every site that does has a bound under {OVER_BOUND_MAX:.0f}°.
 
-Over the sites with a bound under {SMALL:.0f}°, the seed spread is {SD_SMALL_MEDIAN:.2f}° at the median and {FLOOR:.2f}° at the {FLOOR_Q:.0%} quantile. We take the second as the floor: an excess larger than that is more than the bound moves between runs at {FLOOR_Q:.0%} of the small-bound sites. The operand sites set it, since the bound at every symbol and separator spreads by less.
+Over the sites with a bound under {SMALL:.0f}°, the seed spread is {SD_SMALL_MEDIAN:.2f}° at the median and {ATOL:.2f}° at the {ATOL_Q:.0%} quantile. We take the second as the absolute tolerance: an excess larger than that is more than the bound moves between runs at {ATOL_Q:.0%} of the small-bound sites. The operand sites set it, since the bound at every symbol and separator spreads by less.
 
-The floor depends a little on which sites go into the pool. The symbol sites are two fifths of it (the `=` sites, whose bound is a few degrees, are most of the rest). They are well under the floor and pull the quantile down: over the operand sites alone it is {OPERAND_FLOOR:.2f}°. Taken one recipe at a time, the median is the same on all four, and the {FLOOR_Q:.0%} quantile runs from {min(RECIPE_FLOOR.values()):.2f}° to {max(RECIPE_FLOOR.values()):.2f}°.
+The absolute tolerance depends a little on which sites go into the pool. The symbol sites are two fifths of it (the `=` sites, whose bound is a few degrees, are most of the rest). They are well under the absolute tolerance and pull the quantile down: over the operand sites alone it is {OPERAND_ATOL:.2f}°. Taken one recipe at a time, the median is the same on all four, and the {ATOL_Q:.0%} quantile runs from {min(RECIPE_ATOL.values()):.2f}° to {max(RECIPE_ATOL.values()):.2f}°.
 
-The cut at {SMALL:.0f}° leaves out the answers. Their spread comes from the tail of states found in the fixed-effects report, and including them would lift the floor past anything the small-bound sites need.
+The cut at {SMALL:.0f}° leaves out the answers. Their spread comes from the tail of states found in the fixed-effects report, and including them would lift the absolute tolerance past anything the small-bound sites need.
 """
 
 # %%
@@ -410,15 +419,15 @@ The cut at {SMALL:.0f}° leaves out the answers. Their spread comes from the tai
 
 @memo
 def keep_draw(bound: dict, excess: dict, over: dict, syntax: np.ndarray, sweep: np.ndarray, count: dict,
-              floor: float, alt_text: str) -> str:  # fmt: skip
+              atol: float, alt_text: str) -> str:  # fmt: skip
     @themed(
         name="write-floor-keep",
         alt_text=alt_text,
         caption=f"""
-            **Left:** the sites over the tolerance, by the bound there and the excess of the write over it, on all
+            **Left:** the sites over the relative tolerance, by the bound there and the excess of the write over it, on all
             four recipes, each run taken on its own. Hollow markers are at a `?`, `,` or ⏎, filled ones at an
-            operand. **Right:** how many of them stay over as the floor rises, per recipe over its eight runs. The
-            solid line in both panels is the floor of E2, {floor:.2f}°.
+            operand. **Right:** how many of them stay over as the absolute tolerance rises, per recipe over its eight runs. The
+            solid line in both panels is the absolute tolerance of E2, {atol:.2f}°.
         """,
     )
     def _plot() -> plt.Figure:
@@ -428,13 +437,13 @@ def keep_draw(bound: dict, excess: dict, over: dict, syntax: np.ndarray, sweep: 
             left.scatter(b[sy], e[sy], s=14, marker=MARK[n], facecolor="none", edgecolor=ink(n), lw=0.8)
             left.scatter(b[~sy], e[~sy], s=14, marker=MARK[n], color=ink(n), lw=0, label=SHOWN[n])
             right.plot(sweep, count[n], color=ink(n), lw=1.3, label=SHOWN[n])
-        left.axhline(floor, color=rule(), lw=1.0)
-        right.axvline(floor, color=rule(), lw=1.0)
+        left.axhline(atol, color=rule(), lw=1.0)
+        right.axvline(atol, color=rule(), lw=1.0)
         left.set_xlabel("bound (°)", fontsize=8)
         left.set_ylabel("write less bound (°)", fontsize=8)
         left.set_xlim(0, None)
         left.set_ylim(0, None)
-        right.set_xlabel("floor (°)", fontsize=8)
+        right.set_xlabel("absolute tolerance (°)", fontsize=8)
         right.set_ylabel("sites still over", fontsize=8)
         right.set_ylim(0, None)
         for ax in (left, right):
@@ -447,11 +456,11 @@ def keep_draw(bound: dict, excess: dict, over: dict, syntax: np.ndarray, sweep: 
 
 def keep_figure() -> str:
     alt = (
-        "Symbol sites cluster near zero under the floor; the operand sites above it are mostly on pool 1–3, soft τ, "
-        f"which keeps {BOTH[POOL].sum()} past the floor against {BOTH[FIXED].sum()} to "
+        "Symbol sites cluster near zero under the absolute tolerance; the operand sites above it are mostly on pool 1–3, soft τ, "
+        f"which keeps {BOTH[POOL].sum()} past the absolute tolerance against {BOTH[FIXED].sum()} to "
         f"{max(BOTH[n].sum() for n in (FALLOFF, STEP_SOFT))} for the other recipes."
     )
-    return keep_draw(BOUND, EXCESS, OVER, SYNTAX, SWEEP, COUNT_AT, FLOOR, alt)
+    return keep_draw(BOUND, EXCESS, OVER, SYNTAX, SWEEP, COUNT_AT, ATOL, alt)
 
 
 keep_rows = [
@@ -469,31 +478,40 @@ keep_rows = [
 ]
 
 KEEP_TABLE = table_html(
-    ["recipe", "over the tolerance", "at a symbol", "over both", "runs", "slices", "twice the seed spread", "1° floor"],
+    [
+        "recipe",
+        "over the relative tolerance",
+        "at a symbol",
+        "over both",
+        "runs",
+        "slices",
+        "twice the seed spread",
+        "1° absolute",
+    ],
     keep_rows,
-    f"""**The sites over the tolerance, and those over the floor as well**, per recipe over its eight runs, each run
+    f"""**The sites over the relative tolerance, and those over the absolute tolerance as well**, per recipe over its eight runs, each run
     taken on its own. "At a symbol" counts those at a `?`, `,` or ⏎. "Over both" counts those whose excess is
-    also over the floor of E2 ({FLOOR:.2f}°), with the runs and slices they fall on. The last two columns give the
+    also over the absolute tolerance of E2 ({ATOL:.2f}°), with the runs and slices they fall on. The last two columns give the
     count over both under two other rules: an excess over twice the seed spread at that site (in brackets, how
-    many of those are at a symbol), and a floor of a whole degree.""",
+    many of those are at a symbol), and an absolute tolerance of a whole degree.""",
 )
 
 f"""
-## What the floor keeps (E3)
+## What the absolute tolerance keeps (E3)
 
-The figure places each site over the tolerance by its bound and its excess, and counts how many stay over as the floor rises.
+The figure places each site over the relative tolerance by its bound and its excess, and counts how many stay over as the absolute tolerance rises.
 
 {keep_figure()}
 
-The sites over the tolerance are of two kinds. The bound separates them cleanly, and the floor does so only in part. At the symbols and separators (`?`, `,` and ⏎) the bound is under a degree at all but {N_SYNTAX_OVER_DEGREE} of them and at most {SYNTAX_BOUND_MAX:.1f}°, the excess is at most {SYNTAX_EXCESS_MAX:.1f}°, and every one of them falls under the floor. They make up most of the sites over the tolerance on `τ_ℓ fixed` and `falloff` (the table below). At the operands the bound is a few degrees, and the excess ranges from {OPERAND_EXCESS_MIN:.1f}° to several degrees. So the floor takes out every symbol site, and {N_OPERAND_UNDER} of the {N_OPERAND_OVER} operand sites, those with the smallest excess. No site at `=` or at an answer goes over the tolerance. Every site that clears the floor is at an operand, at slice {" or ".join(str(s) for s in sorted(set().union(*SLICES_WITH.values())))}.
+The sites over the relative tolerance are of two kinds. The bound separates them cleanly, and the absolute tolerance does so only in part. At the symbols and separators (`?`, `,` and ⏎) the bound is under a degree at all but {N_SYNTAX_OVER_DEGREE} of them and at most {SYNTAX_BOUND_MAX:.1f}°, the excess is at most {SYNTAX_EXCESS_MAX:.1f}°, and every one of them falls under the absolute tolerance. They make up most of the sites over the relative tolerance on `τ_ℓ fixed` and `falloff` (the table below). At the operands the bound is a few degrees, and the excess ranges from {OPERAND_EXCESS_MIN:.1f}° to several degrees. So the absolute tolerance takes out every symbol site, and {N_OPERAND_UNDER} of the {N_OPERAND_OVER} operand sites, those with the smallest excess. No site at `=` or at an answer goes over the relative tolerance. Every site that clears the absolute tolerance is at an operand, at slice {" or ".join(str(s) for s in sorted(set().union(*SLICES_WITH.values())))}.
 
 {KEEP_TABLE}
 
 On `τ_ℓ fixed`, `falloff` and `step, soft τ` a few operand sites stay, on one to three runs each. On `pool 1–3, soft τ` every run keeps some, {BOTH[POOL].sum()} sites in all, with a median excess of {POOL_EXCESS_MEDIAN:.1f}° on bounds of about 4°. At those sites, block 1 puts e₁ back on the operands of the other ops, up to about twice what the clean model has there. That is the slice where the recipe-compare report found the pool spilling, and the one slice the pool pulls and the step leaves alone.
 
-A floor of one whole degree keeps the same kind of sites, all at operands, with a few more of them: two more on `τ_ℓ fixed` (whose excess at the operands of one run is just over a degree), two more on `step, soft τ`, and one more on the pool. The count on the recipe of record shifts when the floor moves by a few tenths of a degree, but the split between the two kinds does not.
+An absolute tolerance of one whole degree keeps the same kind of sites, all at operands, with a few more of them: two more on `τ_ℓ fixed` (whose excess at the operands of one run is just over a degree), two more on `step, soft τ`, and one more on the pool. The count on the recipe of record shifts when the absolute tolerance moves by a few tenths of a degree, but the split between the two kinds does not.
 
-A rule taken site by site counts a site when the excess there is over twice the seed spread of the bound at that site. It keeps {POOL_SHARED} of the {BOTH[POOL].sum()} pool sites that the floor keeps, and about as many sites as the floor on the other recipes, though on `τ_ℓ fixed` the two rules share none.
+A rule taken site by site counts a site when the excess there is over twice the seed spread of the bound at that site. It keeps {POOL_SHARED} of the {BOTH[POOL].sum()} pool sites that the absolute tolerance keeps, and about as many sites as the absolute tolerance on the other recipes, though on `τ_ℓ fixed` the two rules share none.
 
 It also keeps {sum(PER_SITE_SYNTAX.values())} sites at symbols, with excesses of up to {PER_SITE_SYNTAX_EXCESS:.1f}°. The bound at a symbol spreads by only about {SYNTAX_SD_MEDIAN:.1f}° between runs, so a small excess there is large for that site. In turn, the rule drops some operand sites, where the spread is wider. The two rules ask different questions: whether the turn is large in degrees, or unusual for that site.
 """
@@ -503,13 +521,13 @@ It also keeps {sum(PER_SITE_SYNTAX.values())} sites at symbols, with excesses of
 f"""
 ## Discussion
 
-The tolerance of ex-2.2.1, taken as a ratio alone, mixes two kinds of site: symbols and separators, where the clean model puts almost no e₁ and the write adds a fraction of a degree, and operands at the first slice or two, where the write adds a degree or more to a bound of a few degrees. A floor of about a degree removes the first kind and keeps most of the second.
+The tolerance of ex-2.2.1, taken as a ratio alone, mixes two kinds of site: symbols and separators, where the clean model puts almost no e₁ and the write adds a fraction of a degree, and operands at the first slice or two, where the write adds a degree or more to a bound of a few degrees. An absolute tolerance of about a degree removes the first kind and keeps most of the second.
 
-We are fairly sure of the split under an absolute floor. It holds for any floor above the largest excess at a symbol, {SYNTAX_EXCESS_MAX:.1f}°, and the two kinds are apart in bound on the left of the E3 figure, though their excesses overlap a little below the floor. A rule relative to each site would draw the line elsewhere, flagging a few symbol sites whose small excess is unusual for that site. Which of the two a gate wants is a choice about what the tolerance is for.
+We are fairly sure of the split under an absolute tolerance. It holds for any absolute tolerance above the largest excess at a symbol, {SYNTAX_EXCESS_MAX:.1f}°, and the two kinds are apart in bound on the left of the E3 figure, though their excesses overlap a little below the absolute tolerance. A rule relative to each site would draw the line elsewhere, flagging a few symbol sites whose small excess is unusual for that site. Which of the two a gate wants is a choice about what the relative tolerance is for.
 
-We are less sure of the exact floor. It rests on eight runs per recipe, and on the choice of the {FLOOR_Q:.0%} quantile and the cut at {SMALL:.0f}°. It also rests on taking the quantile over the symbol and operand sites together. The operand sites alone would put it a few tenths of a degree higher (E2), and a few more sites would fall under it. A reference direction, edited at the same sites, would give a second scale for it that this report could not measure from stored data.
+We are less sure of the exact absolute tolerance. It rests on eight runs per recipe, and on the choice of the {ATOL_Q:.0%} quantile and the cut at {SMALL:.0f}°. It also rests on taking the quantile over the symbol and operand sites together. The operand sites alone would put it a few tenths of a degree higher (E2), and a few more sites would fall under it. A reference direction, edited at the same sites, would give a second scale for it that this report could not measure from stored data.
 
-If the floor were adopted, the reports that quote the tolerance would count one site over both on the recipe of record and {BOTH[FALLOFF].sum()} on `falloff`, all at operands of a single run on each recipe. They would also count sites on every run of `pool 1–3, soft τ`. The pool would then stand apart on the write as it already does on spill, at the same slice.
+If the absolute tolerance were adopted, the reports that quote the relative tolerance would count one site over both on the recipe of record and {BOTH[FALLOFF].sum()} on `falloff`, all at operands of a single run on each recipe. They would also count sites on every run of `pool 1–3, soft τ`. The pool would then stand apart on the write as it already does on spill, at the same slice.
 """
 
 # %%
@@ -521,7 +539,7 @@ r"""
 :   `pool 1–3, soft τ` removes about as much as `falloff` and costs the task least, but its edit spills over the criterion on two seeds, and that spill enters with the edit at block 1.
 
 [fixed-effects report](/docs/m2/fixed-effects/report.py)
-:   On `τ_ℓ fixed` the write stays within the clean bound past the embedding, as on `falloff`, with a few dozen sites over the tolerance of ex-2.2.1, all where the bound is a few degrees.
+:   On `τ_ℓ fixed` the write stays within the clean bound past the embedding, as on `falloff`, with a few dozen sites over the relative tolerance of ex-2.2.1, all where the bound is a few degrees.
 
 [fixed confirmation](/docs/m2/fixed-confirm/report.py)
 :   `τ_ℓ fixed` keeps the anchor on all eight runs at seeds 712 to 719 and is the recipe of record for D2.2.
