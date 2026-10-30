@@ -85,7 +85,7 @@ r"""
 Three sets of contexts, which never share a context: a fit set the directions are fitted on, a tuning set the configuration is chosen on, and the test set every published D2.2 score is taken on.
 
 Fit set
-:   14,000 fresh contexts, 2,000 per op, from the training generator of the run with its replacement op noise, each with its generating op and its posterior over ops. The states are those of the clean pass of the run at every slice and position.
+:   280,000 fresh contexts, 40,000 per op, from the training generator of the run with its replacement op noise, each with its generating op and its posterior over ops: about the size of the training corpus, and drawn the way it was. The states are those of the clean pass of the run at every slice and position, and the fits are made from means and covariances accumulated over the set, so the states need not be held at once.
 
 Tuning set
 :   Another 14,000 fresh contexts from the same generator, drawn the same way.
@@ -93,25 +93,29 @@ Tuning set
 Test set
 :   The 14,000 held-out contexts of ex-2.2.21, 2,000 per op, so the anchored numbers need no recomputing.
 
-Every method is fitted with a label on every `difference` context. The anchor had a label on a fiftieth of them at each visit, but the draw is made again at every visit, so over 400 epochs most `difference` contexts were labelled at some point. In distinct labelled contexts the fitters and the anchor are about level; what the fitters lack is a term that shaped the whole representation around the concept, and that is the thing being measured. The fitters also get a graded target, the posterior on `difference` given the examples, which takes away the noise of a label that marks the generating op even where the examples point elsewhere.
+Every method is fitted with a label on every `difference` context. The anchor had a label on a fiftieth of them at each visit, but the draw is made again at every visit, so over 400 epochs about three quarters of the `difference` contexts were labelled at some point, about one and a half times each. So in distinct labelled contexts the fit set and the anchor are about level, though the anchor met its labels a few hundred per pass over the corpus, through a stochastic term, and the fitters see all of theirs at once, in closed form. What the fitters lack is a term that shaped the whole representation around the concept, and that is the thing being measured; how much the label count itself matters to them is what the ladder of E3 measures.
+<!-- REVIEW: the plan said the fitters get "fifty times the labels the anchor saw", and the first draft said "about level" for a fit set of 2,000 `difference` contexts. Under the context labeller (`sca.anchoring._context_mask`) the 1/50 draw is fresh at every visit; at 300k contexts of 24 tokens, a window of 96, an epoch of a quarter of the corpus, and 400 epochs, a context is wholly in view about 70 times, so about 0.75 of the 43k `difference` contexts draw a label at least once (34k distinct, about 650 per pass over the corpus). The fit set was enlarged to 40k `difference` contexts so the claim holds and the bottom rung of E3 (800 contexts) is not a sample-size test. Verify: `(1 - 0.02) ** 70`, and the fit set size above. -->
+
+The fitters also get a graded target, the posterior on `difference` given the examples, which takes away the noise of a label that marks the generating op even where the examples point elsewhere.
 
 Each method then gets a grid over how it is fitted, where it acts, and how much it removes:
 
 | Factor | Levels |
 | --- | --- |
-| Target | binary (the generating op); graded (the posterior on `difference`), for the probe, LEACE, INLP, and the optimized direction |
+| Target | binary (the generating op); graded (the posterior on `difference`), for the probe, LEACE, and the optimized direction |
 | Sites fitted | every position of a context, pooled; the example answers; the query `=` |
 | Slices edited | each slice alone; slices 1 to 3; every slice |
 | Sequential refit | when several slices are edited, the fit at each slice may be made on the states as they arrive under the edits before it |
 | Positions edited | every position; or the sites fitted |
 | Dose | 0.25, 0.5, 0.75, and 1 of the component removed |
 | Replacement | zero (the projection); or the mean coefficient over the contexts of the other ops (mean ablation) |
-| Rank | 2, 4, or 8, for INLP |
+| Rank | 2, 4, or 8, for INLP, on the binary target |
 
 The fits at the example answers and the query `=` use role labels a real corpus does not have, so they are generous diagnostics rather than candidate recipes, and the tables mark which sites each selected configuration used. The anchor gets no grid. Its one configuration is the published edit, reached through some thirty experiments at other seeds, and the fitters arrive with their own literatures behind them and a per-run grid on top.
 
 Selection rule (frozen)
-:   Per method and per run, every configuration is scored on the tuning set, and the frontier is taken: the configurations that no other beats on both removal and spill. Two points are read off the frontier. *Removal at the criterion* is where the frontier crosses a spill of 0.02, interpolated linearly between the two frontier configurations that bracket it, or the configuration with the least spill if none is within the criterion. *Spill at matched removal* is where the frontier crosses the seed mean of the anchored removal, interpolated the same way; a frontier that never reaches that removal has no such point, and the run is recorded as not matched. The bracketing configurations are then scored on the test set, and each point is the same interpolation of their test scores. The tuning set uses raw drops, so that a baseline is computed only for the configurations that are scored on the test set.
+:   Per method and per run, every configuration is scored on the tuning set, net of the median drop under the same operator form along fifteen fixed coordinate axes other than e₁, and the frontier is taken: the configurations that no other beats on both removal and spill. Two points are read off the frontier. *Removal at the criterion* is where the frontier crosses a spill of 0.02, interpolated linearly between the two frontier configurations that bracket it, or the configuration with the least spill if none is within the criterion. *Spill at matched removal* is where the frontier crosses the seed mean of the anchored removal, interpolated the same way; a frontier that never reaches that removal has no such point, and the run is recorded as not matched. The bracketing configurations are then scored on the test set, and each point is their test scores mixed with the weights found on the tuning set, so the test set chooses nothing, and the point can sit a little off the line on the test set; the table shows where it sits.
+<!-- REVIEW: the first draft took the tuning frontier on raw drops. A typical coordinate axis of a control costs about 0.03 per op at full dose (reference-baseline), so raw 0.02 on the tuning set would have meant about −0.01 net, and the selection would have sat inside the criterion it is judged against, biased against the fitters. The axis median is fitter-independent, so fifteen axes per operator form cost about 2,500 passes per run. Verify: the axis subsample is fixed before the run, and the test-set baselines are the full ones of the Measurements. -->
 
 Removal at the criterion is what a practitioner with one of these methods would do: sweep the layer and the strength on a validation set, keep the side effects within a tolerance, and take the strongest edit that does.
 """
@@ -179,6 +183,10 @@ r"""
 
 **What we expect.** The optimized direction comes closer to the anchor than any standard fitter does, on both measures: its removal at the criterion is at least the highest seed mean among the standard fitters, and its count over the criterion at matched removal is at most the lowest. It passes if both hold, and misses if neither does; one without the other would be outside the plan, and the verdict would be Unresolved. Beside the verdict we say how it stands against the anchor. If its Welch interval on removal at the criterion contains zero and the Fisher test does not separate its count from the anchor, it matches the anchor, and the advantage of placing the concept is that no search is needed. If the interval lies above zero, it falls short too, and the control holds the op in a way no rank-1 edit removes cleanly, which is the stronger claim for the anchor.
 
+/// admonition | Open decision
+The verdict here sits on the clause that changes the post least (the ceiling beats the standard fitters), while the clause that decides how the post is framed (whether the ceiling matches the anchor) carries none. The alternative is to split it: H3a, the ceiling against the standard fitters as above; H3b, the ceiling against the anchor, with "matches" (interval contains zero and Fisher does not separate) and "falls short" (interval above zero) as the two named outcomes, and anything else Unresolved. Proposed: split, so a reader of the Findings meets the outcome that matters.
+///
+
 /// admonition | TODO
 The two measures for the optimized direction beside the standard fitters and the anchor, per run.
 ///
@@ -189,7 +197,7 @@ The two measures for the optimized direction beside the standard fitters and the
 r"""
 ## The fitters find a placed concept (H4)
 
-**What we expect.** On the anchored runs, each standard fitter finds e₁. Restricted to fits on the pooled positions or at the example answers, the configuration selected for removal at the criterion has a fitted direction at each of slices 1 to 3 within a cosine of 0.9 of e₁ (the seed mean of its absolute value; for INLP, the largest cosine between e₁ and the span), and removes within 0.1 of what the edit along e₁ removes on the same runs. A fitter passes if both hold, and misses if either does not. The query `=` is left out: the clean alignment there is near zero in the anchored runs (the mid-block-edit experiment), so a fit at that site is not expected to find e₁.
+**What we expect.** On the anchored runs, each standard fitter finds e₁. Restricted to fits on the pooled positions or at the example answers, take the configuration selected for removal at the criterion. Its target and site give a clean-state fit at each of slices 1 to 3, whichever slices the configuration edits, and each of those directions should be within a cosine of 0.9 of e₁ (the seed mean of its absolute value; for INLP, the largest cosine between e₁ and the span). Its removal at the criterion should be within 0.1 of what the edit along e₁ removes at full dose on the same runs. A fitter passes if both hold, and misses if either does not. A fitter that finds e₁ but has to stop short of it to stay within the criterion, as INLP may when its extra directions cost spill, misses: it would not be a fair stand-in for its method on the controls either. The query `=` is left out: the clean alignment there is near zero in the anchored runs (the mid-block-edit experiment), so a fit at that site is not expected to find e₁.
 
 The rule for a miss, frozen here: a fitter that misses H4 is left out of the verdicts of H1 to H3, its rows stay in the tables marked as such, and the report names it as a method the comparison could not fairly score.
 
@@ -215,7 +223,7 @@ Grading by posterior bin per method beside the anchor; landing on both scales; c
 r"""
 ## How many labels a fitter needs (E3)
 
-At the configuration each method selects, the fit is repeated with labels on every `difference` context, on a fixed half, a tenth, and a fiftieth of them, with the unlabelled `difference` contexts counted among the others, as an unlabelled context is for the anchor. A fixed fiftieth is fewer distinct labels than the anchor saw, since its draw is made again at each visit, so the lowest rung is harsher than the anchor had it.
+At the configuration each method selects, the fit is repeated with labels on every `difference` context of the fit set, on a fixed half, a tenth, and a fiftieth of them, with the unlabelled `difference` contexts counted among the others, as an unlabelled context is for the anchor. A fixed fiftieth is 800 contexts, about what the anchor met in one pass over the corpus and far fewer than it met over training, so the lowest rung is harsher than the anchor had it.
 
 /// admonition | TODO
 Removal at the criterion (y) against the label rate (x, log scale), per method, with the anchor as a horizontal line.
@@ -275,9 +283,9 @@ r"""
 
 **The optimized direction.** A unit vector per edited slice, initialized at the difference in means and fitted by Adam for a few hundred steps on the fit set: the KL divergence from the target null to the edited answers on `difference` contexts, plus a weight times the KL divergence from the clean answers to the edited ones on the other contexts, at full dose. The weight takes four values, and the dose and slice sets are crossed as for the others. Its configurations join the frontier like any other.
 
-**Grid size.** About 360 configurations for difference in means, 720 for the probe and for LEACE, and about 1,000 for INLP, counting doses; each is one scoring pass over the tuning set, reading the logits at the query answer only. A fit is made once per (target, site, slice, refit) and reused across doses and positions.
+**Grid size.** About 360 configurations for difference in means, 720 for the probe and for LEACE, and about 1,080 for INLP, counting doses; each is one scoring pass, reading the logits at the query answer only. The whole grid is scored on the tuning set, and again on the test set for the figure of E1, where nothing is chosen. A fit is made once per (target, site, slice, refit) and reused across doses and positions.
 
-**The baseline.** Fifteen permuted fits per configuration scored on the test set, at the bracketing configurations of each point. LEACE is homogeneous in its covariance vector, so a permuted fit is a full-strength oblique erasure along a reference direction. The coordinate-axis median applies the same operator form (slices, positions, dose, replacement) along each of the 63 axes other than e₁; it does not depend on the fitter, so it is computed once per form.
+**The baseline.** On the tuning set, the median over fifteen coordinate axes other than e₁, drawn once with a fixed seed before the run and shared by every run. On the test set, fifteen permuted fits per configuration, at the bracketing configurations of each point. LEACE is homogeneous in its covariance vector, so a permuted fit is a full-strength oblique erasure along a reference direction. The coordinate-axis median applies the same operator form (slices, positions, dose, replacement) along each of the 63 axes other than e₁; it does not depend on the fitter, so it is computed once per form.
 
 **Comparisons.** Each method against the anchor as two samples of eight runs: the difference of seed means with a 95% Welch t interval, and Fisher's exact test for counts of runs over the criterion.
 
@@ -291,7 +299,7 @@ Whether the control holds the evidence for the op at the example answers, as the
 Whether to run the same comparison for *red* on the D2.1 checkpoints, where ex-2.2.1 gave the fitters far less. The code would carry over as it is. Proposed: not in this report, which is about the inferred op; a backlog item, to take up if the post or the paper shows the *red* result beside this one.
 ///
 
-**Cost.** No training. Each run takes about 3,500 scoring passes on the tuning and test sets, and the anchored runs the same for H4, so sixteen runs come to about 56,000 passes plus the state passes for sequential refit and the optimized direction. The plan estimates eight to ten L4-hours as eight containers in parallel, about \$15, with \$25 as the ceiling; the smoke test gives the figure for the full run before it starts.
+**Cost.** No training. Each run takes about 6,000 scoring passes: the grid on the tuning and test sets, the axis baseline on the tuning set, the permuted fits, and the ladder. The anchored runs take the same for H4, so sixteen runs come to about 100,000 passes, plus the state passes over the fit set and for sequential refit, and the optimized direction. The plan estimates eight to ten L4-hours as eight containers in parallel, about \$15, with \$25 as the ceiling; the smoke test gives the figure for the full run before it starts.
 """
 
 # %%
