@@ -35,4 +35,4 @@ The step had five scatter-adds, which are the gradients of indexing: two residua
 
 Peak memory was about 125 MB per seed, so memory was never the limit: a pack of 64 used 8 GB of the A100.
 
-Two results bear on other work, and they are taken up in [`scatter-free-training-step`](./scatter-free-training-step.md): the scatter-free step is faster for every run, packed or not, and the fallback cards differ a lot per dollar. The probe cost about $6.40 in all.
+Two results bear on other work, and they are taken up in [`scatter-free-training-step`](./scatter-free-training-step.md): the scatter-free step is faster for every run, packed or not, and the fallback cards differ a lot per dollar. The probe cost about $6.60 in all.
