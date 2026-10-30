@@ -61,12 +61,13 @@ KEEP = tuple(sorted({*fc.STOP_KEEP, *fc.FINISH_KEEP}))
 """The checkpoints the fixed confirmation's runs kept, over both of their stages."""
 DRAW_SALT = 50
 """Folded into the model seed for the label draw, so it is a stream of its own."""
-RATES: dict[str, float] = {"r50": lean.ex2216.LABEL_RATE, "r10": 0.1}
-"""The fixed draw's rates by tag: the recipe's 1/50, and 1/10, about the geometric middle between the 1/50 draw's
-count of labelled `difference` contexts (about 900) and the per-visit redraw's over a run (about 34,000)."""
+RATES: dict[str, float] = {"r50": lean.ex2216.LABEL_RATE, "r25": 0.04, "r10": 0.1}
+"""The fixed draw's rates by tag: the recipe's 1/50; 1/10, about the geometric middle between the 1/50 draw's
+count of labelled `difference` contexts (about 900) and the per-visit redraw's over a run (about 34,000); and 1/25,
+about the geometric middle of those two, added after both had run at four seeds."""
 DEFAULT_RATE = "r50"
 
-BUDGET_USD = 10
+BUDGET_USD = 15
 """From the fixed confirmation's task times on L4s, per rate: eight runs to epoch 400 at about twenty minutes each
 (\\$2), their end measurements and the axis scoring of their kept checkpoints (\\$1); and room for a retry."""
 
@@ -313,7 +314,7 @@ def half(ctx: Ctx) -> dict:
     return run(ctx, seeds=SEEDS[:4])
 
 
-STAGE = "half"
+STAGE = "full"
 """Which entry `main` runs: `smoke`, `scout`, `half`, or `full`. Each stage's runs are memo hits for the next."""
 
 
