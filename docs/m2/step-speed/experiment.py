@@ -55,25 +55,57 @@ SEED = 900
 """A seed no experiment trains (the pack-timing probe's first)."""
 N_LINES = 60_000
 """The pack-timing probe's corpus, a fifth of the recipe's: the corpus size sets the epoch length and nothing in the
-step."""
+step. A second round trains on the recipe's own corpus (`full`), where the work done once an epoch is spread over
+five times the steps."""
 STOP = 40
-"""Epochs trained in each task: ten records at the recipe's stride of four epochs, about 8,500 steps."""
+"""Epochs trained in each task: ten records at the recipe's stride of four epochs."""
 NONDET_XLA_FLAGS = "--xla_cpu_enable_concurrency_optimized_scheduler=false"
 """The project's `XLA_FLAGS` with the two GPU determinism flags left out."""
-VARIANTS: dict[str, tuple[str, dict[str, str], int]] = {
-    "L40S-off": ("L40S", {"XLA_FLAGS": NONDET_XLA_FLAGS}, 3),
-    "L4-off": ("L4", {"XLA_FLAGS": NONDET_XLA_FLAGS}, 3),
-    "L40S-on": ("L40S", {}, 2),
-    "L4-on": ("L4", {}, 1),
+VARIANTS: dict[str, dict[str, Any]] = {
+    "L40S-off": dict(card="L40S", env={"XLA_FLAGS": NONDET_XLA_FLAGS}, n=3),
+    "L4-off": dict(card="L4", env={"XLA_FLAGS": NONDET_XLA_FLAGS}, n=3),
+    "L40S-on": dict(card="L40S", env={}, n=2),
+    "L4-on": dict(card="L4", env={}, n=1),
+    # The second round, on the recipe's corpus, with the flags on.
+    "L40S-full": dict(card="L40S", env={}, n=1, full=True),
+    "L40S-full-gather": dict(card="L40S", env={}, n=1, full=True, gather=True),
+    "L40S-full-profile": dict(card="L40S", env={}, n=1, full=True, profile=True),
+    "L4-full": dict(card="L4", env={}, n=1, full=True),
+    "L4-full-gather": dict(card="L4", env={}, n=1, full=True, gather=True),
 }
-"""Variant → (card, environment over the project baseline, replicas)."""
+"""Variant → card, environment over the project baseline, replicas, and the options: `full` trains on the recipe's
+corpus, `gather` puts back the indexed embedding and cross-entropy the step had before (the step as trained until
+now, but for the prefetched draw, which changes no draw), and `profile` runs the training under `cProfile`."""
 
 
-def train_timed(corpus, labels, probes, row: dict, variant: str, replica: int) -> dict:
+def _with_gathers() -> None:
+    """Put back the embedding lookup and the cross-entropy as they were before the scatter-free step, in this process."""
+    import jax.numpy as jnp
+    import optax
+
+    import sca.anchoring
+    from sca.model import ngpt
+
+    def cross_entropy(logits, targets):
+        losses = optax.softmax_cross_entropy_with_integer_labels(logits, targets)
+        mask = targets != 0
+        return jnp.sum(losses * mask) / jnp.maximum(jnp.sum(mask), 1)
+
+    ngpt.NGPT.embed = lambda self, idx: ngpt.normalize(self.transformer.wte[idx])
+    sca.anchoring.cross_entropy = cross_entropy  # ty: ignore[invalid-assignment] — a patch for the probe alone
+
+
+def train_timed(  # noqa: C901 — one setup, one run, and the probe's options
+    corpus, labels, probes, row: dict, variant: str, replica: int, gather: bool = False, profile: bool = False
+) -> dict:
     """Train *row* for `STOP` epochs in this container; return the steady ms per step, the digest of the weights at
-    the stop, and the card. *variant* and *replica* give each task its own memo key.
+    the stop, and the card. *variant* and *replica* give each task its own memo key; *gather* and *profile* are the
+    `VARIANTS` options.
     """
+    import cProfile
     import hashlib
+    import io
+    import pstats
     import os
     import time
 
@@ -87,6 +119,8 @@ def train_timed(corpus, labels, probes, row: dict, variant: str, replica: int) -
     from mini.runs import gpu_name
     from mini.store import get
 
+    if gather:
+        _with_gathers()
     workdir = get_data_dir() / "step-speed" / f"{variant}-r{replica}"
     corpus_dir = get(corpus, workdir / "corpus")
     config = row["config"]
@@ -112,6 +146,9 @@ def train_timed(corpus, labels, probes, row: dict, variant: str, replica: int) -
     stride = max(1, round(fc.sps.TRAJ_STRIDE_EPOCHS * epoch_length))
 
     stamps: list[float] = []
+    profiler = cProfile.Profile() if profile else None
+    if profiler is not None:
+        profiler.enable()
     model, metrics, _ = train_anchored(
         config,
         corpus_dir,
@@ -132,6 +169,12 @@ def train_timed(corpus, labels, probes, row: dict, variant: str, replica: int) -
         on_record=lambda _i, _m: stamps.append(time.perf_counter()),
         stop_epoch=STOP,
     )
+    profile_text = None
+    if profiler is not None:
+        profiler.disable()
+        out = io.StringIO()
+        pstats.Stats(profiler, stream=out).sort_stats("tottime").print_stats(30)
+        profile_text = out.getvalue()
     # The last record is the one at the stop, made after the loop; the ones before it are a stride apart.
     steady = stamps[:-1]
     ms_per_step = 1000 * (steady[-1] - steady[0]) / ((len(steady) - 1) * stride)
@@ -149,51 +192,61 @@ def train_timed(corpus, labels, probes, row: dict, variant: str, replica: int) -
         "ms_per_step": ms_per_step,
         "digest": digest,
         "val_loss": metrics[-1].val_loss,
+        "profile": profile_text,
     }
 
 
 def main(ctx: Ctx) -> dict:
-    prep = ctx.run(
-        ex2221.prepare_condition,
-        fc.OP_NAMES,
-        fc.K,
-        ex2221.RHO,
-        0.0,
-        ex2221.CUBE_RATE,
-        N_LINES,
-        ex2221.CORPUS_SEED,
-        ex2216.HOLDOUT_CONTEXTS,
-        ex2216.N_TRAJ_PROBE,
-        f"{ex2221.MAIN_KEY}-n{N_LINES}",
-        role="prep",
-    )
-    (row,) = fc.rows_of(prep["meta"], (SEED,), None)
-    row = row | {"total_tokens": prep["meta"].total_tokens}
+    def prep(n_lines: int, key: str) -> dict:
+        return ctx.run(
+            ex2221.prepare_condition,
+            fc.OP_NAMES,
+            fc.K,
+            ex2221.RHO,
+            0.0,
+            ex2221.CUBE_RATE,
+            n_lines,
+            ex2221.CORPUS_SEED,
+            ex2216.HOLDOUT_CONTEXTS,
+            ex2216.N_TRAJ_PROBE,
+            key,
+            role="prep",
+        )
+
+    preps = {False: prep(N_LINES, f"{ex2221.MAIN_KEY}-n{N_LINES}"), True: prep(ex2221.N_LINES, ex2221.MAIN_KEY)}
+    rows = {}
+    for full, p in preps.items():
+        (row,) = fc.rows_of(p["meta"], (SEED,), None)
+        rows[full] = row | {"total_tokens": p["meta"].total_tokens}
     # One task per role, so that every replica gets a container of its own. A task in flight raises `Pending`,
     # which would hold back the ones after it, so every task launches before the wake suspends.
     timed, waiting = {}, []
-    for variant, (_, _, n) in VARIANTS.items():
-        for r in range(n):
+    for variant, v in VARIANTS.items():
+        full = v.get("full", False)
+        # The first round's tasks pass no options, which keeps their memo keys.
+        opts = (v.get("gather", False), v.get("profile", False)) if full else ()
+        p = preps[full]
+        for r in range(v["n"]):
             try:
                 timed[f"{variant}-r{r}"] = ctx.run(
-                    train_timed, prep["corpus"], prep["labels"], prep["probes"], row, variant, r,
+                    train_timed, p["corpus"], p["labels"], p["probes"], rows[full], variant, r, *opts,
                     role=f"{variant}-r{r}",
                 )  # fmt: skip
-            except Pending as p:
-                waiting.append(p)
+            except Pending as e:
+                waiting.append(e)
     if waiting:
         raise waiting[0]
     return {"timed": timed}
 
 
 COMPUTE: dict[str, Any] = {
-    # One corpus build of 60,000 contexts with its held-out set and probes (the pack-timing probe's).
+    # Two corpus builds with their held-out sets and probes: 60,000 contexts (the pack-timing probe's) and the recipe's.
     "prep": dict(cpu=2, timeout=1800),
 } | {
-    # Forty epochs, about 8,500 steps: under a minute of steps on an L40S, a few minutes on an L4.
-    f"{variant}-r{r}": dict(gpu=card, env=env, timeout=3600, watchdog=600, watchdog_grace=900)
-    for variant, (card, env, n) in VARIANTS.items()
-    for r in range(n)
+    # Forty epochs: about 2,000 steps on the small corpus and 10,000 on the recipe's, a few minutes at most.
+    f"{variant}-r{r}": dict(gpu=v["card"], env=v["env"], timeout=3600, watchdog=600, watchdog_grace=900)
+    for variant, v in VARIANTS.items()
+    for r in range(v["n"])
 }
 
 experiment = Experiment(name="step-speed", main=main, roles=COMPUTE)
