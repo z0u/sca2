@@ -5,7 +5,7 @@ opened: 2026-10-31
 ---
 # Determinism flags off, with a shared compilation cache
 
-With no scatter left in the training step ([`scatter-free-training-step`](./scatter-free-training-step.md)), the GPU determinism flags cost about a sixth of a step on an L40S (2.42 ms a step with them, 2.0 to 2.1 without). Turned off alone, they cost reproducibility: in the step-speed probe (`docs/m2/step-speed`), six L40S containers and four L4 containers each ended on weights of their own. With JAX's compilation cache in a directory on the Volume, filled by one task and loaded by three more, the four L40S runs agreed bit for bit ([eng/determinism.md](/eng/determinism.md#with-no-scatter-left-2026-10-31)). So the autotuner's timed picks look like the remaining source of drift, and pinning the compiled program removes it.
+With no scatter left in the training step ([`scatter-free-training-step`](./scatter-free-training-step.md)), the GPU determinism flags cost about a sixth of a step on an L40S (2.42 ms a step with them, 2.0 to 2.1 without). Turned off alone, they cost reproducibility: in the step-speed probe (`docs/m2/step-speed`), six L40S containers and four L4 containers each ended on weights of their own. With JAX's compilation cache in a directory on the Volume, filled by one task and loaded by three more, the four L40S runs agreed bit for bit, and so did three L4 runs, at 5.6 to 5.7 ms a step against 6.74 with the flags ([eng/determinism.md](/eng/determinism.md#with-no-scatter-left-2026-10-31)). So the autotuner's timed picks look like the remaining source of drift, and pinning the compiled program removes it.
 
 Adopting it would mean a run reproduces only while its compiled program is in the cache. Things to settle first:
 
@@ -14,4 +14,4 @@ Adopting it would mean a run reproduces only while its compiled program is in th
 - Concurrent writers on the Modal Volume, and how a reader sees an entry written after its container started.
 - XLA's own per-fusion autotune cache (`--xla_gpu_per_fusion_autotune_cache_dir`) is a narrower alternative: it pins the picks and leaves the rest of compilation alone. Untested here.
 
-The flags stay on until this is settled. The probe's fourth round has the L40S numbers; an L4 round was still running when this was written.
+The flags stay on until this is settled. The numbers are from the fourth round of the probe.

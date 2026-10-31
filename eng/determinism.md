@@ -72,8 +72,10 @@ Without the flags, every container ended on weights of its own, on both cards. S
 | --- | --- | --- | --- | --- |
 | L40S | on, no cache | 1 | | 2.42 |
 | L40S | off, shared cache | 4 | 1 | 2.0 to 2.1 |
+| L4 | on, no cache | 1 | | 6.74 |
+| L4 | off, shared cache | 3 | 1 | 5.6 to 5.7 |
 
-With the compiled programs shared, the flags-off runs agree bit for bit, and a step is about a sixth faster than with the flags on. So the flags are not the only way to a reproducible run any more. They stay on for now, because the cache brings questions of its own: a run reproduces only while its compiled program is in the cache, so deleting the cache, or two first compiles racing in one fan-out, would let one memo key map to two numerically different results (the quiet failure the JAX version has, below). The open item is `todo/eng/flags-off-with-a-compilation-cache.md`.
+With the compiled programs shared, the flags-off runs agree bit for bit on both cards, and a step is about a sixth faster than with the flags on. So the flags are not the only way to a reproducible run any more. They stay on for now, because the cache brings questions of its own: a run reproduces only while its compiled program is in the cache, so deleting the cache, or two first compiles racing in one fan-out, would let one memo key map to two numerically different results (the quiet failure the JAX version has, below). The open item is `todo/eng/flags-off-with-a-compilation-cache.md`.
 
 The digest does not hold across GPU *models* (measured in the full-length probe above): determinism is a per-device-class property. Training roles list `["L40S", "L4", "A10G"]`, so a re-run can land on another card and give another digest; the card is recorded on every attempt and returned in training results (see [Seeds are draws](#seeds-are-draws)).
 
