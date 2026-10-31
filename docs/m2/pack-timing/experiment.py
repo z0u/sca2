@@ -19,6 +19,9 @@ Corpus preparation and the timing tasks run under the dev profile; nothing here 
 
     MINI_PROFILE=dev bin/mini run docs/m2/pack-timing/experiment.py --app modal --max-containers 15 --budget 2h
     MINI_PROFILE=dev bin/mini status pack-timing
+
+The fifth round (`-nondet-onehot`) added utilization sampling to `time_packs`, which changed the memo evidence of
+the earlier rounds; they were kept with `--keep-stale-done` rather than re-run.
 """
 
 from __future__ import annotations
@@ -72,9 +75,9 @@ N_LINES = 60_000
 """A fifth of the recipe corpus: enough for an epoch longer than the timed span, and a quicker build. The corpus
 size sets the epoch length and nothing in the step."""
 N_REPLICAS = 3
-REPLICAS = {"L4": 1, "L4-static": 2, "L4-onehot": 2}
+REPLICAS = {"L4": 1, "L4-static": 2, "L4-onehot": 2, "L40S-nondet-onehot": 2, "A100-nondet-onehot": 1}
 """Replicas by variant where not `N_REPLICAS`: the L4 ran a pack of 32 so slowly (about an hour a task) that one is
-enough."""
+enough, and the fifth round is a check on a hypothesis, kept to about a dollar."""
 PRICE_PER_HOUR = {"L4": 0.80, "A10G": 1.10, "L40S": 1.95, "A100": 2.10}
 """Modal list prices in USD (October 2026), for the cost per seed-step."""
 NONDET_CARDS: tuple[str, ...] = ("A100",)
@@ -88,16 +91,28 @@ ONE_HOT_CARDS: tuple[str, ...] = ("L40S", "L4")
 already static in `sca.anchoring` (since the second round), and here the embedding lookup and the cross-entropy as
 products with a one-hot matrix in place of indexing (`_without_gathers`). The second round found the L40S's cost per
 seed-step rising most with the pack size; the L4 followed in a fourth round."""
+NONDET_ONE_HOT_CARDS: tuple[str, ...] = ("L40S", "A100")
+"""Cards timed in a fifth round with the flags off *and* no scatter-add in the step: the best case for a pack. The
+fourth round left a pack of 8 on the scatter-free L40S at 13× one seed with the flags on, and the determinism flags
+also make XLA's autotuner take the first candidate algorithm rather than the fastest (`RequireDeterminism` in XLA's
+`stream_executor_util.cc`), so this round separates the autotuner from the scatters. It also samples `nvidia-smi`
+utilization during the device timings (`_gpu_sampler`)."""
 VARIANTS: dict[str, tuple[str, dict[str, str]]] = (
     {card: (card, {}) for card in CARDS}
     | {f"{card}-nondet": (card, {"XLA_FLAGS": NONDET_XLA_FLAGS}) for card in NONDET_CARDS}
     | {f"{card}-onehot": (card, {}) for card in ONE_HOT_CARDS}
     | {"L4-static": ("L4", {})}
+    | {f"{card}-nondet-onehot": (card, {"XLA_FLAGS": NONDET_XLA_FLAGS}) for card in NONDET_ONE_HOT_CARDS}
 )
 """Role name → (card, environment over the project baseline). A fourth round timed the L4 on the static slice selection
 alone (`L4-static`, the code every variant but the first rounds' runs) and with no scatter-add (`L4-onehot`), at the
 small packs only, since the third round found the scatter-free step faster for one seed."""
-VARIANT_PACKS: dict[str, tuple[int | str, ...]] = {"L4-static": ("plain", 1), "L4-onehot": ("plain", 1, 8)}
+VARIANT_PACKS: dict[str, tuple[int | str, ...]] = {
+    "L4-static": ("plain", 1),
+    "L4-onehot": ("plain", 1, 8),
+    "L40S-nondet-onehot": ("plain", 8, 32),
+    "A100-nondet-onehot": ("plain", 8, 32),
+}
 """Pack sizes by variant where not the card's (`PACKS`)."""
 
 
@@ -141,6 +156,36 @@ def _without_gathers() -> None:
 
     ngpt.NGPT.stream_and_logits = stream_and_logits
     sca.anchoring.cross_entropy = cross_entropy  # ty: ignore[invalid-assignment] — a patch for the probe alone
+
+
+def _gpu_sampler():
+    """Sample `nvidia-smi` utilization in a thread every 0.2 s until the returned event is set.
+
+    Returns the event and the list the samples land in, as (GPU busy %, memory-controller busy %) pairs. `nvidia-smi`
+    reports the fraction of the sample period in which a kernel was running and in which memory was being accessed,
+    which says whether the card ever sits idle between kernels; it does not say how full each kernel leaves the card.
+    """
+    import subprocess
+    import threading
+
+    samples: list[tuple[float, float]] = []
+    stop = threading.Event()
+
+    def run() -> None:
+        while not stop.is_set():
+            try:
+                out = subprocess.run(
+                    ["nvidia-smi", "--query-gpu=utilization.gpu,utilization.memory", "--format=csv,noheader,nounits"],
+                    capture_output=True, text=True, timeout=5,
+                ).stdout  # fmt: skip
+                gpu, mem = (float(v) for v in out.strip().split(","))
+                samples.append((gpu, mem))
+            except OSError, subprocess.SubprocessError, ValueError:
+                pass
+            stop.wait(0.2)
+
+    threading.Thread(target=run, daemon=True).start()
+    return stop, samples
 
 
 def time_packs(corpus, labels, rows: list[dict], packs: tuple, variant: str, replica: int) -> dict:  # noqa: C901 — one setup, then two timings per pack
@@ -267,13 +312,25 @@ def time_packs(corpus, labels, rows: list[dict], packs: tuple, variant: str, rep
         on_device = jax.device_put(draw(streams, pack != "plain"))
         jax.block_until_ready(on_device)
         times = []
+        stop, samples = _gpu_sampler()
         for _ in range(n_dispatch):
             t = time.perf_counter()
             model, opt_state, outs = dispatch(model, opt_state, on_device)
             jax.block_until_ready(outs)
             times.append(time.perf_counter() - t)
             tick()
+        stop.set()
         device_ms = 1000 * float(np.median(times)) / (SCAN_STEPS * k)
+        util = (
+            {
+                "gpu_mean": float(np.mean([g for g, _ in samples])),
+                "gpu_max": float(np.max([g for g, _ in samples])),
+                "mem_mean": float(np.mean([m for _, m in samples])),
+                "n": len(samples),
+            }
+            if samples
+            else None
+        )
 
         # loop: draw, stack, dispatch, read back, as train_anchored does per dispatch.
         sample_s = []
@@ -301,11 +358,12 @@ def time_packs(corpus, labels, rows: list[dict], packs: tuple, variant: str, rep
                 "sample_ms": sample_ms,
                 "finite": finite,
                 "peak_bytes": stats.get("peak_bytes_in_use"),
+                "util": util,
             }
         )
         print(
             f"pack {pack}: device {device_ms:.3f}, loop {loop_ms:.3f}, sampling {sample_ms:.3f} ms per seed-step;"
-            f" compile {compile_s:.0f} s",
+            f" compile {compile_s:.0f} s; util {util}",
             flush=True,
         )
         del model, opt_state, outs

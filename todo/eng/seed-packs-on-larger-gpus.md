@@ -36,3 +36,7 @@ The step had five scatter-adds, which are the gradients of indexing: two residua
 Peak memory was about 125 MB per seed, so memory was never the limit: a pack of 64 used 8 GB of the A100.
 
 Two results bear on other work, and they are taken up in [`scatter-free-training-step`](./scatter-free-training-step.md): the scatter-free step is faster for every run, packed or not, and the fallback cards differ a lot per dollar. The probe cost about $6.60 in all.
+
+## Notes
+
+**2026-10-31, follow-up thread** — A fifth round of the probe (`-nondet-onehot`: flags off, no scatter-add, `nvidia-smi` sampled) explains the rest. One seed keeps a card's memory bus about a third busy (the step is a few thousand elementwise passes over 6–19 MB activation tensors, so it is bytes, not arithmetic); a pack pins the bus at 96–99% and moves two to five times the bytes per seed that one seed does, so it comes out level or behind: L40S plain 1.95 ms a seed-step, pack of 8 3.38; A100 plain 3.33, pack of 32 2.46. The flags off save a fifth on a single scatter-free L40S seed (2.37 → 1.95), and the A100 single seed goes 5.7 → 3.33. The single-run path (scatter-free step, flags off if the digest test still passes, a prefetch thread for the host draw) reaches about 1.95 ms a step on an L40S against 8.7 on today's L4; the pack would need a GPU-side HLO comparison to find what inflates its traffic. Memo: project files `pack-timing/why-packing-doesnt-pay.md`.

@@ -33,3 +33,7 @@ From the probe, with the flags on and one seed per card, in microdollars a step 
 | A100 | 4.0 (6.8) | |
 
 The L4 figure is the step with the slice picks already static; one L4 container on the earlier code took 11.2 ms. So the L40S comes second to the L4 per dollar and runs twice as fast, and the A10G costs about twice the L4 per step. The fallback list for fresh-seed training is now `["L4", "L40S", "A10G"]` (the `mi-ni` authoring reference and [eng/determinism.md](/eng/determinism.md)), which was `["L4", "A10G", "L40S"]` when it was first written. On the scatter-free step the L4 and L40S come out nearly level per dollar, so the L4 stays first.
+
+## Notes
+
+**2026-10-31, follow-up thread** — The fifth round of the pack-timing probe timed the scatter-free step with the determinism flags off: one L40S seed 2.37 → 1.95 ms a seed-step on the card, one A100 seed 5.7 → 3.33. The flags make XLA's autotuner take its first candidate rather than its fastest (`RequireDeterminism` in `stream_executor_util.cc`; the XLA determinism guide says the same), so the saving is the autotuner. Scatter-adds were the one atomically-reduced op in the step, so once they are gone the program may be deterministic without the flags, given a persisted autotune cache; the determinism probe (`eng/determinism.md`) would check that for about a dollar. Worth folding into this item: the two together take an L40S step from 3.3 to 2.8 ms with the host draw, and a prefetch thread for the host draw would take it to about 1.95.
