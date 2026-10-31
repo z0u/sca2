@@ -351,6 +351,11 @@ class LabelSpec:
     context_len: np.ndarray | None = None
     """`variant="latter"` only: each context's own token count, indexed like *context_op* (one entry per
     context in corpus order)."""
+    fixed_draw: np.ndarray | None = None
+    """`context` keying only: a boolean per context, indexed like *context_op*, drawn once before training. When
+    given, a context is labelled on every visit where it is set and on none where it is not, in place of the
+    per-visit draw, so the labelled set is fixed for the run. The per-visit draw is still taken from the stream,
+    so the batches are those of the per-visit labeller at the same seed. Not meaningful under `sampled`."""
 
 
 Crop = Literal["all", "whole", "half", "scaled", "cut-only", "knowable"]
@@ -819,13 +824,18 @@ def _context_mask(
     a boolean the same length as the corpus, precomputed from the posterior on the examples before each
     position), or `sampled` (every position, as `whole`, of a context whose draw succeeded at its own
     posterior-scaled rate). *absolute* is each position's corpus-wide index, which `prefix_ok` is keyed on.
+    With `LabelSpec.fixed_draw`, the context's entry there decides in place of the draw, which is still taken.
     """
     assert spec.context_op is not None
     n_rows = local.shape[0]
     draw = rng.random((n_rows, n_lines))
     drew_local = np.take_along_axis(draw, local, axis=1)
     is_anchored = spec.context_op[line] == spec.anchored_op_id
-    if spec.variant == "sampled":
+    if spec.fixed_draw is not None:
+        if spec.variant == "sampled":
+            raise ValueError("a fixed draw replaces the sampled variant's own per-visit draw")
+        drew = spec.fixed_draw[line] & is_anchored
+    elif spec.variant == "sampled":
         assert spec.sample_prob is not None
         drew = (drew_local < spec.sample_prob[absolute]) & is_anchored
     else:
