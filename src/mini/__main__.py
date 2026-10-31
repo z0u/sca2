@@ -703,7 +703,7 @@ def _grouped_attention_line(g: dict[str, Any]) -> str:
 def _attention_json(rec: dict) -> dict[str, Any]:
     """A task entry for the ``attention`` list: the full record trimmed to what acting on it needs — key/state/error/liveness (and ``fc_id`` for Modal log lookup), without the env/metrics/timestamps bulk of the full ``--json``."""
     out = _task_json(rec)
-    for f in ("env", "sys", "started_at", "finished_at", "watchdog_s", "watchdog_grace_s"):
+    for f in ("env", "sys", "compile_cache", "started_at", "finished_at", "watchdog_s", "watchdog_grace_s"):
         out.pop(f, None)  # metrics and throughput stay: they're what the deviation flags are about
     if out.pop("queued", None):
         out.pop("heartbeat_age_s", None)  # a queued record's heartbeat is just its launch stamp
@@ -828,6 +828,7 @@ def _task_json(rec: dict) -> dict[str, Any]:
         "phase_until",
         "phase_at",
         "sys",
+        "compile_cache",
     ):
         if (v := rec.get(f)) is not None:
             out[f] = v

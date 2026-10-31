@@ -135,7 +135,9 @@ _MODAL_ENV_KEYS = {
 # that agree on code and inputs can still disagree on results across a change
 # here. Read from the worker's own environment rather than from what the client
 # asked for, so a setting that failed to arrive shows up as absent.
-_NUMERICS_ENV_KEYS = ("XLA_FLAGS",)
+# `MINI_COMPILE_CACHE` names the shared compilation cache a worker loads its
+# compiled programs from (`mini.compile_cache`), which pins the autotuner's picks.
+_NUMERICS_ENV_KEYS = ("XLA_FLAGS", "MINI_COMPILE_CACHE")
 
 # Packages whose *version* changes what a task computes. They are invisible to the
 # memo — `mini.memo._is_project_file` excludes site-packages, so no library source

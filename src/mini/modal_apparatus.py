@@ -410,6 +410,7 @@ def _modal_task_entry(
     import modal as _modal
 
     from mini._taskworker import execute_task
+    from mini.compile_cache import ModalBackend
     from mini.memo import MemoStore
     from mini.modal_apparatus import WORKER_STORE_CACHE, ModalRecordStore
     from mini.store import store_for
@@ -438,6 +439,7 @@ def _modal_task_entry(
         experiment=volume_name,
         watchdog_s=watchdog_s,
         watchdog_grace_s=watchdog_grace_s,
+        compile_backend=lambda: ModalBackend.from_names(modal_environment()),
     )
 
 
