@@ -199,6 +199,23 @@ def _scanned(step, n_steps: int, scheduled_tau: bool = False):
     return run
 
 
+def _dispatch_sizes(step: int, epoch_length: int, traj_stride: int) -> list[int]:
+    """The steps in each dispatch of an epoch that starts at *step*: at most `SCAN_STEPS`, stopping at each trajectory record and at the epoch's end, which need the model there."""
+    sizes, done = [], 0
+    while done < epoch_length:
+        n = min(SCAN_STEPS, epoch_length - done, traj_stride - (step + done) % traj_stride)
+        sizes.append(n)
+        done += n
+    return sizes
+
+
+def _draw_stacked(batches, n: int) -> tuple[np.ndarray, ...]:
+    """The next *n* batches, stacked along a leading step axis and padded to `SCAN_STEPS` with copies of the last."""
+    chunk = [next(batches) for _ in range(n)]
+    pad = SCAN_STEPS - n
+    return tuple(np.stack([b[f] for b in chunk] + [chunk[-1][f]] * pad) for f in range(len(chunk[0])))
+
+
 class _Window:
     """Running means of the fallback step's extra outputs between trajectory records."""
 
@@ -495,16 +512,14 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
             min_line_tokens=min_line_tokens,
             loss_mask=loss_mask,
         )
-        while len(train_losses) < epoch_length:
-            # A dispatch stops at the next trajectory record and at the epoch's end, which need the model there.
-            n = min(SCAN_STEPS, epoch_length - len(train_losses), traj_stride - step % traj_stride)
-            chunk = [next(batches) for _ in range(n)]
+        sizes = _dispatch_sizes(step, epoch_length, traj_stride)
+        stacked = _draw_stacked(batches, sizes[0])
+        for k, n in enumerate(sizes):
             ats = [epoch + (len(train_losses) + i) / epoch_length for i in range(n)]
             weights = [float(anchor(at)) for at in ats]
             anti_weights = [_anti_at(anti, at) for at in ats]
             taus = [anchor.taus(at) for at in ats]
             pad = SCAN_STEPS - n
-            stacked = tuple(np.stack([b[f] for b in chunk] + [chunk[-1][f]] * pad) for f in range(len(chunk[0])))
             model, opt_state, outs = train_steps(
                 model,
                 opt_state,
@@ -514,6 +529,9 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
                 np.nan_to_num(np.asarray(taus + [taus[-1]] * pad, np.float32), nan=1.0, posinf=1.0),
                 np.arange(SCAN_STEPS) < n,
             )
+            # The dispatch runs on the card while the host draws the next one's batches; reading the losses waits for it.
+            if k + 1 < len(sizes):
+                stacked = _draw_stacked(batches, sizes[k + 1])
             loss, anchor_loss, anti_loss, fb_loss, aa_loss, fb_lines = np.asarray(outs[:n]).T.tolist()
             train_losses += loss
             anchor_losses += anchor_loss

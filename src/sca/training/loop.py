@@ -4,6 +4,7 @@ This is what PyTorch Lightning used to provide; in JAX it's a handful of pure fu
 """
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import optax
 from jax.typing import ArrayLike
@@ -13,8 +14,12 @@ from sca.model import LanguageModel
 
 
 def cross_entropy(logits: Float[Array, "B T V"], targets: Int[Array, "B T"]) -> Float[Array, ""]:
-    """Mean cross-entropy over non-padding tokens (padding id 0)."""
-    losses = optax.softmax_cross_entropy_with_integer_labels(logits, targets)
+    """Mean cross-entropy over non-padding tokens (padding id 0).
+
+    The same arithmetic as `optax.softmax_cross_entropy_with_integer_labels` (the log-normalizer less the target logit), with the target logit picked by a one-hot mask rather than an index, so the forward value is the same bit for bit and the gradient has no scatter-add (`todo/eng/scatter-free-training-step.md`).
+    """
+    target = targets[..., None] == jnp.arange(logits.shape[-1])
+    losses = jax.nn.logsumexp(logits, axis=-1) - jnp.where(target, logits, 0.0).sum(-1)
     mask = targets != 0
     return jnp.sum(losses * mask) / jnp.maximum(jnp.sum(mask), 1)
 
