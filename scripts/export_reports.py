@@ -59,14 +59,12 @@ def bundle_is_stale(path: Path) -> bool:
     return is_stale(path, export_dir(path) / "index.html")
 
 
-def export_one(path: Path, *, thumbs: bool = True, text: str | None = None, out_dir: Path | None = None) -> Path:
+def export_one(path: Path, *, thumbs: bool = True) -> Path:
     """Export *path* to ``.mini/exports/<key>/index.html`` (assets land beside it). Returns the dir.
 
     *thumbs* off skips the figure thumbnails, which only the site index reads: a bundle exported for a print (``./go render``) has no use for them. A preview built from such a bundle (``--stale-only``) shows the full figures in its strips; a publish always re-exports, thumbnails and all.
-
-    *text* exports an earlier version of the script in its place, into *out_dir* (``./go render --since FILE``, :func:`review_base.export_file`).
     """
-    out = (out_dir or export_dir(path)) / "index.html"
+    out = export_dir(path) / "index.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     # The render rewrites every asset it still produces, and the sync mirrors whatever is
     # here; clear the last export's first so a figure the report no longer draws (or a
@@ -75,7 +73,7 @@ def export_one(path: Path, *, thumbs: bool = True, text: str | None = None, out_
     shutil.rmtree(assets, ignore_errors=True)
     sidecar = assets / PROVENANCE_ASSET
     print(f"  export {path.relative_to(ROOT)} -> {out.relative_to(ROOT)}")
-    html = _weave(path, out, text)
+    html = _weave(path, out)
     if sidecar.exists():  # the render read store refs — cite their producers in a footer
         refs = json.loads(sidecar.read_text()).get("refs", {})
         html = set_provenance(html, refs)
@@ -92,14 +90,14 @@ def export_one(path: Path, *, thumbs: bool = True, text: str | None = None, out_
     return out.parent
 
 
-def _weave(script: Path, out: Path, text: str | None = None) -> str:
+def _weave(script: Path, out: Path) -> str:
     """Weave the literate *script* into the bundle holding *out*, and return the page.
 
     ``mini.lit.render`` writes the page and the woven Markdown beside it, with figures under the bundle's ``_assets/`` through the report publisher, so the sidecar and the thumbnails read from one place. The Markdown is declared as an alternate rendition, the way the PDF is, so a reader (an agent, mostly) can fetch the text of a published report without parsing the page. The render inlines the shared stylesheet (``docs/report.css``), so the bundle stands on its own; the site build re-inlines the current source on top.
 
     A cell that raised is a failed export: the page would carry the traceback where a figure should be, and the sync would publish it.
     """
-    rendered = render(script, out_dir=out.parent, text=text)
+    rendered = render(script, out_dir=out.parent)
     if errors := rendered.woven.errors:
         lines = "\n\n".join(f"cell at line {o.cell.line}:\n{o.error}" for o in errors)
         sys.exit(f"export of {script.relative_to(ROOT)} failed: {len(errors)} cell(s) raised\n{lines}")

@@ -7,7 +7,7 @@ The export is of the results the store holds now: a report reads its results thr
 
 A baseline lands at ``.mini/review/<sha>/<key>/`` and is kept, so the next print against the same ref reuses it (nothing prunes them; ``rm -r .mini/review`` when they pile up). A report that did not exist at *ref* has none, and its print carries no marks.
 
-A draft with no commit to name can be marked against an earlier copy of itself instead (``--since FILE``, :func:`export_file`).
+A Markdown draft with no commit to name can be marked against an earlier copy of itself instead (``--since FILE``, :func:`export_file`).
 """
 
 import argparse
@@ -115,22 +115,16 @@ def file_slot(earlier: Path) -> str:
     return "file-" + hashlib.sha256(earlier.read_bytes()).hexdigest()[:16]
 
 
-def export_file(earlier: Path, report: Path) -> Path:
-    """Render *earlier*, an earlier version of *report* kept as a file, into :func:`baseline_dir` as the baseline its print is marked against, and return the directory.
+def export_file(earlier: Path, page: Path) -> Path:
+    """Weave *earlier*, an earlier copy of Markdown *page*, into :func:`baseline_dir` as the baseline its print is marked against, and return the directory.
 
-    For a draft with no commit to name: an agent keeps numbered copies (``draft-1.md``, ``draft-2.md``) and prints the second ``--since`` the first. Both go through today's code, woven as if at *report*'s path, so the two pages differ only where the text does. That path matters for a literate report: its cells run in a module named for it, and the memoized figures are keyed by that name, so a figure whose code is unchanged comes from the weave cache. A copy rendered under its own path would miss for every figure.
+    For a draft with no commit to name: an agent keeps numbered copies (``draft-1.md``, ``draft-2.md``) and prints the second ``--since`` the first. The copy is woven by today's code as if it were *page*, so the two pages differ only where the text does. It is woven afresh each time (no reuse, unlike a ref's baseline), since a file can change under the same name. Its images are not bundled here; the caller does that, as it does for the current page.
 
-    It is rendered afresh each time (no reuse, unlike a ref's baseline), since a file can change under the same name. A Markdown page's images are not bundled here; the caller does that, as it does for the current page.
+    A literate report has no such option. It lives in the repo and is edited in place, so the round last reviewed is a commit (``HEAD`` for uncommitted edits), and its baseline is an export from a checkout of that commit (:func:`export_at`).
     """
-    dest = baseline_dir(file_slot(earlier), export_key(report))
+    dest = baseline_dir(file_slot(earlier), export_key(page))
     shutil.rmtree(dest, ignore_errors=True)
-    text = earlier.read_text("utf-8")
-    if report.suffix == ".md":
-        _weave_md(report, text, dest)
-    else:
-        from export_reports import export_one
-
-        export_one(report, thumbs=False, text=text, out_dir=dest)
+    _weave_md(page, earlier.read_text("utf-8"), dest)
     print(f"  baseline {earlier} -> {dest}")
     return dest
 

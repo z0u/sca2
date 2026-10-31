@@ -24,7 +24,7 @@ Be proactive. Fix little things as you go, and create todos for larger things.
 
 Code style & conventions: see the `style-*` skills.
 
-The human reviews on paper, a tablet, or a phone, so a document sent for review (a report, a design doc, a plan) goes as a PDF print, the Markdown ones included: `./go render <doc> -o .mini/prints/<name>.pdf [--since <commit or earlier copy>]` (the `report-render` skill; in a project thread, print under `/mnt/project-files/prints/` and attach it). A Claude Doc suits a discussion at a desktop, when they ask for one.
+The human reviews on paper, a tablet, or a phone, so a document sent for review (a report, a design doc, a plan) goes as a PDF print, the Markdown ones included: `./go render <doc> -o .mini/prints/<name>.pdf [--since <commit, or an earlier copy of a Markdown draft>]` (the `report-render` skill; in a project thread, print under `/mnt/project-files/prints/` and attach it). A Claude Doc suits a discussion at a desktop, when they ask for one.
 
 Before writing prose of any kind (reports, design docs, todo items and notes, PR bodies, docstrings that name corpus units), load the `writing` and `style-terms` skills. Several of their rules differ from common usage (a *condition* is never a "cell", "read" is never a noun, no possessives on abstract terms), so they can't be inferred and are easy to miss. When you brief a subagent that will write prose, name both skills in the brief.
 

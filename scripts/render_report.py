@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Render one report to the files you name: ``.md``, ``.html``, or ``.pdf``, by extension (``./go render``).
 
-Without a PDF this is the weave alone (:mod:`mini.lit`), with the figures under ``_assets/`` beside each output. A PDF is the print a reviewer reads on paper or e-ink, so it is made the way the site makes one, from the report's export bundle (``scripts/export_reports.py``, which adds the provenance footer), with author links resolved to the published site (:func:`build_site.printable`). It also names the commit it was printed from on the edge of its first page, and with ``--since REF`` it bars its margin beside every line changed since REF (:mod:`mini.review_marks`), against a baseline exported from a checkout of REF (``scripts/review_base.py``). The baseline goes through the same exporter, so the two pages differ only where the report does. ``--since FILE`` names an earlier copy of the report instead, for a draft with no commit to compare against (:func:`review_base.export_file`).
+Without a PDF this is the weave alone (:mod:`mini.lit`), with the figures under ``_assets/`` beside each output. A PDF is the print a reviewer reads on paper or e-ink, so it is made the way the site makes one, from the report's export bundle (``scripts/export_reports.py``, which adds the provenance footer), with author links resolved to the published site (:func:`build_site.printable`). It also names the commit it was printed from on the edge of its first page, and with ``--since REF`` it bars its margin beside every line changed since REF (:mod:`mini.review_marks`), against a baseline exported from a checkout of REF (``scripts/review_base.py``). The baseline goes through the same exporter, so the two pages differ only where the report does. For a Markdown page, ``--since FILE`` names an earlier copy instead, for a draft with no commit to compare against (:func:`review_base.export_file`).
 
 Only the named report is exported and printed, and nothing is memoized: a print takes a few seconds, and its stamp changes with every commit anyway.
 
@@ -158,7 +158,7 @@ def export_for_review(report: Path, since: str | None, earlier: Path | None) -> 
             export_at(since, [report])
     if earlier is not None:
         base = export_file(earlier, report)
-        if report.suffix == ".md" and DOCS not in report.parents:
+        if DOCS not in report.parents:
             index = base / "index.html"
             index.write_text(local_images(index.read_text("utf-8"), page_dir=earlier.parent, bundle=base), "utf-8")
     return bundle
@@ -184,7 +184,7 @@ def main() -> None:
         "--since",
         metavar="REF|FILE",
         help="bar the PDF's margin beside every line changed since REF (the commit the reader last reviewed), "
-        "or since FILE, an earlier copy of the report (a draft with no commit to name)",
+        "or, for a Markdown page, since FILE, an earlier copy of it (a draft with no commit to name)",
     )
     args = ap.parse_args()
     report = Path(args.report).resolve()
@@ -207,8 +207,11 @@ def main() -> None:
     # A file of that name is an earlier copy; anything else is a ref, resolved before the export so a bad one fails fast.
     earlier = Path(args.since).resolve() if args.since and Path(args.since).is_file() else None
     since = resolve(args.since) if args.since and earlier is None else None
-    if earlier is not None and earlier.suffix != report.suffix:
-        ap.error(f"--since {args.since}: an earlier copy of a {report.suffix} report is a {report.suffix} file")
+    if earlier is not None and (report.suffix != ".md" or earlier.suffix != ".md"):
+        ap.error(
+            f"--since {args.since}: only a Markdown page is marked against an earlier copy; "
+            "a report is edited in place, so name the commit last reviewed (HEAD for uncommitted edits)"
+        )
     bundle = export_for_review(report, since, earlier)
     page = review_page(report, bundle, Review.at(since, report=report, earlier=earlier), LinkResolver.discover())
     write_from_bundle(bundle, page, outs)

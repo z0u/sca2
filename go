@@ -64,8 +64,8 @@ show_help() {
 		                       and --since REF bars its margin beside every line changed
 		                       since REF (the round last reviewed; the baseline is
 		                       exported from a checkout of REF, reading the store);
-		                       --since FILE marks it against an earlier copy instead,
-		                       for a draft with no commit to name
+		                       --since FILE marks a Markdown draft against an earlier
+		                       copy instead, for a draft with no commit to name
 		  serve   <report> [--port N]:
 		                       serve one report or Markdown page with live reload while
 		                       you edit it

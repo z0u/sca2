@@ -109,13 +109,14 @@ def test_a_draft_is_marked_against_an_earlier_copy(render_report, tmp_path: Path
 
 
 def test_since_names_a_file_or_a_ref(render_report, tmp_path: Path, monkeypatch, capsys):
-    """An earlier copy must be the same kind of file as the report; a name that is no file is taken for a ref."""
-    (tmp_path / "draft-1.py").write_text("")
-    argv = ["render_report.py", str(tmp_path / "draft-2.md"), "-o", str(tmp_path / "d.pdf"), "--since"]
-    monkeypatch.setattr(sys, "argv", [*argv, str(tmp_path / "draft-1.py")])
+    """Only a Markdown page is marked against an earlier copy; a name that is no file is taken for a ref."""
+    (tmp_path / "report-1.py").write_text("")
+    pdf = str(tmp_path / "d.pdf")
+    monkeypatch.setattr(sys, "argv", ["render_report.py", "docs/x/report.py", "-o", pdf, "--since", str(tmp_path / "report-1.py")])
     with pytest.raises(SystemExit):
         render_report.main()
-    assert "an earlier copy of a .md report is a .md file" in capsys.readouterr().err
+    assert "only a Markdown page is marked against an earlier copy" in capsys.readouterr().err
+    argv = ["render_report.py", str(tmp_path / "draft-2.md"), "-o", pdf, "--since"]
     monkeypatch.setattr(sys, "argv", [*argv, "no-such-ref-or-file"])
     with pytest.raises(SystemExit, match="unknown git ref"):
         render_report.main()
