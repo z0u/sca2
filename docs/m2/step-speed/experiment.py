@@ -118,7 +118,7 @@ def _without_cond() -> None:
 
         return run
 
-    training._scanned = scanned
+    training._scanned = scanned  # ty: ignore[invalid-assignment] — a patch for the probe alone
 
 
 def _with_gathers() -> None:
