@@ -112,7 +112,9 @@ def test_since_names_a_file_or_a_ref(render_report, tmp_path: Path, monkeypatch,
     """Only a Markdown page is marked against an earlier copy; a name that is no file is taken for a ref."""
     (tmp_path / "report-1.py").write_text("")
     pdf = str(tmp_path / "d.pdf")
-    monkeypatch.setattr(sys, "argv", ["render_report.py", "docs/x/report.py", "-o", pdf, "--since", str(tmp_path / "report-1.py")])
+    monkeypatch.setattr(
+        sys, "argv", ["render_report.py", "docs/x/report.py", "-o", pdf, "--since", str(tmp_path / "report-1.py")]
+    )
     with pytest.raises(SystemExit):
         render_report.main()
     assert "only a Markdown page is marked against an earlier copy" in capsys.readouterr().err
