@@ -89,3 +89,33 @@ def test_a_markdown_print_bundles_the_images_it_links_from_disk(render_report, t
     srcs = re.findall(r'src="([^"]+)"', out)
     assert [(bundle / s).read_bytes() for s in srcs[:2]] == [b"beside", b"far"]
     assert srcs[2:] == ["https://example.com/x.png", "_assets/fig.png", "missing.png"]  # left as written
+
+
+def test_a_draft_is_marked_against_an_earlier_copy(render_report, tmp_path: Path, monkeypatch):
+    """A draft outside the repo has no commit; `--since FILE` weaves the earlier copy as if it were the draft, and the note names both files."""
+    review_base = sys.modules["review_base"]
+    draft, earlier = tmp_path / "draft-2.md", tmp_path / "draft-1.md"
+    draft.write_text("# Plan\n\nNew text.\n")
+    earlier.write_text("# Plan\n\nOld text.\n")
+    monkeypatch.setattr(review_base, "baseline_dir", lambda slot, key: tmp_path / "base" / slot / key)
+    base = review_base.export_file(earlier, draft)
+    assert base == tmp_path / "base" / review_base.file_slot(earlier) / "draft-2"
+    assert "Old text." in (base / "index.html").read_text()
+
+    monkeypatch.setattr(render_report, "baseline_dir", lambda slot, key: tmp_path / "base" / slot / key)
+    review = render_report.Review.at(None, report=draft, earlier=earlier)
+    out = review.mark(PAGE, "draft-2", root=tmp_path)
+    assert 'id="rv-data"' in out and "Bars mark changes since draft-1.md" in out and "printed from draft-2.md" in out
+
+
+def test_since_names_a_file_or_a_ref(render_report, tmp_path: Path, monkeypatch, capsys):
+    """An earlier copy must be the same kind of file as the report; a name that is no file is taken for a ref."""
+    (tmp_path / "draft-1.py").write_text("")
+    argv = ["render_report.py", str(tmp_path / "draft-2.md"), "-o", str(tmp_path / "d.pdf"), "--since"]
+    monkeypatch.setattr(sys, "argv", [*argv, str(tmp_path / "draft-1.py")])
+    with pytest.raises(SystemExit):
+        render_report.main()
+    assert "an earlier copy of a .md report is a .md file" in capsys.readouterr().err
+    monkeypatch.setattr(sys, "argv", [*argv, "no-such-ref-or-file"])
+    with pytest.raises(SystemExit, match="unknown git ref"):
+        render_report.main()

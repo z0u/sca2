@@ -79,10 +79,13 @@ def render(
     extra_body: str = "",
     write: bool = True,
     partial: Callable[[Woven], None] | None = None,
+    text: str | None = None,
 ) -> Rendered:
     """Weave *doc* and (with *write*) put ``index.html`` and ``index.md`` under *out_dir*.
 
     *live* is the interactive setting: asset URLs carry a content stamp so a browser shows a re-drawn figure, and a re-drawn figure may replace one of the same name. Pass the previous call's *runner* to re-run only the cells that changed, and *partial* to be handed the document as it stands before each cell that runs (see :meth:`Runner.weave`).
+
+    *text* stands in for the file's contents, woven as if it were at *doc*: an earlier version of a report renders this way as the baseline a review print is marked against, under the report's own module name, so its memoized figures hit the cache where their code is unchanged.
     """
     path = Path(doc).resolve()
     out = (out_dir or output_dir(path, live=live)).resolve()
@@ -92,7 +95,7 @@ def render(
         runner = Runner(path, publish=publish)
     else:
         runner.publish = publish
-    parsed = parse(path)
+    parsed = parse(path, text)
     woven = runner.weave(parsed, partial=partial)
     html, seconds = compose(woven, extra_body=extra_body)
     rendered = Rendered(parsed, woven, html, out, runner, seconds)

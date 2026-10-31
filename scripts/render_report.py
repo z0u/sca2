@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Render one report to the files you name: ``.md``, ``.html``, or ``.pdf``, by extension (``./go render``).
 
-Without a PDF this is the weave alone (:mod:`mini.lit`), with the figures under ``_assets/`` beside each output. A PDF is the print a reviewer reads on paper or e-ink, so it is made the way the site makes one, from the report's export bundle (``scripts/export_reports.py``, which adds the provenance footer), with author links resolved to the published site (:func:`build_site.printable`). It also names the commit it was printed from on the edge of its first page, and with ``--since REF`` it bars its margin beside every line changed since REF (:mod:`mini.review_marks`), against a baseline exported from a checkout of REF (``scripts/review_base.py``). The baseline goes through the same exporter, so the two pages differ only where the report does.
+Without a PDF this is the weave alone (:mod:`mini.lit`), with the figures under ``_assets/`` beside each output. A PDF is the print a reviewer reads on paper or e-ink, so it is made the way the site makes one, from the report's export bundle (``scripts/export_reports.py``, which adds the provenance footer), with author links resolved to the published site (:func:`build_site.printable`). It also names the commit it was printed from on the edge of its first page, and with ``--since REF`` it bars its margin beside every line changed since REF (:mod:`mini.review_marks`), against a baseline exported from a checkout of REF (``scripts/review_base.py``). The baseline goes through the same exporter, so the two pages differ only where the report does. ``--since FILE`` names an earlier copy of the report instead, for a draft with no commit to compare against (:func:`review_base.export_file`).
 
 Only the named report is exported and printed, and nothing is memoized: a print takes a few seconds, and its stamp changes with every commit anyway.
 
@@ -21,7 +21,7 @@ from urllib.parse import unquote
 
 from build_site import Bundle, LinkResolver, open_details, print_css, printable
 from export_reports import export_one
-from review_base import export_at, render_md_at, resolve
+from review_base import export_at, export_file, file_slot, render_md_at, resolve
 
 from mini.lit import render
 from mini.lit.render import write_outputs
@@ -47,14 +47,25 @@ class Review:
     Every such print names the commit it is of on the edge of its first page, so the next round can be marked against it: with ``since`` (a ref the reader last reviewed), a report that has a baseline there prints with its changes barred in the margin.
     """
 
-    since: str | None  # full commit id
+    since: str | None  # full commit id, or the slot of a baseline made from a file (review_base.file_slot)
     printed: str  # what the print is of, for the margin note: a short commit id, and whether the tree has edits past it
+    since_name: str | None = None  # what the margin note calls the baseline, when it is not a commit
 
     @classmethod
-    def at(cls, since: str | None) -> "Review":
-        head = _git("rev-parse", "--short", "HEAD")
-        dirty = _git("status", "--porcelain", "--untracked-files=no", "--", "docs", "src")
-        return cls(since, f"{head} + uncommitted edits" if dirty else head)
+    def at(cls, since: str | None, *, report: Path | None = None, earlier: Path | None = None) -> "Review":
+        """The review of a print of *report*, marked against commit *since*, or against file *earlier* when there is one.
+
+        A draft outside the repo is named by its file, since the commit it was printed from says nothing about it.
+        """
+        if report is not None and ROOT not in report.parents:
+            printed = report.name
+        else:
+            head = _git("rev-parse", "--short", "HEAD")
+            dirty = _git("status", "--porcelain", "--untracked-files=no", "--", "docs", "src")
+            printed = f"{head} + uncommitted edits" if dirty else head
+        if earlier is not None:
+            return cls(file_slot(earlier), printed, since_name=earlier.name)
+        return cls(since, printed)
 
     def mark(self, page: str, key: str, *, root: Path) -> str:
         """*page* with its change bars, or with the note alone when there is no ``since`` or report *key* has no baseline at it (``review_base.py`` says when it has none).
@@ -69,7 +80,7 @@ class Review:
         if not (base / "index.html").is_file():
             return unmarked
         base_html = mark_verdicts((base / "index.html").read_text("utf-8"))
-        note = f"Bars mark changes since {since[:7]} · printed from {self.printed}"
+        note = f"Bars mark changes since {self.since_name or since[:7]} · printed from {self.printed}"
         return mark_changes(page, base_html, note=note, root=root, base_root=base)
 
 
@@ -134,6 +145,25 @@ def write_from_bundle(bundle: Path, page: str, outs: list[Path]) -> None:
         print(out)
 
 
+def export_for_review(report: Path, since: str | None, earlier: Path | None) -> Path:
+    """Export *report* for a print, and its baseline at commit *since* or from file *earlier*, if either is given. Returns the report's bundle."""
+    if report.suffix == ".md":
+        bundle = render(report).out_dir  # index.html and index.md, as an export bundle has them
+        if since:
+            render_md_at(since, report)
+    else:
+        # Exits on a cell that raised. No thumbnails: only the site index reads them.
+        bundle = export_one(report, thumbs=False)
+        if since:
+            export_at(since, [report])
+    if earlier is not None:
+        base = export_file(earlier, report)
+        if report.suffix == ".md" and DOCS not in report.parents:
+            index = base / "index.html"
+            index.write_text(local_images(index.read_text("utf-8"), page_dir=earlier.parent, bundle=base), "utf-8")
+    return bundle
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument(
@@ -152,8 +182,9 @@ def main() -> None:
     )
     ap.add_argument(
         "--since",
-        metavar="REF",
-        help="bar the PDF's margin beside every line changed since REF (the commit the reader last reviewed)",
+        metavar="REF|FILE",
+        help="bar the PDF's margin beside every line changed since REF (the commit the reader last reviewed), "
+        "or since FILE, an earlier copy of the report (a draft with no commit to name)",
     )
     args = ap.parse_args()
     report = Path(args.report).resolve()
@@ -173,17 +204,13 @@ def main() -> None:
             print(out)
         return
 
-    since = resolve(args.since) if args.since else None  # before the export, so a bad ref fails fast
-    if report.suffix == ".md":
-        bundle = render(report).out_dir  # index.html and index.md, as an export bundle has them
-        if since:
-            render_md_at(since, report)
-    else:
-        # Exits on a cell that raised. No thumbnails: only the site index reads them.
-        bundle = export_one(report, thumbs=False)
-        if since:
-            export_at(since, [report])
-    page = review_page(report, bundle, Review.at(since), LinkResolver.discover())
+    # A file of that name is an earlier copy; anything else is a ref, resolved before the export so a bad one fails fast.
+    earlier = Path(args.since).resolve() if args.since and Path(args.since).is_file() else None
+    since = resolve(args.since) if args.since and earlier is None else None
+    if earlier is not None and earlier.suffix != report.suffix:
+        ap.error(f"--since {args.since}: an earlier copy of a {report.suffix} report is a {report.suffix} file")
+    bundle = export_for_review(report, since, earlier)
+    page = review_page(report, bundle, Review.at(since, report=report, earlier=earlier), LinkResolver.discover())
     write_from_bundle(bundle, page, outs)
 
 

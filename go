@@ -53,7 +53,7 @@ show_help() {
 		                       upstream tag, dev container features against the registry,
 		                       and upgrades available to packages we declare.
 		                       Read-only; the upgrade check is a --dry-run
-		  render  <report> -o FILE [-o FILE ...] [--since REF]:
+		  render  <report> -o FILE [-o FILE ...] [--since REF|FILE]:
 		                       weave a report (mini.lit: a .py with string prose between
 		                       cells, or a Markdown page under docs/) to each FILE, in
 		                       the format its extension names:
@@ -63,7 +63,9 @@ show_help() {
 		                       site makes it, it names the commit it was printed from,
 		                       and --since REF bars its margin beside every line changed
 		                       since REF (the round last reviewed; the baseline is
-		                       exported from a checkout of REF, reading the store)
+		                       exported from a checkout of REF, reading the store);
+		                       --since FILE marks it against an earlier copy instead,
+		                       for a draft with no commit to name
 		  serve   <report> [--port N]:
 		                       serve one report or Markdown page with live reload while
 		                       you edit it
