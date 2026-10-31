@@ -309,9 +309,13 @@ def key_parts(variant: str, replica: int) -> dict:
     except Exception as e:  # noqa: BLE001 — a probe: say what went wrong
         topo = repr(e)
     smi = subprocess.run(
-        ["nvidia-smi", "--query-gpu=driver_version,vbios_version,clocks.max.sm,clocks.max.mem,memory.total,pci.device_id",
-         "--format=csv,noheader"],
-        capture_output=True, text=True,
+        [
+            "nvidia-smi",
+            "--query-gpu=driver_version,vbios_version,clocks.max.sm,clocks.max.mem,memory.total,pci.device_id",
+            "--format=csv,noheader",
+        ],
+        capture_output=True,
+        text=True,
     ).stdout.strip()
     version = Path("/proc/driver/nvidia/version")
     return {

@@ -14,6 +14,12 @@ from mini import compile_cache
 from mini.compile_cache import DictClaims, LocalBackend, SharedCache
 
 
+def _summary(cache: SharedCache) -> dict:
+    summary = cache.summary()
+    assert summary is not None
+    return summary
+
+
 def _worker(root: Path, **kw) -> SharedCache:
     """A cache as one worker sees it; two of these over one root are two workers sharing it."""
     return SharedCache(LocalBackend(root), "ns", poll_s=0.01, **kw)
@@ -25,7 +31,7 @@ def test_first_worker_compiles_and_the_next_loads(tmp_path):
     a.put("jit_step-1", b"program")
     assert b.get("jit_step-1") == b"program"
     assert a.summary() == {"namespace": "ns", "compiled": 1, "digest": ANY}
-    assert b.summary() == {"namespace": "ns", "loaded": 1, "digest": a.summary()["digest"]}
+    assert b.summary() == {"namespace": "ns", "loaded": 1, "digest": _summary(a)["digest"]}
 
 
 def test_a_cold_fan_out_waits_for_the_one_compile(tmp_path):
@@ -40,7 +46,7 @@ def test_a_cold_fan_out_waits_for_the_one_compile(tmp_path):
     a.put("k", b"program")
     waiter.join(5)
     assert got == [b"program"]
-    assert b.summary() == {"namespace": "ns", "waited": 1, "digest": a.summary()["digest"]}
+    assert b.summary() == {"namespace": "ns", "waited": 1, "digest": _summary(a)["digest"]}
 
 
 def test_a_failed_compile_hands_the_claim_on(tmp_path):
@@ -50,7 +56,7 @@ def test_a_failed_compile_hands_the_claim_on(tmp_path):
     a.release_all()
     assert b.get("k") is None  # `b` claims it and compiles
     b.put("k", b"program")
-    assert b.summary()["compiled"] == 1
+    assert _summary(b)["compiled"] == 1
 
 
 def test_entries_are_written_once(tmp_path):
@@ -60,7 +66,7 @@ def test_entries_are_written_once(tmp_path):
     b.put("k", b"second")
     assert LocalBackend(tmp_path).read("ns/k") == b"first"
     assert b.summary() == {"namespace": "ns", "unshared": 1, "digest": ANY}
-    assert b.summary()["digest"] != a.summary()["digest"]
+    assert _summary(b)["digest"] != _summary(a)["digest"]
 
 
 def test_a_stuck_holder_is_given_up_on(tmp_path):
@@ -185,7 +191,9 @@ def _keyed(cache: SharedCache, accelerator: str) -> None:
         cache.note_part(part, digest)
 
 
-@pytest.mark.parametrize(("device_b", "shared"), [("gpu:NVIDIA L40S:8.9:142:1", True), ("gpu:NVIDIA L4:8.9:58:1", False)])
+@pytest.mark.parametrize(
+    ("device_b", "shared"), [("gpu:NVIDIA L40S:8.9:142:1", True), ("gpu:NVIDIA L4:8.9:58:1", False)]
+)
 def test_hosts_of_one_card_model_share_a_program(tmp_path, device_b, shared):
     """Two host pools with the same card describe it to XLA differently; the key keeps one program per card model."""
     a = SharedCache(LocalBackend(tmp_path), "ns", device="gpu:NVIDIA L40S:8.9:142:1")
@@ -197,4 +205,4 @@ def test_hosts_of_one_card_model_share_a_program(tmp_path, device_b, shared):
     got = b.get("jit_step-oci")
     assert got == (b"program" if shared else None)
     if shared:  # one program, so one digest, whatever JAX called it on each host
-        assert b.summary()["digest"] == a.summary()["digest"]
+        assert _summary(b)["digest"] == _summary(a)["digest"]
