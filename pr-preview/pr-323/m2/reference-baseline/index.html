@@ -1,0 +1,1677 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/70fbbc63852edebdbbae5316540366aa5dacf3db/exports/m2/reference-baseline/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A baseline from the quiet axes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The base sheet: what a woven report page and the site's Markdown pages share —
+ * tokens, type, code, tables, images, quotes, heading anchors. It reaches a page three
+ * ways: mini.lit.page inlines it ahead of lit.css (the report frame); scripts/build_site.py
+ * concatenates it ahead of scripts/md-prose.css and scripts/md.css into the md.css the
+ * site serves; and VS Code's Markdown preview lists them all (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and site-only rules live in those two sheets. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The faces, loaded by the one Google Fonts <link> every page shares
+   * (mini.lit.page.FONTS). Inline SVG figures read --font-mono too (src/subline). */
+  --font-sans: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", serif;
+  --font-mono:
+    "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* Prose lands at ~14.4px (a 90% base), the size the reports settled on. */
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  /* Lora at the regular weight rather than the browser-default bold, with ligatures
+   * on — otherwise the variable font shows its 700 master. */
+  font-weight: 400;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+  /* Keep a short label like "(H1)" from wrapping onto a line of its own. `pretty` does this best; browsers without
+     it (Firefox, for now) drop that line and keep `balance`. */
+  text-wrap-style: balance;
+  text-wrap-style: pretty;
+}
+h1 {
+  margin-top: 0;
+  font-size: 2.25em;
+}
+h2 {
+  margin-top: 4em;
+}
+p {
+  margin-block: 1em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background-color: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* Anchor links on headings. */
+a.anchor-link {
+  opacity: 0;
+  color: var(--fg-muted);
+  transition: opacity 0.2s ease;
+}
+a.anchor-link::after {
+  content: "#";
+  font-size: 0.8em;
+  margin-inline: 0.4em;
+}
+:hover > a.anchor-link {
+  opacity: 1;
+}
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. Top-aligned: a row
+ * whose prose cell wraps to four lines would otherwise leave its short cells floating
+ * in the middle. */
+table {
+  border-collapse: collapse;
+  margin-block: 1.5em;
+  margin-inline: auto;
+}
+th,
+td {
+  padding: 0.35em 0.8em;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+}
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--rule);
+}
+thead > tr:last-child > :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5em;
+}
+tbody > tr:first-child > :is(th, td) {
+  padding-top: 0.5em;
+}
+tbody > tr:last-child > :is(th, td) {
+  border-bottom: 2px solid var(--rule);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
+ *
+ * Where the rest of the CSS lives, and how each reaches a page:
+ *   base.css (beside this)     shared with the site's Markdown pages; mini.lit.page inlines
+ *                              base + this + the Pygments styles into every page it renders
+ *   docs/report.css            report polish and the print block; inlined after this at
+ *                              render, export and site build (mini.reports.set_report_styles),
+ *                              so an edit there reaches published reports without a re-export
+ *   scripts/md-prose.css       a Markdown page's prose: on the site (below), and inlined
+ *                              after report.css when the page is printed
+ *   scripts/md.css             the site's Markdown pages only (base + md-prose + md,
+ *                              concatenated by scripts/build_site.py; VS Code's preview
+ *                              reads all three files)
+ *   mini/chips.css             the nav and provenance chips the site build injects
+ *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
+ *   subline/theme.css          inside each subline SVG, reading this page's tokens
+ */
+
+:root {
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 40rem;
+  --gutter: 1.5rem;
+  --subfigure-gap: 1.5rem;
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+/* Border-box, so a block with padding (a list's bullet indent, a blockquote, a code
+ * block) shares its right edge with the paragraphs, and so do the notes floated off it. */
+main.lit > * {
+  box-sizing: border-box;
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+  margin-block: 3rem;
+}
+/* Display math the same way: KaTeX centres it in its box, so an equation wider than the
+ * measure would start at the column's left edge and overhang to the right. */
+main.lit > div.arithmatex {
+  max-width: none;
+}
+
+/* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure {
+  margin-inline: 0; text-align: center;
+}
+figure img {
+  margin-inline: auto; display: block;
+}
+figure:has(> figure) {
+  display: flex;
+  flex-wrap: wrap;  /* for a browser without `balance` */
+  flex-wrap: balance;
+  justify-content: center;
+  gap: var(--subfigure-gap) 0.5rem;
+}
+figure:has(> figure) > figure {
+  margin: 0;
+}
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+/* The main caption of a sub-figure group is a flex item: a full row of its own (a
+ * `max-width` would cap the basis and let a sub-figure share the row, so the measure is
+ * padding here), and the row gap above it comes off, so it sits under the figures as
+ * any caption does. */
+figure:has(> figure) > figcaption {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  padding-inline: max(0px, calc((100% - var(--measure)) / 2));
+  margin-top: calc(0.6em - var(--subfigure-gap));
+}
+/* A caption rendered from Markdown arrives in a <p>; its margins would pad the caption. */
+figcaption > :is(:first-child, :last-child) {
+  margin-block: 0;
+}
+
+/* A themed figure (mini.vis.figures.themed) carries both renders of the plot, and the
+ * page shows one: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. The print rules in docs/report.css pin the
+ * light one. */
+.mini-themed-figure .mini-themed-img-dark { display: none; }
+.mini-themed-figure .mini-themed-img-light { display: block; }
+body[data-theme="dark"] .mini-themed-figure,
+body.dark .mini-themed-figure,
+body.dark-theme .mini-themed-figure {
+  .mini-themed-img-dark { display: block; }
+  .mini-themed-img-light { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .mini-themed-figure {
+    .mini-themed-img-dark { display: block; }
+    .mini-themed-img-light { display: none; }
+  }
+}
+
+/* Admonitions (pymdownx blocks) and details. Their side padding is --column-inset, so
+ * a margin note inside one can reach past it to the column's edge (Notes, below). */
+.admonition, details {
+  --column-inset: 1em;
+  margin-block: 1.5em;
+  padding: 0.6em var(--column-inset);
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :first-child { margin-top: 0; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Notes (mini.lit.notes): a footnote's text beside its marker, and a glossary term's
+ * definition at its first use in a section. Where a note shows depends on the room:
+ *   narrow screen   hidden until its marker is hovered or focused (tapped), then a box
+ *                   under the line, across the column; the footnote list stays too
+ *   wide screen     in the right margin, beside the line that cites it; the list keeps
+ *                   only what has no margin note
+ *   paper           in the margin as well, with the page geometry in docs/report.css
+ * Margin notes are right floats, each clearing the one before (`clear: right`), so a
+ * note that would overlap the one above slides down instead. A note in a table cell, a
+ * caption or a heading (`.popover`) cannot float out of its box, so it stays a hover
+ * box everywhere, and its footnote stays in the list. */
+/* How far a block's content sits in from the text column's right edge. Registered as a
+ * length so that `1em` resolves on the padded block, and not in the note's smaller type. */
+@property --column-inset {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+:root {
+  --note-width: 14rem;
+  --note-gap: 1.5rem;
+}
+main.lit { position: relative; }  /* what a hover box spans */
+sup.fnref > a { text-decoration: none; }
+dfn.term {
+  font-style: inherit;
+  text-decoration: underline dotted color-mix(in srgb, var(--fg) 45%, transparent);
+  text-underline-offset: 0.2em;
+  cursor: help;
+}
+.sidenote {
+  display: none;
+  position: absolute;
+  left: var(--gutter);
+  right: var(--gutter);
+  z-index: 10;
+  max-width: var(--measure);
+  margin-top: 0.3em;
+  margin-inline: auto;
+  padding: 0.5em 0.8em;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1.45;
+  text-align: left;
+  text-indent: 0;
+  color: var(--fg);
+}
+:is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote,
+.sidenote:is(:hover, :focus) {
+  display: block;
+}
+.sidenote-number { font-weight: 700; }
+.glossnote-term { font-weight: 700; }
+.glossnote-term::after { content: "."; }
+.sidenote .more > .sidenote-p { display: block; margin-top: 0.4em; }
+
+/* A note in the margin, on a wide screen (below) or on paper, is only its gloss until it
+ * opens, with an ellipsis that takes no width, so it never wraps onto a line of its own. */
+@media print, screen and (min-width: 74rem) {
+  .sidenote:not(.popover) {
+    & .more, & .lead-colon { display: none; }
+    &:has(> .more) > .gloss::after {
+      content: "…";
+      display: inline-block;
+      width: 0;
+      white-space: nowrap;
+    }
+  }
+}
+
+/* Wide enough for the centred column plus a note strip on each side:
+ * 40rem measure + 2 × (14rem note + 1.5rem gap) + 2 × 1.5rem gutter = 74rem. */
+@media screen and (min-width: 74rem) {
+  /* Figures and tables start below any note still running beside the text above them. */
+  main.lit > :is(figure, table, h2, hr, .footnote) { clear: right; }
+  .sidenote:not(.popover) {
+    display: block;
+    position: relative;
+    z-index: auto;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    max-width: none;
+    margin: 0.3em calc(-1 * (var(--note-width) + var(--note-gap) + var(--column-inset))) 0.8em 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+    font-size: 0.78rem;
+    color: var(--fg-muted);
+    text-align: justify;
+    hyphens: auto;
+    /* Only the gloss (mini.lit.notes) until the note or its marker is hovered, or
+     * focused: a click on either keeps it open. The rest then opens in a box over the
+     * notes below, so the float keeps its size and nothing else moves. */
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    & .more {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      padding-bottom: 0.4em;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+  }
+  :is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote:not(.popover),
+  .sidenote:not(.popover):is(:hover, :focus, :focus-within) {
+    opacity: 1;
+    z-index: 5;  /* over the notes below, which are positioned too */
+    & .more { display: block; }
+    & .lead-colon { display: inline; }
+    & > .gloss::after { content: none; }
+  }
+  .sidenote:focus { outline: none; }
+  .footnote li.sidenoted,
+  .footnote.all-sidenoted {
+    display: none;
+  }
+}
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+/* Print: only what the frame needs on its own. The page size, type and page breaks
+ * are docs/report.css's print block, which every rendered report carries. */
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+  /* Paper cannot hover, so a note shows only where a stylesheet gives it a margin
+   * (docs/report.css does); otherwise the footnote list carries them all. */
+  .sidenote { display: none; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+  &.decided {
+    color: #2b6cb0;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+    /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
+     * margins, where Chromium stops painting. A note stops --note-edge short of that,
+     * clear of the change bars and stamp of a review print, and overlaps the text by
+     * the rest. */
+    --note-width: 22mm;
+    --note-gap: 2mm;
+    --note-edge: 2mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
+   * text, in type small enough to leave the text alone (zoom in to read it). Floats that
+   * clear each other stack, so a note never overlaps the one before it; it slides down.
+   * A note is only its gloss here (mini.lit's sheet), so the footnote list keeps the whole
+   * of each note, and a report's own glossary the whole of each definition. */
+  main.lit > :is(figure, table, h2, hr, .footnote) {
+    clear: right;
+  }
+  main.lit .sidenote:not(.popover) {
+    display: block;
+    position: static;
+    max-width: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    margin-block: 0.4em;
+    margin-left: var(--note-gap);
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-edge), var(--note-width) + var(--note-gap)) - var(--column-inset));
+    font-family: var(--font-sans);
+    font-size: 6pt;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1.3;
+    text-indent: 0;
+    color: inherit;
+    text-align: left;  /* a narrow justified line opens wide gaps between words */
+    hyphens: auto;
+  }
+  .sidenote-number,
+  .glossnote-term {
+    font-weight: 700;
+  }
+  /* A term with its definition beside it needs no underline on paper. */
+  dfn.term {
+    text-decoration: none;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+  &.decided {
+    color: #2b6cb0;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+    /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
+     * margins, where Chromium stops painting. A note stops --note-edge short of that,
+     * clear of the change bars and stamp of a review print, and overlaps the text by
+     * the rest. */
+    --note-width: 22mm;
+    --note-gap: 2mm;
+    --note-edge: 2mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
+   * text, in type small enough to leave the text alone (zoom in to read it). Floats that
+   * clear each other stack, so a note never overlaps the one before it; it slides down.
+   * A note is only its gloss here (mini.lit's sheet), so the footnote list keeps the whole
+   * of each note, and a report's own glossary the whole of each definition. */
+  main.lit > :is(figure, table, h2, hr, .footnote) {
+    clear: right;
+  }
+  main.lit .sidenote:not(.popover) {
+    display: block;
+    position: static;
+    max-width: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    margin-block: 0.4em;
+    margin-left: var(--note-gap);
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-edge), var(--note-width) + var(--note-gap)) - var(--column-inset));
+    font-family: var(--font-sans);
+    font-size: 6pt;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1.3;
+    text-indent: 0;
+    color: inherit;
+    text-align: left;  /* a narrow justified line opens wide gaps between words */
+    hyphens: auto;
+  }
+  .sidenote-number,
+  .glossnote-term {
+    font-weight: 700;
+  }
+  /* A term with its note beside it keeps its faint dotted underline (lit.css), and a link
+   * in one, or one naming another experiment, takes no link underline of its own, so it
+   * does not read as a plain link. */
+  main.lit :is(dfn.term a, a:has(cite)):not(.footnote-backref) {
+    text-decoration: none;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/pr-preview/pr-323/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/reference-baseline/report.py">Source</a><a href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>reference-baseline</strong> · <code>dc95e0f-dirty</code> (dirty) · run 2026-10-24<div>via reports/m2/reference-baseline/axes</div></div><div><strong>rotated-basis</strong> · <code>53d9f71</code> · run 2026-10-23<div>via reports/m2/rotated-basis/dose</div></div><div><strong>soft-pool</strong> · <code>434a7a7</code> · run 2026-10-20<div>via reports/m2/soft-pool/dose</div></div><div><strong>split-anti-seeds</strong> · <code>87826ef</code> · run 2026-10-13<div>via reports/m2/split-anti-seeds/dose</div></div></details>
+<main class="lit">
+<h1 id="a-baseline-from-the-quiet-axes">A baseline from the quiet axes<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#a-baseline-from-the-quiet-axes" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- lede -->
+<p>Removal and <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The side effect of an edit on the other ops<span class="lead-colon">:</span></span><span class="more"> the largest drop in the score of any op other than the one removed, net of what the same edit does to a control trained without the anchor. The selectivity criterion of D2.2 allows at most 0.02 at any dose.</span></span> have been measured net of what the same edit does to the control at the same seed, so they depend on where the anchored axis, e₁, happens to sit in that control. We re-scored the stored runs of the recipe of record against a baseline that does not depend on it: the median drop over edits along the other quiet coordinate axes. The numbers quoted so far barely move, and on the rotated-basis runs the new baseline brings the short seeds back up beside the rest.</p>
+</div>
+<p>The question comes from <a href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/rotated-basis/">rotated-basis</a>, where Adam acted in a rotated basis.<sup class="fnref" id="fnref:adam"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#fn:adam">1</a></sup><span class="sidenote" role="note" tabindex="-1"><span class="sidenote-number">1</span> <span class="gloss">Adam and the basis<span class="lead-colon">:</span></span><span class="more"> Adam scales the update of each coordinate separately, so the coordinate axes are special to it. Rotated-basis ran it in a rotated basis instead.</span></span> On two seeds e₁ overlapped the syntax direction of the control, so the edit took half of the op from the control as well. Removal net of the control then fell short, although the anchored runs removed the op as before.</p>
+<p>That report and the <a href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/d2.2/design.html">D2.2 design</a> proposed a different baseline: the median over reference edits along other coordinate axes, leaving out the syntax axes, as in the spill-timing experiment.</p>
+<p>This report trains nothing. It scores stored runs: the eight <code>falloff</code> runs (the recipe of record) of <a href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/split-anti-seeds/">split-anti-seeds</a>, the eight controls of ex-2.2.23 at the same seeds, the sixteen runs of rotated-basis, and, for E4, the sixteen runs of two soft-pool arms. On each run it scores the edit along each of the 64 coordinate axes, at every dose.</p>
+<h2 id="observations">Observations<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#observations" title="Link to this heading">&para;</a></h2>
+<ul>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#where-e-sits-in-the-control-e1">Where e₁ sits in the control (E1)</a>: it varies by seed. On some seeds e₁ is among the quietest axes of the control, and on one it is among the five costliest. The median over the reference axes is steady across seeds. Separately, on three seeds the anchored run keeps its spike of energy on a different coordinate from the control.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#net-removal-and-spill-against-the-new-baseline-e2">Net removal and spill against the new baseline (E2)</a>: little changes. The mean removal rises by a hundredth or two, mostly on the one seed where e₁ was a busy axis of the control. Every run stays within the <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The side effect of an edit on the other ops<span class="lead-colon">:</span></span><span class="more"> the largest drop in the score of any op other than the one removed, net of what the same edit does to a control trained without the anchor. The selectivity criterion of D2.2 allows at most 0.02 at any dose.</span></span> criterion. The median taken in the anchored run itself, with no control, agrees with the one taken in the control.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#the-rotated-basis-runs-e3">The rotated-basis runs (E3)</a>: the new baseline, taken along the rotated axes, brings the removal on the two seeds below half, and a third at six tenths, up to the level of the rest.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#runs-near-the-spill-criterion-e4">Runs near the spill criterion (E4)</a>: on two arms of soft-pool that come close to the criterion, the median moves runs across it. <code>step, soft τ</code> goes from 2 runs over to none, and <code>pool 1–3, soft τ</code> keeps about as many, but not the same ones.</li>
+</ul>
+<h2 id="scope-and-method">Scope and method<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#scope-and-method" title="Link to this heading">&para;</a></h2>
+<p>This is an exploratory re-scoring, with no preregistration and no gate. The model seeds are 704 to 711, and the controls are the 400-epoch ones. Each anchored run pairs with the control at its seed, which shares its initialization, batches, and label draws.</p>
+<p>The edit is the dose edit of ex-2.2.22, unchanged. It projects a fixed direction out of the state at every position and slice, removing a quarter, a half, three quarters, or all of the component along it. It is scored on the whole held-out set of every op, as before.</p>
+<p>Along e₁ the drops this edit causes reproduce the published dose scoring to rounding. New here is the same edit along every other coordinate axis, and, for the rotated-basis runs, along every axis of the rotated basis Adam acted in.</p>
+<p>A reference axis is any coordinate axis other than e₁ and the two that hold the most energy<sup class="fnref" id="fnref:energy"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#fn:energy">2</a></sup><span class="sidenote" role="note" tabindex="-1"><span class="sidenote-number">2</span> <span class="gloss">Energy<span class="lead-colon">:</span></span><span class="more"> the sum of the squared projections of the states onto a direction. The share of a direction is its energy over the total.</span></span> of the stream, averaged over slices. Those two are where the model puts its syntax tokens. For the rotated-basis runs the reference axes are the rotated axes, with the two highest in energy left out the same way.</p>
+<!-- REVIEW: "Those two are where the model puts its syntax tokens" is the rule's intent; E1 shows the second axis by energy is a mild one on 707 and 708, where no other axis costs more than about 0.2. -->
+
+<p>One coordinate holds about 0.4 of the energy in every control, and E1 shows what projecting it out costs.</p>
+<h2 id="measurements">Measurements<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#measurements" title="Link to this heading">&para;</a></h2>
+<ul>
+<li>Removal: the net drop in score on <code>difference</code> under the full edit along e₁, as a share of the way from the clean score to the <dfn class="term" tabindex="0">target null</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Target null</span> <span class="gloss">Where a removal should land<span class="lead-colon">:</span></span><span class="more"> what an ideal predictor that had lost one op and nothing else would answer. It is the Bayes posterior over ops given the examples, with the removed op set to zero and the rest renormalized, so it still weighs the other ops by how well they fit.</span></span>. Higher is better.</li>
+<li><dfn class="term" tabindex="0">Spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The side effect of an edit on the other ops<span class="lead-colon">:</span></span><span class="more"> the largest drop in the score of any op other than the one removed, net of what the same edit does to a control trained without the anchor. The selectivity criterion of D2.2 allows at most 0.02 at any dose.</span></span>: the largest net drop on another op under the e₁ edit, over the four doses. A run is within the criterion when it is at most 0.02. Lower is better.</li>
+<li>The cost of an axis: the drop under the full edit along it, averaged over the ops. A quiet axis is one that costs little.</li>
+</ul>
+<p>Each of these is net of a baseline. We compare three, each taken per op and per dose:</p>
+<ul>
+<li>e₁ in the control: the drop the same e₁ edit causes in the control at the same seed. This is the measurement quoted so far.</li>
+<li>Reference axes, control: the median drop over the reference axes of the control.</li>
+<li>Reference axes, own run: the median drop over the reference axes of the anchored run itself. It needs no control.</li>
+</ul>
+<p>E2 also shows removal with nothing subtracted (raw), as rotated-basis recommended.</p>
+<h2 id="where-e₁-sits-in-the-control-e1">Where e₁ sits in the control (E1)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#where-e₁-sits-in-the-control-e1" title="Link to this heading">&para;</a></h2>
+<p>How typical an axis is e₁ in a control? If it is always among the quiet ones, the paired baseline and the median of the quiet axes should agree, and nothing quoted so far would move. If its place varies by seed, so does the paired baseline.</p>
+<p><strong>What we saw.</strong> Its place varies. On two seeds e₁ is the second quietest axis of the control. At seed 705 it is the 5th costliest of 64 (the high square in the figure below), with about twice the cost of the median reference axis. The median itself is steady across seeds.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/reference-baseline-cost-light.png" alt="On every seed most axes cost between about 0.01 and 0.06, around a steady median near 0.03, and the two syntax axes stand far above them. e₁ falls low in that band on most seeds, and near its top at seed 705." width="626" height="260" style="max-width: 100%; height: auto;" data-asset-name="reference-baseline-cost" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/reference-baseline-cost-dark.png" alt="On every seed most axes cost between about 0.01 and 0.06, around a steady median near 0.03, and the two syntax axes stand far above them. e₁ falls low in that band on most seeds, and near its top at seed 705." width="626" height="260" style="max-width: 100%; height: auto;" data-asset-name="reference-baseline-cost" />
+<figcaption><p><strong>The cost of each coordinate axis in the control</strong>, the full edit along it, averaged over the ops. One
+column per seed: the reference axes as faded dots, their median as a bar, the two syntax axes as open
+circles, and e₁ as a square. The axis is logarithmic.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>seed</th><th class=num>e₁ rank by cost, control</th><th class=num>e₁ cost, control</th><th class=num>reference median, control</th><th class=num>syntax axes cost, control</th><th class=num>top energy share, control</th><th class=num>top axis, <code>falloff</code></th></tr></thead><tbody><tr><td>704</td><td class=num>63 of 64</td><td class=num>0.018</td><td class=num>0.030</td><td class=num>0.55, 0.58</td><td class=num>0.38</td><td class=num>same</td></tr><tr><td>705</td><td class=num>5 of 64</td><td class=num>0.062</td><td class=num>0.030</td><td class=num>0.46, 0.57</td><td class=num>0.36</td><td class=num>same</td></tr><tr><td>706</td><td class=num>55 of 64</td><td class=num>0.022</td><td class=num>0.029</td><td class=num>0.40, 0.34</td><td class=num>0.36</td><td class=num>moved</td></tr><tr><td>707</td><td class=num>38 of 64</td><td class=num>0.031</td><td class=num>0.033</td><td class=num>0.57, 0.19</td><td class=num>0.44</td><td class=num>moved</td></tr><tr><td>708</td><td class=num>48 of 64</td><td class=num>0.030</td><td class=num>0.036</td><td class=num>0.58, 0.12</td><td class=num>0.45</td><td class=num>moved</td></tr><tr><td>709</td><td class=num>15 of 64</td><td class=num>0.041</td><td class=num>0.033</td><td class=num>0.46, 0.57</td><td class=num>0.37</td><td class=num>same</td></tr><tr><td>710</td><td class=num>63 of 64</td><td class=num>0.018</td><td class=num>0.034</td><td class=num>0.45, 0.57</td><td class=num>0.38</td><td class=num>same</td></tr><tr><td>711</td><td class=num>27 of 64</td><td class=num>0.032</td><td class=num>0.029</td><td class=num>0.35, 0.57</td><td class=num>0.36</td><td class=num>same</td></tr></tbody></table><figcaption><p><strong>Where e₁ sits in the control</strong>, per seed. The rank counts from the costliest of the 64 coordinate axes.
+The cost is the drop under the full edit, averaged over the ops. The top energy share is the share of the
+energy of the stream held by the axis with the most, averaged over slices, and the last column says whether
+the <code>falloff</code> run at that seed has its top axis on the same coordinate.</p></figcaption></figure>
+
+<p>So the paired baseline is one draw from the axes of the control, and that draw ranges from one of the quietest axes to one of the busiest few.</p>
+<p>The axis with the most energy takes most of the score of every op on every seed, and all of it on 707 and 708.</p>
+<!-- REVIEW: "costs every op about half its score" read the cost of the top axis (about 0.5, the drop averaged over ops) as a share of the score; the mean clean score over ops is about 0.58, so that drop is most to all of it. Verify: `drop[top][FULL_DOSE]` over `clean` per op in the control axes data is 0.7 to 1.0 on every seed, and 1.0 on 707 and 708. -->
+<p>The second (the lower open circle) costs as much on most seeds, but on 707 and 708 it is a milder axis, and on 706 two reference axes cost more than it does. So ranking by energy only roughly finds the costly axes.</p>
+<p>Leaving the syntax axes out of the reference set hardly matters: the median over all 63 axes other than e₁ gives a removal within 0.005 of the median without them, on every seed. A median of a few dozen axes is not swayed by two.</p>
+<p>On 3 of 8 seeds (706, 707, 708) the <code>falloff</code> run puts its most energetic axis (the spike) on a different coordinate from the control at the same seed, at every slice, and that coordinate holds almost nothing in the control. Rotated-basis expected otherwise: it found the spike on the same coordinate in both runs on the seeds it checked, and took a move under the rotated basis as a sign that the anti term steers it.</p>
+<!-- REVIEW: rotated-basis E3 says "In the stored runs we found the spike on the same coordinate in the control and the anchored run at every seed we checked." Here the top-energy coordinate differs on the seeds listed. Verify: `energy` of `falloff-s<seed>` and `control-s<seed>` in the axes data, averaged over slices; the result holds at the last slice too. Checked against the axes data: on 706, 707 and 708 the top-energy coordinate of `falloff` differs from that of the control at each of the five slices, and the control holds under 0.02 of its energy on that coordinate; on the other five seeds it is the same coordinate at every slice. -->
+
+<p>The moves seen here under plain Adam suggest the spike can move without the rotation, so a change of loss alone may be enough to move it.</p>
+<h2 id="net-removal-and-spill-against-the-new-baseline-e2">Net removal and spill against the new baseline (E2)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#net-removal-and-spill-against-the-new-baseline-e2" title="Link to this heading">&para;</a></h2>
+<p>When netted against the median of the reference axes, do the removal and <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The side effect of an edit on the other ops<span class="lead-colon">:</span></span><span class="more"> the largest drop in the score of any op other than the one removed, net of what the same edit does to a control trained without the anchor. The selectivity criterion of D2.2 allows at most 0.02 at any dose.</span></span> of <code>falloff</code> change from the numbers that split-anti-seeds quoted? The main measurement is removal at the full dose per seed, shown beside spill over the four doses.</p>
+<p><strong>What we saw.</strong> Hardly at all. The mean removal goes from 0.85 against e₁ in the control to 0.87 against the median of the control, and 0.87 against the median of the anchored run. Every run stays within the spill criterion under every baseline.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/reference-baseline-coordinate-light.png" alt="The three baselines give nearly the same removal, about 0.8 to 0.9, on every seed but 705, where the paired one is about a tenth lower. Spill stays below the criterion under all three, and only the raw spill crosses it." width="626" height="375" style="max-width: 100%; height: auto;" data-asset-name="reference-baseline-coordinate" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/reference-baseline-coordinate-dark.png" alt="The three baselines give nearly the same removal, about 0.8 to 0.9, on every seed but 705, where the paired one is about a tenth lower. Spill stays below the criterion under all three, and only the raw spill crosses it." width="626" height="375" style="max-width: 100%; height: auto;" data-asset-name="reference-baseline-coordinate" />
+<figcaption><p><strong>Removal and spill under each baseline</strong>, the stored <code>falloff</code> runs,
+per seed. The gray circles (e₁ in the control) are the measurement quoted so far. Removal is at the full
+dose; spill is the largest over the four doses. The dashed rule is the spill criterion.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>baseline</th><th class=num>removal ↑</th><th class=num>within criterion ↑</th><th class=num>spill, any dose ↓</th></tr></thead><tbody><tr><td>e₁ in the control</td><td class=num>0.85 (0.79 to 0.90)</td><td class=num>8 of 8</td><td class=num>0.003 (−0.004 to 0.018)</td></tr><tr><td>reference axes, control</td><td class=num>0.87 (0.77 to 0.90)</td><td class=num>8 of 8</td><td class=num>−0.001 (−0.009 to 0.013)</td></tr><tr><td>reference axes, own run</td><td class=num>0.87 (0.77 to 0.91)</td><td class=num>8 of 8</td><td class=num>−0.002 (−0.009 to 0.014)</td></tr><tr><td>nothing subtracted</td><td class=num>0.96 (0.87 to 0.99)</td><td class=num></td><td class=num>0.017 (0.003 to 0.038)</td></tr></tbody></table><figcaption><p><strong>Removal and spill under each baseline</strong>, the stored <code>falloff</code> runs,
+seed mean and range over 8 runs. Removal is at the full dose; spill is the largest net drop on
+another op over the four doses, and "within criterion" counts the runs where it is at most 0.02.
+Arrows mark which direction is better.</p></figcaption></figure>
+
+<p>The one seed that moves by more than a few hundredths is 705, where e₁ was among the busiest axes of the control. There the paired baseline (the gray circle in the figure above) gives a removal about a tenth lower than the medians do. Elsewhere the three baselines agree within a few hundredths, small next to the spread of removal across seeds.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>seed</th><th class=num>removal, e₁ in the control ↑</th><th class=num>removal, reference axes, control ↑</th><th class=num>removal, reference axes, own run ↑</th><th class=num>removal, nothing subtracted ↑</th></tr></thead><tbody><tr><td>704</td><td class=num>0.88</td><td class=num>0.89</td><td class=num>0.91</td><td class=num>0.97</td></tr><tr><td>705</td><td class=num>0.79</td><td class=num>0.90</td><td class=num>0.91</td><td class=num>0.99</td></tr><tr><td>706</td><td class=num>0.85</td><td class=num>0.83</td><td class=num>0.83</td><td class=num>0.92</td></tr><tr><td>707</td><td class=num>0.87</td><td class=num>0.88</td><td class=num>0.90</td><td class=num>0.98</td></tr><tr><td>708</td><td class=num>0.79</td><td class=num>0.77</td><td class=num>0.77</td><td class=num>0.87</td></tr><tr><td>709</td><td class=num>0.86</td><td class=num>0.89</td><td class=num>0.90</td><td class=num>0.99</td></tr><tr><td>710</td><td class=num>0.90</td><td class=num>0.88</td><td class=num>0.89</td><td class=num>0.97</td></tr><tr><td>711</td><td class=num>0.86</td><td class=num>0.89</td><td class=num>0.89</td><td class=num>0.97</td></tr></tbody></table><figcaption><p><strong>Removal at the full dose by seed</strong>, under each baseline, the stored <code>falloff</code> runs.
+These are the values in the top panel of the figure above.</p></figcaption></figure>
+
+<p>The two medians agree on every seed, within 0.02 of removal. So in these runs the quiet axes of an anchored run cost about what the quiet axes of its control cost, and the anchor hardly touches them.</p>
+<!-- REVIEW: "leaves them alone" softened to "hardly touches them": the median cost of the reference axes is a few thousandths higher in `falloff` than in the control on 7 of 8 seeds (0.031 to 0.040 against 0.029 to 0.036). Verify: `np.median(cost(FALLOFF, s)[reference_dirs(FALLOFF, s)])` against `REF_COST[s]`. -->
+
+<p>Spill falls slightly under both medians. On most seeds, e₁ in the control costs a little less on the other ops than the median does, so the paired baseline subtracts less.</p>
+<!-- REVIEW: the reason had its direction reversed ("costs a little more than the median"). Net spill is the drop on the anchored run less the baseline, so a higher spill under the paired baseline means that baseline is the smaller one. Verify: `e1_drop(CONTROL, s)[FULL_DOSE, OTHER] - baseline(CTRL_MED, s)[FULL_DOSE, OTHER]` is negative on most ops of most seeds; 705 is the exception. -->
+
+<p>The raw spill, with nothing subtracted, is higher (up to 0.038), so some baseline is still needed to separate the anchored op from the general cost of an edit.</p>
+<p>The median of eight reference axes drawn at random, as spill-timing takes it, varies with the draw. Over many draws at each seed, the middle nine tenths of the removal spans at most 0.06, about half the seed range of removal, so eight axes are enough to tell a removable run from a weak one.</p>
+<p>Over the same draws, spill stays at or below 0.018 on nineteen draws in twenty. The median over all the reference axes needs no draw.</p>
+<h2 id="the-rotated-basis-runs-e3">The rotated-basis runs (E3)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#the-rotated-basis-runs-e3" title="Link to this heading">&para;</a></h2>
+<p>In the rotated-basis runs, Adam put the cheap directions along the rotated axes. With the median taken along those axes, does the baseline put the short seeds back beside the rest?</p>
+<p><strong>What we saw.</strong> Yes. Against e₁ in the control, removal falls below half on seeds 706 and 710, and to about six tenths on 707. Against either median it sits near nine tenths on every seed, with every run within the <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The side effect of an edit on the other ops<span class="lead-colon">:</span></span><span class="more"> the largest drop in the score of any op other than the one removed, net of what the same edit does to a control trained without the anchor. The selectivity criterion of D2.2 allows at most 0.02 at any dose.</span></span> criterion.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/reference-baseline-rotated-light.png" alt="Under the paired baseline removal drops below half on seeds 706 and 710 and to about 0.6 on 707, while under both medians it sits near 0.9 on every seed. Spill stays near zero under every baseline." width="626" height="375" style="max-width: 100%; height: auto;" data-asset-name="reference-baseline-rotated" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/reference-baseline-rotated-dark.png" alt="Under the paired baseline removal drops below half on seeds 706 and 710 and to about 0.6 on 707, while under both medians it sits near 0.9 on every seed. Spill stays near zero under every baseline." width="626" height="375" style="max-width: 100%; height: auto;" data-asset-name="reference-baseline-rotated" />
+<figcaption><p><strong>Removal and spill under each baseline</strong>, the rotated-basis <code>falloff</code> runs,
+per seed. The gray circles (e₁ in the control) are the measurement quoted so far. Removal is at the full
+dose; spill is the largest over the four doses. The dashed rule is the spill criterion.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>baseline</th><th class=num>removal ↑</th><th class=num>within criterion ↑</th><th class=num>spill, any dose ↓</th></tr></thead><tbody><tr><td>e₁ in the control</td><td class=num>0.71 (0.26 to 0.90)</td><td class=num>8 of 8</td><td class=num>0.000 (−0.009 to 0.005)</td></tr><tr><td>reference axes, control</td><td class=num>0.89 (0.88 to 0.91)</td><td class=num>8 of 8</td><td class=num>−0.003 (−0.007 to 0.006)</td></tr><tr><td>reference axes, own run</td><td class=num>0.88 (0.86 to 0.91)</td><td class=num>8 of 8</td><td class=num>−0.005 (−0.009 to 0.000)</td></tr><tr><td>nothing subtracted</td><td class=num>0.98 (0.97 to 0.99)</td><td class=num></td><td class=num>0.017 (−0.002 to 0.038)</td></tr></tbody></table><figcaption><p><strong>Removal and spill under each baseline</strong>, the rotated-basis <code>falloff</code> runs,
+seed mean and range over 8 runs. Removal is at the full dose; spill is the largest net drop on
+another op over the four doses, and "within criterion" counts the runs where it is at most 0.02.
+Arrows mark which direction is better.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>seed</th><th class=num>removal, e₁ in the control ↑</th><th class=num>removal, reference axes, control ↑</th><th class=num>removal, reference axes, own run ↑</th><th class=num>removal, nothing subtracted ↑</th></tr></thead><tbody><tr><td>704</td><td class=num>0.90</td><td class=num>0.88</td><td class=num>0.86</td><td class=num>0.97</td></tr><tr><td>705</td><td class=num>0.84</td><td class=num>0.88</td><td class=num>0.86</td><td class=num>0.97</td></tr><tr><td>706</td><td class=num>0.47</td><td class=num>0.91</td><td class=num>0.91</td><td class=num>0.99</td></tr><tr><td>707</td><td class=num>0.60</td><td class=num>0.88</td><td class=num>0.88</td><td class=num>0.97</td></tr><tr><td>708</td><td class=num>0.80</td><td class=num>0.88</td><td class=num>0.86</td><td class=num>0.97</td></tr><tr><td>709</td><td class=num>0.86</td><td class=num>0.88</td><td class=num>0.88</td><td class=num>0.97</td></tr><tr><td>710</td><td class=num>0.26</td><td class=num>0.90</td><td class=num>0.86</td><td class=num>0.98</td></tr><tr><td>711</td><td class=num>0.90</td><td class=num>0.90</td><td class=num>0.89</td><td class=num>0.98</td></tr></tbody></table><figcaption><p><strong>Removal at the full dose by seed</strong>, under each baseline, the rotated-basis <code>falloff</code> runs.
+These are the values in the top panel of the figure above.</p></figcaption></figure>
+
+<p>Again the two medians agree, within 0.04 of removal. The median of eight drawn axes spans at most 0.09 in removal over the middle nine tenths of draws, a little wider than under plain Adam.</p>
+<p>The reference axes have to be the cheap ones for the basis the model trained in. Under the rotated basis a coordinate axis is an ordinary direction and costs more, as rotated-basis found, so a median over coordinate axes would overstate the baseline there.</p>
+<p>With an optimizer that has no privileged basis at all, every direction touches the spike, and no set of cheap reference directions exists in the same sense.</p>
+<h2 id="runs-near-the-spill-criterion-e4">Runs near the spill criterion (E4)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#runs-near-the-spill-criterion-e4" title="Link to this heading">&para;</a></h2>
+<p>The stored <code>falloff</code> runs are all well within the <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The side effect of an edit on the other ops<span class="lead-colon">:</span></span><span class="more"> the largest drop in the score of any op other than the one removed, net of what the same edit does to a control trained without the anchor. The selectivity criterion of D2.2 allows at most 0.02 at any dose.</span></span> criterion, so a change of baseline could not move a run across it. Two arms of <a href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/soft-pool/">soft-pool</a>, <code>step, soft τ</code> and <code>pool 1–3, soft τ</code>, come close to it at the same seeds: against e₁ in the control, 2 and 4 of their 8 runs spill over it. How do those counts change against the medians? We compare the spill of each run, the largest over the four doses, under each baseline.</p>
+<p><strong>What we saw.</strong> For <code>step, soft τ</code> the count drops to none: both runs that were over the criterion fall under it against either median. For <code>pool 1–3, soft τ</code> the count barely changes (4 against e₁ in the control, 3 against the median of the control, 3 against the median of the run), but which runs are over it changes. Seeds 708 and 710 fall under the criterion, and seed 705 rises to it: just over against the median of the control, and over by less than a thousandth against the median of the run (the bold 0.020 in the table). The figure shows each run under each baseline and, for scale, with no baseline subtracted.</p>
+<!-- REVIEW: "seed 705 rises just over it" now says it rises to the criterion. Against the own-run median it is 0.0205, and against the median over all 63 other axes (the D2.2 rule) in the run it is 0.0198, so which side it lands on is a matter of rounding. Verify: `SOFT_SPILL[POOL][SELF_MED][705]`, and `scores(median_drop(FALLOFF, 705, POOL, [i for i in range(64) if i != E1]), 705, POOL)["worst_spill"]`. -->
+
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/reference-baseline-soft-pool-light.png" alt="Against either median, both step, soft τ runs over the criterion (seeds 705 and 711) fall under it. For pool 1–3, soft τ, seeds 708 and 710 fall under it, 705 rises to it, and 707 and 711 stay over." width="626" height="260" style="max-width: 100%; height: auto;" data-asset-name="reference-baseline-soft-pool" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/reference-baseline-soft-pool-dark.png" alt="Against either median, both step, soft τ runs over the criterion (seeds 705 and 711) fall under it. For pool 1–3, soft τ, seeds 708 and 710 fall under it, 705 rises to it, and 707 and 711 stay over." width="626" height="260" style="max-width: 100%; height: auto;" data-asset-name="reference-baseline-soft-pool" />
+<figcaption><p><strong>Spill under each baseline, soft-pool runs</strong>, per seed, for the two arms of soft-pool that come close
+to the criterion. Spill is the largest net drop on another op over the four doses; the triangles
+subtract no baseline. The dashed rule is the spill criterion.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>arm</th><th class=num>baseline</th><th class=num>704</th><th class=num>705</th><th class=num>706</th><th class=num>707</th><th class=num>708</th><th class=num>709</th><th class=num>710</th><th class=num>711</th><th class=num>over criterion ↓</th></tr></thead><tbody><tr><td><code>step, soft τ</code></td><td class=num>e₁ in the control</td><td class=num>0.013</td><td class=num><strong>0.029</strong></td><td class=num>0.007</td><td class=num>−0.007</td><td class=num>0.001</td><td class=num>0.002</td><td class=num>0.009</td><td class=num><strong>0.022</strong></td><td class=num>2 of 8</td></tr><tr><td><code>step, soft τ</code></td><td class=num>reference axes, control</td><td class=num>−0.004</td><td class=num>0.015</td><td class=num>−0.004</td><td class=num>−0.004</td><td class=num>−0.004</td><td class=num>0.004</td><td class=num>−0.007</td><td class=num>0.011</td><td class=num>0 of 8</td></tr><tr><td><code>step, soft τ</code></td><td class=num>reference axes, own run</td><td class=num>−0.004</td><td class=num>0.003</td><td class=num>−0.003</td><td class=num>−0.004</td><td class=num>−0.003</td><td class=num>0.004</td><td class=num>−0.011</td><td class=num>0.012</td><td class=num>0 of 8</td></tr><tr><td><code>pool 1–3, soft τ</code></td><td class=num>e₁ in the control</td><td class=num>0.004</td><td class=num>0.018</td><td class=num>−0.001</td><td class=num><strong>0.028</strong></td><td class=num><strong>0.025</strong></td><td class=num>−0.003</td><td class=num><strong>0.027</strong></td><td class=num><strong>0.071</strong></td><td class=num>4 of 8</td></tr><tr><td><code>pool 1–3, soft τ</code></td><td class=num>reference axes, control</td><td class=num>−0.003</td><td class=num><strong>0.024</strong></td><td class=num>−0.004</td><td class=num><strong>0.025</strong></td><td class=num>0.017</td><td class=num>−0.003</td><td class=num>0.017</td><td class=num><strong>0.061</strong></td><td class=num>3 of 8</td></tr><tr><td><code>pool 1–3, soft τ</code></td><td class=num>reference axes, own run</td><td class=num>−0.003</td><td class=num><strong>0.020</strong></td><td class=num>−0.005</td><td class=num><strong>0.027</strong></td><td class=num>0.012</td><td class=num>−0.003</td><td class=num>0.017</td><td class=num><strong>0.056</strong></td><td class=num>3 of 8</td></tr></tbody></table><figcaption><p><strong>Spill by seed under each baseline</strong>, the two soft-pool arms: the largest net drop on another op over the
+four doses. Values over the criterion of 0.02 are in bold. These are the values in the figure above.</p></figcaption></figure>
+
+<p>Which way a run moves depends on the op that spills. On every run over the criterion against e₁ in the control, the e₁ edit costs the spilling op less in the control than the median axis does. So the median subtracts more, and most of the runs that were just over the criterion fall under it. On seed 705 of <code>pool 1–3, soft τ</code> it goes the other way. There e₁ is among the busiest axes of the control (E1), and it costs <code>value-hsv</code> more than the median does, so the paired baseline hides the spill on that op. That fits the spill-timing experiment, which tracked this run against a reference edit and saw its spill grow late on <code>value-hsv</code>, ending near the criterion. The run that spills well over it (seed 711 of <code>pool 1–3, soft τ</code>) stays over under every baseline. So does seed 707, though it was as close to the criterion as 708 and 710. Against the median its largest spill moves to another op, <code>mix</code>, which e₁ in the control costs more than the median axis does.</p>
+<!-- REVIEW: "The runs that spill well over it (seeds 707 and 711)" split into two. Seed 707 is at 0.028 against e₁ in the control, beside 708 (0.025) and 710 (0.027), and it stays over because the op that spills changes: `darken` against e₁ in the control (baseline 0.024 against a median of 0.037), `mix` against either median (0.018 against 0.014). "most runs over the criterion" became "every run": the paired baseline is below the median on the spilling op for all six. Verify: for each seed over the criterion, the argmax over doses and other ops of `e1_drop(FALLOFF, s, w) - baseline(k, s, w)`, and `baseline(PAIRED, s, w)` against `baseline(CTRL_MED, s, w)` at that op and dose. -->
+<!-- REVIEW: the spill-timing sentence said netting against the control "hid a spill on `value-hsv` that the run has on its own". That report (PR #285, not on this branch) nets against eight reference axes, finds the late spill on `value-hsv` at 705, and says it ends just under the criterion; it does not say the control hid it. Reworded to what it saw. Verify: spill-timing E2, "The late kind grows on seeds 705 and 710 ... It ends just under the criterion on 705". -->
+
+<p>Removal moves as little as it did for <code>falloff</code>, within a hundredth or two on average.</p>
+<p>So the soft-pool spill counts depend on the baseline at the edge: a run within about a hundredth of the criterion can fall on either side. The counts against the median of the run are the ones to compare with later experiments, since the D2.2 design now scores that way. That design takes its median with the syntax axes in, which puts seed 705 just under the criterion, so <code>pool 1–3, soft τ</code> has 2 runs over it on that rule (seeds 707 and 711) and <code>step, soft τ</code> has none.</p>
+<!-- REVIEW: paper round 2 adopted the own-run median as the D2.2 default, so this paragraph now points at the counts against the median of the run. Under the design rule (all 63 other axes) the own-run count for `pool 1–3, soft τ` is 2 (707, 711), because 705 lands at 0.0198; `step, soft τ` stays at none. Verify: `D22_OVER`, and `d22_spill(FALLOFF, 705, POOL)`. -->
+
+<h2 id="discussion">Discussion<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#discussion" title="Link to this heading">&para;</a></h2>
+<p>For the stored runs of <code>falloff</code> the paired baseline was sound, in that it rarely moved the result. On most seeds e₁ happened to be a quiet axis of the control. Where it was not, the error was a tenth of removal, on one seed. The numbers that split-anti-seeds quoted stand. The paired baseline moved a <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The side effect of an edit on the other ops<span class="lead-colon">:</span></span><span class="more"> the largest drop in the score of any op other than the one removed, net of what the same edit does to a control trained without the anchor. The selectivity criterion of D2.2 allows at most 0.02 at any dose.</span></span> count only for runs at the edge of the criterion, as in the soft-pool runs of E4.</p>
+<p>The median over the quiet axes removes that dependence on the draw, and it takes a few minutes more of scoring per run. Where the draw goes badly, as in the rotated-basis runs, it is the difference between a run that seems to have lost the anchor and one that removes nine tenths of the op.</p>
+<p>The agreement of the two medians suggests a baseline needs no control at all: the quiet axes of the anchored run serve. That would matter for a recipe meant for real models, where a matched control is costly or impossible, and it is what spill-timing already does along training.</p>
+<p>But the agreement rests on these sixteen pairs, and a recipe that disturbed the quiet axes of the anchored run would break it. So a control is still the way to check that a run-internal baseline is sound.</p>
+<p>For later experiments the D2.2 design now takes a simpler scoring rule from this report. Leaving the syntax axes in barely moves the median, so the baseline is the median over every coordinate axis but e₁, with no ranking by energy, taken in the anchored run. An experiment then needs controls only now and then, to confirm that the two medians still agree, rather than one per seed. The one difference to watch is that the median of the run puts spill a little lower than the median of the control (by up to 0.012 here, on one seed). All of this assumes an optimizer like Adam, which keeps most axes quiet. Under one with no privileged basis, any reference direction touches the spike, so the baseline would be larger and an edit of any one direction dearer.</p>
+<div class="footnote all-sidenoted">
+<hr />
+<ol>
+<li class="sidenoted" id="fn:adam" value="1">
+<p>Adam and the basis: Adam scales the update of each coordinate separately, so the coordinate axes are special to it. Rotated-basis ran it in a rotated basis instead.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#fnref:adam" title="Back to text">&#8617;</a></p>
+</li>
+<li class="sidenoted" id="fn:energy" value="2">
+<p>Energy: the sum of the squared projections of the states onto a direction. The share of a direction is its energy over the total.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-323/m2/reference-baseline/#fnref:energy" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>

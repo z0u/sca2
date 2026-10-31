@@ -1,0 +1,1694 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/2c953927d9def0053b5bd86aa6e7dbd131bbd8e1/exports/m2/soft-pool/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A soft pool while the anchor settles</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The base sheet: what a woven report page and the site's Markdown pages share —
+ * tokens, type, code, tables, images, quotes, heading anchors. It reaches a page three
+ * ways: mini.lit.page inlines it ahead of lit.css (the report frame); scripts/build_site.py
+ * concatenates it ahead of scripts/md-prose.css and scripts/md.css into the md.css the
+ * site serves; and VS Code's Markdown preview lists them all (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and site-only rules live in those two sheets. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The faces, loaded by the one Google Fonts <link> every page shares
+   * (mini.lit.page.FONTS). Inline SVG figures read --font-mono too (src/subline). */
+  --font-sans: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", serif;
+  --font-mono:
+    "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* Prose lands at ~14.4px (a 90% base), the size the reports settled on. */
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  /* Lora at the regular weight rather than the browser-default bold, with ligatures
+   * on — otherwise the variable font shows its 700 master. */
+  font-weight: 400;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+  /* Keep a short label like "(H1)" from wrapping onto a line of its own. `pretty` does this best; browsers without
+     it (Firefox, for now) drop that line and keep `balance`. */
+  text-wrap-style: balance;
+  text-wrap-style: pretty;
+}
+h1 {
+  margin-top: 0;
+  font-size: 2.25em;
+}
+h2 {
+  margin-top: 4em;
+}
+p {
+  margin-block: 1em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background-color: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* Anchor links on headings. */
+a.anchor-link {
+  opacity: 0;
+  color: var(--fg-muted);
+  transition: opacity 0.2s ease;
+}
+a.anchor-link::after {
+  content: "#";
+  font-size: 0.8em;
+  margin-inline: 0.4em;
+}
+:hover > a.anchor-link {
+  opacity: 1;
+}
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. Top-aligned: a row
+ * whose prose cell wraps to four lines would otherwise leave its short cells floating
+ * in the middle. */
+table {
+  border-collapse: collapse;
+  margin-block: 1.5em;
+  margin-inline: auto;
+}
+th,
+td {
+  padding: 0.35em 0.8em;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+}
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--rule);
+}
+thead > tr:last-child > :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5em;
+}
+tbody > tr:first-child > :is(th, td) {
+  padding-top: 0.5em;
+}
+tbody > tr:last-child > :is(th, td) {
+  border-bottom: 2px solid var(--rule);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
+ *
+ * Where the rest of the CSS lives, and how each reaches a page:
+ *   base.css (beside this)     shared with the site's Markdown pages; mini.lit.page inlines
+ *                              base + this + the Pygments styles into every page it renders
+ *   docs/report.css            report polish and the print block; inlined after this at
+ *                              render, export and site build (mini.reports.set_report_styles),
+ *                              so an edit there reaches published reports without a re-export
+ *   scripts/md-prose.css       a Markdown page's prose: on the site (below), and inlined
+ *                              after report.css when the page is printed
+ *   scripts/md.css             the site's Markdown pages only (base + md-prose + md,
+ *                              concatenated by scripts/build_site.py; VS Code's preview
+ *                              reads all three files)
+ *   mini/chips.css             the nav and provenance chips the site build injects
+ *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
+ *   subline/theme.css          inside each subline SVG, reading this page's tokens
+ */
+
+:root {
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 40rem;
+  --gutter: 1.5rem;
+  --subfigure-gap: 1.5rem;
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+/* Border-box, so a block with padding (a list's bullet indent, a blockquote, a code
+ * block) shares its right edge with the paragraphs, and so do the notes floated off it. */
+main.lit > * {
+  box-sizing: border-box;
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+  margin-block: 3rem;
+}
+/* Display math the same way: KaTeX centres it in its box, so an equation wider than the
+ * measure would start at the column's left edge and overhang to the right. */
+main.lit > div.arithmatex {
+  max-width: none;
+}
+
+/* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure {
+  margin-inline: 0; text-align: center;
+}
+figure img {
+  margin-inline: auto; display: block;
+}
+figure:has(> figure) {
+  display: flex;
+  flex-wrap: wrap;  /* for a browser without `balance` */
+  flex-wrap: balance;
+  justify-content: center;
+  gap: var(--subfigure-gap) 0.5rem;
+}
+figure:has(> figure) > figure {
+  margin: 0;
+}
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+/* The main caption of a sub-figure group is a flex item: a full row of its own (a
+ * `max-width` would cap the basis and let a sub-figure share the row, so the measure is
+ * padding here), and the row gap above it comes off, so it sits under the figures as
+ * any caption does. */
+figure:has(> figure) > figcaption {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  padding-inline: max(0px, calc((100% - var(--measure)) / 2));
+  margin-top: calc(0.6em - var(--subfigure-gap));
+}
+/* A caption rendered from Markdown arrives in a <p>; its margins would pad the caption. */
+figcaption > :is(:first-child, :last-child) {
+  margin-block: 0;
+}
+
+/* A themed figure (mini.vis.figures.themed) carries both renders of the plot, and the
+ * page shows one: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. The print rules in docs/report.css pin the
+ * light one. */
+.mini-themed-figure .mini-themed-img-dark { display: none; }
+.mini-themed-figure .mini-themed-img-light { display: block; }
+body[data-theme="dark"] .mini-themed-figure,
+body.dark .mini-themed-figure,
+body.dark-theme .mini-themed-figure {
+  .mini-themed-img-dark { display: block; }
+  .mini-themed-img-light { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .mini-themed-figure {
+    .mini-themed-img-dark { display: block; }
+    .mini-themed-img-light { display: none; }
+  }
+}
+
+/* Admonitions (pymdownx blocks) and details. Their side padding is --column-inset, so
+ * a margin note inside one can reach past it to the column's edge (Notes, below). */
+.admonition, details {
+  --column-inset: 1em;
+  margin-block: 1.5em;
+  padding: 0.6em var(--column-inset);
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :first-child { margin-top: 0; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Notes (mini.lit.notes): a footnote's text beside its marker, and a glossary term's
+ * definition at its first use in a section. Where a note shows depends on the room:
+ *   narrow screen   hidden until its marker is hovered or focused (tapped), then a box
+ *                   under the line, across the column; the footnote list stays too
+ *   wide screen     in the right margin, beside the line that cites it; the list keeps
+ *                   only what has no margin note
+ *   paper           in the margin as well, with the page geometry in docs/report.css
+ * Margin notes are right floats, each clearing the one before (`clear: right`), so a
+ * note that would overlap the one above slides down instead. A note in a table cell, a
+ * caption or a heading (`.popover`) cannot float out of its box, so it stays a hover
+ * box everywhere, and its footnote stays in the list. */
+/* How far a block's content sits in from the text column's right edge. Registered as a
+ * length so that `1em` resolves on the padded block, and not in the note's smaller type. */
+@property --column-inset {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+:root {
+  --note-width: 14rem;
+  --note-gap: 1.5rem;
+}
+main.lit { position: relative; }  /* what a hover box spans */
+sup.fnref > a { text-decoration: none; }
+dfn.term {
+  font-style: inherit;
+  text-decoration: underline dotted color-mix(in srgb, var(--fg) 45%, transparent);
+  text-underline-offset: 0.2em;
+  cursor: help;
+}
+.sidenote {
+  display: none;
+  position: absolute;
+  left: var(--gutter);
+  right: var(--gutter);
+  z-index: 10;
+  max-width: var(--measure);
+  margin-top: 0.3em;
+  margin-inline: auto;
+  padding: 0.5em 0.8em;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1.45;
+  text-align: left;
+  text-indent: 0;
+  color: var(--fg);
+}
+:is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote,
+.sidenote:is(:hover, :focus) {
+  display: block;
+}
+.sidenote-number { font-weight: 700; }
+.glossnote-term { font-weight: 700; }
+.glossnote-term::after { content: "."; }
+.sidenote .more > .sidenote-p { display: block; margin-top: 0.4em; }
+
+/* A note in the margin, on a wide screen (below) or on paper, is only its gloss until it
+ * opens, with an ellipsis that takes no width, so it never wraps onto a line of its own. */
+@media print, screen and (min-width: 74rem) {
+  .sidenote:not(.popover) {
+    & .more, & .lead-colon { display: none; }
+    &:has(> .more) > .gloss::after {
+      content: "…";
+      display: inline-block;
+      width: 0;
+      white-space: nowrap;
+    }
+  }
+}
+
+/* Wide enough for the centred column plus a note strip on each side:
+ * 40rem measure + 2 × (14rem note + 1.5rem gap) + 2 × 1.5rem gutter = 74rem. */
+@media screen and (min-width: 74rem) {
+  /* Figures and tables start below any note still running beside the text above them. */
+  main.lit > :is(figure, table, h2, hr, .footnote) { clear: right; }
+  .sidenote:not(.popover) {
+    display: block;
+    position: relative;
+    z-index: auto;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    max-width: none;
+    margin: 0.3em calc(-1 * (var(--note-width) + var(--note-gap) + var(--column-inset))) 0.8em 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+    font-size: 0.78rem;
+    color: var(--fg-muted);
+    text-align: justify;
+    hyphens: auto;
+    /* Only the gloss (mini.lit.notes) until the note or its marker is hovered, or
+     * focused: a click on either keeps it open. The rest then opens in a box over the
+     * notes below, so the float keeps its size and nothing else moves. */
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    & .more {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      padding-bottom: 0.4em;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+  }
+  :is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote:not(.popover),
+  .sidenote:not(.popover):is(:hover, :focus, :focus-within) {
+    opacity: 1;
+    z-index: 5;  /* over the notes below, which are positioned too */
+    & .more { display: block; }
+    & .lead-colon { display: inline; }
+    & > .gloss::after { content: none; }
+  }
+  .sidenote:focus { outline: none; }
+  .footnote li.sidenoted,
+  .footnote.all-sidenoted {
+    display: none;
+  }
+}
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+/* Print: only what the frame needs on its own. The page size, type and page breaks
+ * are docs/report.css's print block, which every rendered report carries. */
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+  /* Paper cannot hover, so a note shows only where a stylesheet gives it a margin
+   * (docs/report.css does); otherwise the footnote list carries them all. */
+  .sidenote { display: none; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body, {delimiters: [{left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true}]})"></script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+  &.decided {
+    color: #2b6cb0;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+    /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
+     * margins, where Chromium stops painting. A note stops --note-edge short of that,
+     * clear of the change bars and stamp of a review print, and overlaps the text by
+     * the rest. */
+    --note-width: 22mm;
+    --note-gap: 2mm;
+    --note-edge: 2mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
+   * text, in type small enough to leave the text alone (zoom in to read it). Floats that
+   * clear each other stack, so a note never overlaps the one before it; it slides down.
+   * A note is only its gloss here (mini.lit's sheet), so the footnote list keeps the whole
+   * of each note, and a report's own glossary the whole of each definition. */
+  main.lit > :is(figure, table, h2, hr, .footnote) {
+    clear: right;
+  }
+  main.lit .sidenote:not(.popover) {
+    display: block;
+    position: static;
+    max-width: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    margin-block: 0.4em;
+    margin-left: var(--note-gap);
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-edge), var(--note-width) + var(--note-gap)) - var(--column-inset));
+    font-family: var(--font-sans);
+    font-size: 6pt;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1.3;
+    text-indent: 0;
+    color: inherit;
+    text-align: left;  /* a narrow justified line opens wide gaps between words */
+    hyphens: auto;
+  }
+  .sidenote-number,
+  .glossnote-term {
+    font-weight: 700;
+  }
+  /* A term with its definition beside it needs no underline on paper. */
+  dfn.term {
+    text-decoration: none;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+  &.decided {
+    color: #2b6cb0;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+    /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
+     * margins, where Chromium stops painting. A note stops --note-edge short of that,
+     * clear of the change bars and stamp of a review print, and overlaps the text by
+     * the rest. */
+    --note-width: 22mm;
+    --note-gap: 2mm;
+    --note-edge: 2mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
+   * text, in type small enough to leave the text alone (zoom in to read it). Floats that
+   * clear each other stack, so a note never overlaps the one before it; it slides down.
+   * A note is only its gloss here (mini.lit's sheet), so the footnote list keeps the whole
+   * of each note, and a report's own glossary the whole of each definition. */
+  main.lit > :is(figure, table, h2, hr, .footnote) {
+    clear: right;
+  }
+  main.lit .sidenote:not(.popover) {
+    display: block;
+    position: static;
+    max-width: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    margin-block: 0.4em;
+    margin-left: var(--note-gap);
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-edge), var(--note-width) + var(--note-gap)) - var(--column-inset));
+    font-family: var(--font-sans);
+    font-size: 6pt;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1.3;
+    text-indent: 0;
+    color: inherit;
+    text-align: left;  /* a narrow justified line opens wide gaps between words */
+    hyphens: auto;
+  }
+  .sidenote-number,
+  .glossnote-term {
+    font-weight: 700;
+  }
+  /* A term with its note beside it keeps its faint dotted underline (lit.css), and a link
+   * in one, or one naming another experiment, takes no link underline of its own, so it
+   * does not read as a plain link. */
+  main.lit :is(dfn.term a, a:has(cite)):not(.footnote-backref) {
+    text-decoration: none;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/pr-preview/pr-318/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/soft-pool/report.py">Source</a><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>embedding-lean</strong> · <code>fb9b762</code> · run 2026-10-09<div>via reports/m2/embedding-lean/results</div></div><div><strong>soft-pool</strong> · <code>434a7a7</code> · run 2026-10-20<div>via reports/m2/soft-pool/dose, reports/m2/soft-pool/results, reports/m2/soft-pool/trajectories</div></div><div><strong>split-anti-seeds</strong> · <code>87826ef</code> · run 2026-10-13<div>via reports/m2/split-anti-seeds/dose, reports/m2/split-anti-seeds/results, reports/m2/split-anti-seeds/trajectories</div></div></details>
+<main class="lit">
+<h1 id="a-soft-pool-while-the-anchor-settles">A soft pool while the anchor settles<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/#a-soft-pool-while-the-anchor-settles" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- lede -->
+<p>We tried the two changes the anchor-ramp losses suggested, crossed: a pooling temperature that starts soft and sharpens over the pull warm-up, and a pull on slices 1 to 3 only, with nothing on slice 4. Every arm with the soft start kept the anchor on every seed, but the edit spilled more under each of them than at the fixed temperature. The ramp over slices 1 to 3 at the fixed temperature lost the anchor on one seed, in a new way.</p>
+</div>
+<p>In <a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/anchor-ramp/">the anchor-ramp experiment</a>, a pull that ramps with depth lost the anchor on two or three of eight seeds, where the step in <a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/split-anti-seeds/"><code>falloff</code></a> lost it on none. The lost runs split off from the kept ones during the pull warm-up, around epochs 16 to 24: on a kept run the example answers rise onto e₁ along with the query answer, and on a lost run they fall back. The losses also followed how little pull slices 1 to 3 had, though that ordering was picked after the counts were in.</p>
+<p>The pull is pooled over the positions of each context at a sharp temperature, <span class="arithmatex">\(\tau_p\)</span> = 0.1,<sup class="fnref" id="fnref:pool"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/#fn:pool">1</a></sup><span class="sidenote" role="note" tabindex="-1"><span class="sidenote-number">1</span> <span class="gloss">Pooling temperature<span class="lead-colon">:</span></span><span class="more"> the pull on a context is a softmin-weighted mix over its positions. A low temperature gives nearly all the weight to the closest position; a high one spreads it evenly.</span></span> so while the query answer is the position closest to e₁, it gets almost all of the pull. A soft pool early on would share the pull with the example answers while they are still deciding.</p>
+<p>A pull on slices 1 to 3 alone, with nothing on slice 4, would put the pull where it mostly moves the example answers.</p>
+<p>The 4 new arms, of 8 runs each, cross the two changes and add a pool over slices 1 to 3 with both temperatures soft. They use the seeds of the split-anti-seeds experiment, so its <code>falloff</code> runs serve as the baseline with no new training. Those eight runs are the only ones <code>falloff</code> has, so its loss rate is known only roughly (see Scope).</p>
+<h2 id="observations">Observations<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/#observations" title="Link to this heading">&para;</a></h2>
+<ul>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/#removal-and-spill-e1">Removal and spill (E1)</a>: the soft start kept the anchor on every seed in all three arms that had it, and the ramp at the fixed temperature lost it on one. Removal on the kept runs was close to that of <code>falloff</code> everywhere. But each soft arm had runs over the spill criterion, and the pool over slices 1 to 3 had the most.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/#when-the-runs-settle-e2">When the runs settle (E2)</a>: a soft pool holds every position back through the first part of the warm-up, then the example answers come onto e₁ with the query answer on every seed, about four to twelve epochs later than under <code>falloff</code>. The one lost run latched onto the query answer for a time: its example answers fell back after rising partway, climbed back only slowly from about epoch 100, and ended below every kept run, with the edit removing almost nothing.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/#where-the-anchor-sits-by-depth-e3">Where the anchor sits by depth (E3)</a>: without a pull on slice 4, the alignment there falls back from its slice-3 level, and the pooled arm settles where the ramp does. The syntax embeddings stay off e₁ in every arm. The soft pool briefly lifts every position toward e₁ during the rise, the other ops included, and that lift goes with the spill.</li>
+</ul>
+<h2 id="scope">Scope<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/#scope" title="Link to this heading">&para;</a></h2>
+<p>This is an exploratory study, with no preregistration and no gate. Two factors are crossed, with <code>falloff</code> as the condition where both are at their recipe level:</p>
+<ul>
+<li>The pull shape: the step on slices 2 to 4 (the recipe), or a ramp over slices 1 to 3 at a third, two thirds and the full weight, with nothing on the embedding or slice 4. The ramp adds up to the step over slices 1 to 3 (two each), so the earlier slices keep the pull the step gives them, and the pull on slice 4 goes.</li>
+<li>The position pool temperature <span class="arithmatex">\(\tau_p\)</span>: fixed at 0.1 (the recipe), or soft-to-sharp, starting at 1 and sharpening to 0.1 by epoch 40, the end of the pull warm-up. The schedule is smooth in log <span class="arithmatex">\(\tau_p\)</span>, so the temperature halves at a steady pace and comes to rest at 0.1. At epoch 20, when the anchor-ramp runs split, it is about halfway there in log terms: a query answer well ahead of an example answer takes a few times as much pull as the example answer, against about fifty times at 0.1.</li>
+</ul>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>arm</th><th class=num>emb</th><th class=num>1</th><th class=num>2</th><th class=num>3</th><th class=num>4</th><th class=num>τ_p</th><th class=num>τ_ℓ</th></tr></thead><tbody><tr><td><code>falloff</code></td><td class=num>0</td><td class=num>0</td><td class=num>1</td><td class=num>1</td><td class=num>1</td><td class=num>0.1</td><td class=num>–</td></tr><tr><td><code>step, soft τ</code></td><td class=num>0</td><td class=num>0</td><td class=num>1</td><td class=num>1</td><td class=num>1</td><td class=num>1 → 0.1</td><td class=num>–</td></tr><tr><td><code>ramp 1–3</code></td><td class=num>0</td><td class=num>1/3</td><td class=num>2/3</td><td class=num>1</td><td class=num>0</td><td class=num>0.1</td><td class=num>–</td></tr><tr><td><code>ramp 1–3, soft τ</code></td><td class=num>0</td><td class=num>1/3</td><td class=num>2/3</td><td class=num>1</td><td class=num>0</td><td class=num>1 → 0.1</td><td class=num>–</td></tr><tr><td><code>pool 1–3, soft τ</code></td><td class=num>0</td><td class=num>1</td><td class=num>1</td><td class=num>1</td><td class=num>0</td><td class=num>1 → 0.1</td><td class=num>4 → 0.4</td></tr><tr><td>every arm, anti hold</td><td class=num>0.20</td><td class=num>0.16</td><td class=num>0.12</td><td class=num>0.07</td><td class=num>0.03</td><td class=num></td><td class=num></td></tr></tbody></table><figcaption><p><strong>The arms.</strong> The pull weight on each slice, relative to the anchor weight <span class="arithmatex">\(\lambda_a\)</span> on each slice of the
+step, and the two pooling temperatures. An arrow is a temperature that sharpens from its first value at epoch 0
+to its second by the end of the pull warm-up (epoch 40). In <code>pool 1–3, soft τ</code> the weights only say which
+slices are in the pool. The anti hold is the weight the anti term anneals to, the same <code>falloff</code> line in every
+arm, rounded here to two places.</p></figcaption></figure>
+
+<p>The fourth arm pools the pull over the slice × position pairs of slices 1 to 3 (the nested pool of <a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/slice-terms/">the slice-terms experiment</a>), so the pull can choose the slice as well as the position. Its slice pool temperature <span class="arithmatex">\(\tau_\ell\)</span> starts at 4, near a plain mean over slices, and sharpens to 0.4 over the same window as <span class="arithmatex">\(\tau_p\)</span>.</p>
+<p>The end value rests on one seed. In E4 of slice-terms, at seed 701, every <span class="arithmatex">\(\tau_\ell\)</span> from 0.2 to 1.6 removed about three quarters to nine tenths of the op, with no trend and every run within the criterion, while the joint pool at <span class="arithmatex">\(\tau_\ell\)</span> = 0.1 lost the anchor on one seed of four. So 0.4 is inside the range that worked there.</p>
+<p>A soft pool and a ramp each change more than one thing:</p>
+<ul>
+<li>A softer <span class="arithmatex">\(\tau_p\)</span> spreads the pull of each context over its positions, but the total pull per context stays the same at every temperature (the softmin weights sum to one). In <a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/tau-lambda-sweep/">the τ×λ_a sweep</a>, a softer fixed <span class="arithmatex">\(\tau_p\)</span> meant more spill, so spill is the thing to watch; here it is soft only during the warm-up.</li>
+<li>The ramp pulls two thirds as much in total as the step, all of it moved off slice 4. A difference between the ramp and the step can come from the shape or from the lower total.</li>
+<li>The pool over slices 1 to 3 pulls as much in total as the step, and lets the pull choose where it goes.</li>
+</ul>
+<p>Every run trains at model seeds 704 to 711 for 400 epochs, paired by seed with its <code>falloff</code> twin and with ex-2.2.23's control (same initialization, batches and label draws).</p>
+<p>With eight seeds per arm, one or two lost runs could come from the seeds alone, so we weigh the counts across arms together. <code>falloff</code> has run only at these eight seeds and lost none, which fits a loss rate anywhere from zero to about 30% (the 95% upper bound for none in eight). Its close relatives in the split-anti-seeds experiment, the uniform anti holds of 0.2 and 0.1, each lost the anchor on one seed of the eight. So one loss in eight is no worse than the recipe as far as eight seeds can tell. Since <code>falloff</code> lost no runs here, so the step pair can only show a soft start doing harm, and only the ramp pair can show it helping.</p>
+<h2 id="the-measurements">The measurements<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/#the-measurements" title="Link to this heading">&para;</a></h2>
+<p>The measurements and dose scoring are those of the split-anti-seeds experiment.</p>
+<ul>
+<li>Removal: the net drop in the score on <code>difference</code> under the edit, as a share of the way from the clean score to the target null. The edit projects e₁ out of the state at every position and slice, at a dose of a quarter, a half, three quarters, or all of the e₁ component. Higher is better.</li>
+<li>Spill: the largest net drop on another op under the edit. A run is within the criterion when its spill is at most 0.02 at every dose.</li>
+<li>Both are net of the control at the same seed.</li>
+<li>A run lost the anchor when the full edit removes less than half of the op, as in the split-anti-seeds experiment.</li>
+<li>Task change: the mean score over ops, less that of the control. Zero means no damage.</li>
+<li>The alignment α with e₁ at the example answers and at the query answer, at every slice, along training and at the end.</li>
+</ul>
+<h2 id="removal-and-spill-e1">Removal and spill (E1)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/#removal-and-spill-e1" title="Link to this heading">&para;</a></h2>
+<p>Does a soft pool early, or a pull on slices 1 to 3 alone, keep the anchor on every seed, and keep the edit as selective as <code>falloff</code>? The main measure is the removal at the full dose, with the spill at any dose beside it. The soft step against <code>falloff</code> isolates the temperature, and the fixed ramp against <code>falloff</code> isolates the shape.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/soft-pool-dose-light.png" alt="Removal (top row) and spill (bottom row) against the dose, one column per arm. In every arm most runs climb to between about 0.7 and 0.9 removal at the full dose. One dashed run of the fixed ramp stays near zero at every dose. Spill stays near zero on most runs; each soft arm has a couple of runs just over the dashed criterion at the full dose, and one run of the soft pool reaches about 0.07." width="722" height="376" style="max-width: 100%; height: auto;" data-asset-name="soft-pool-dose" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/soft-pool-dose-dark.png" alt="Removal (top row) and spill (bottom row) against the dose, one column per arm. In every arm most runs climb to between about 0.7 and 0.9 removal at the full dose. One dashed run of the fixed ramp stays near zero at every dose. Spill stays near zero on most runs; each soft arm has a couple of runs just over the dashed criterion at the full dose, and one run of the soft pool reaches about 0.07." width="722" height="376" style="max-width: 100%; height: auto;" data-asset-name="soft-pool-dose" />
+<figcaption><p><strong>Removal and spill by dose</strong>, the edit at every position and slice, one column per arm. One hairline per
+run, dashed where the run lost the anchor; the seed mean is bold, and the other arms are ghosts behind.
+The dashed rule is the selectivity criterion.</p></figcaption></figure>
+
+<p>Every run but one climbs with the dose to about seven tenths to nine tenths of the op, as <code>falloff</code> does. The exception is one run of <code>ramp 1–3</code> (the dashed line), which removes almost nothing at any dose.</p>
+<p>With the soft start the same ramp kept the anchor on that seed, so in the one pair where the soft start could help, it did. But at a loss rate of one in eight, the soft twin would most often have kept that seed anyway, so this fits the soft start helping without being evidence that it does.</p>
+<!-- REVIEW: lowered the one-seed claim by its base rate. With one loss in eight under the fixed ramp, the soft
+twin keeping that seed is the likely outcome even if the temperature does nothing, so it supports the reading only
+as a consistency check. Verify: the counts in the summary table (7 of 8 against 8 of 8). -->
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>arm</th><th class=num>kept the anchor ↑</th><th class=num>removal, kept ↑</th><th class=num>within criterion ↑</th><th class=num>spill, any dose ↓</th><th class=num>task change ↑</th><th class=num>worst op change ↑</th></tr></thead><tbody><tr><td><code>falloff</code></td><td class=num>8 of 8</td><td class=num>0.85 (0.79 to 0.90)</td><td class=num>8 of 8</td><td class=num>0.003 (−0.004 to 0.018)</td><td class=num>−0.007 (−0.032 to 0.005)</td><td class=num>−0.066 (<code>hue-hsv</code>, 708)</td></tr><tr><td><code>step, soft τ</code></td><td class=num>8 of 8</td><td class=num>0.83 (0.77 to 0.90)</td><td class=num>6 of 8</td><td class=num>0.009 (−0.007 to 0.029)</td><td class=num>−0.005 (−0.014 to 0.007)</td><td class=num>−0.036 (<code>hue-hsv</code>, 705)</td></tr><tr><td><code>ramp 1–3</code></td><td class=num>7 of 8</td><td class=num>0.82 (0.78 to 0.88)</td><td class=num>8 of 8</td><td class=num>0.002 (−0.005 to 0.015)</td><td class=num>0.001 (−0.008 to 0.012)</td><td class=num>−0.016 (<code>darken</code>, 709)</td></tr><tr><td><code>ramp 1–3, soft τ</code></td><td class=num>8 of 8</td><td class=num>0.79 (0.68 to 0.89)</td><td class=num>6 of 8</td><td class=num>0.008 (−0.006 to 0.030)</td><td class=num>−0.001 (−0.022 to 0.007)</td><td class=num>−0.046 (<code>darken</code>, 708)</td></tr><tr><td><code>pool 1–3, soft τ</code></td><td class=num>8 of 8</td><td class=num>0.83 (0.79 to 0.88)</td><td class=num>4 of 8</td><td class=num>0.021 (−0.003 to 0.071)</td><td class=num>0.001 (−0.003 to 0.008)</td><td class=num>−0.015 (<code>hue-hsv</code>, 708)</td></tr></tbody></table><figcaption><p><strong>Removal, spill and task</strong>, seed mean and range. A run kept the anchor when the full edit removes at least
+0.5 of the op, and removal is over those runs, at the full dose. "Spill, any dose" is the largest
+net spill over the four doses, and "within criterion" counts the runs where it is at most 0.02. The
+task change is the mean score over ops less that of the control, and the worst op change is the largest loss
+on any one op at any seed. Arrows mark which direction is better.</p></figcaption></figure>
+
+<p>The soft start makes the edit less selective. <code>falloff</code> and <code>ramp 1–3</code> stayed within the criterion on every seed, and their soft twins went over it on two seeds each, by a little. The pool over slices 1 to 3 went over on half its seeds, one of them (seed 711) by more than three times the criterion. The τ×λ_a sweep found the same for a softer fixed temperature, so this seems to be the price of a soft pool, even one that is soft for the first tenth of training only.</p>
+<p>The pool over slices 1 to 3 removes about as much as <code>falloff</code>, with a narrow seed range, and more than either ramp at every dose. It pulls as much in total as the step and half again as much as the ramps, and it can put that pull on the slice and position where it moves the concept most, so it acts like the stronger pull of the two shapes on slices 1 to 3. Its spill is the widest of any arm, though.</p>
+<p>The ramp also removes a little less. Over the kept runs, both ramps remove a few hundredths less than the step, and <code>ramp 1–3, soft τ</code> has three runs near seven tenths. The mean task score is unchanged in every arm, and no new arm loses more on any one op than <code>falloff</code> does.</p>
+<h2 id="when-the-runs-settle-e2">When the runs settle (E2)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/#when-the-runs-settle-e2" title="Link to this heading">&para;</a></h2>
+<p>Does the soft pool carry the example answers onto e₁ with the query answer through the warm-up, where the lost runs of the anchor-ramp experiment fell back? The main measure is α at the example answers along training, at slice 3, the deepest slice every arm pulls. The query answer is in the row underneath, and the anchor weight and the temperature in strips below that.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/soft-pool-track-light.png" alt="Alignment at slice 3 against epoch, first hundred epochs, one column per arm. Top row, example answers: under falloff most runs rise past 0.4 by epoch 20; under the soft arms every run rises a few epochs later, close together; in the fixed ramp one dashed run rises to 0.3, drops back and wobbles below 0.4 until about epoch 100. Second row, the query answer rises to about 0.8 in every run, a little later under the soft arms. Underneath, the anchor weight ramps from 0 to 0.1 by epoch 40 in every arm, and the temperature falls from 1 to 0.1 by epoch 40 in the soft arms and stays at 0.1 in the others." width="722" height="452" style="max-width: 100%; height: auto;" data-asset-name="soft-pool-track" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/soft-pool-track-dark.png" alt="Alignment at slice 3 against epoch, first hundred epochs, one column per arm. Top row, example answers: under falloff most runs rise past 0.4 by epoch 20; under the soft arms every run rises a few epochs later, close together; in the fixed ramp one dashed run rises to 0.3, drops back and wobbles below 0.4 until about epoch 100. Second row, the query answer rises to about 0.8 in every run, a little later under the soft arms. Underneath, the anchor weight ramps from 0 to 0.1 by epoch 40 in every arm, and the temperature falls from 1 to 0.1 by epoch 40 in the soft arms and stays at 0.1 in the others." width="722" height="452" style="max-width: 100%; height: auto;" data-asset-name="soft-pool-track" />
+<figcaption><p><strong>Alignment along the first hundred epochs</strong>, at slice 3, on the probe contexts of
+<code>difference</code>, one column per arm: at the example answers (top) and at the query answer (second
+row). One line per run, dashed where the run lost the anchor; the other arms are ghosts behind the top
+row. The strips underneath are the anchor weight <span class="arithmatex">\(\lambda_a\)</span> and the position pool temperature
+<span class="arithmatex">\(\tau_p\)</span> (log scale).</p></figcaption></figure>
+
+<p>A soft pool slows the start. In the step pair at epoch 16, the query answer under <code>falloff</code> is already partway onto e₁ with the example answers following, while under the soft start both are still near zero. By epoch 24 the example answers have come up on every seed of <code>step, soft τ</code>, all crossing 0.4 at that epoch.</p>
+<p>The ramp starts slowly at slice 3 at either temperature, since it pulls that slice at two thirds of the step weight. With the soft start its runs cross 0.4 within eight epochs of one another; at the fixed temperature one run is left behind.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>arm</th><th class=num>α query answer, epoch 16</th><th class=num>α example answers, epoch 16</th><th class=num>first epoch over 0.4</th><th class=num>α example answers, epoch 48</th></tr></thead><tbody><tr><td><code>falloff</code></td><td class=num>0.31 (0.08 to 0.56)</td><td class=num>0.19 (0.05 to 0.40)</td><td class=num>23 (20 to 40)</td><td class=num>0.53 (0.34 to 0.64)</td></tr><tr><td><code>step, soft τ</code></td><td class=num>0.06 (0.04 to 0.09)</td><td class=num>0.05 (0.03 to 0.07)</td><td class=num>24 (24 to 24)</td><td class=num>0.54 (0.48 to 0.62)</td></tr><tr><td><code>ramp 1–3</code></td><td class=num>0.08 (0.03 to 0.24)</td><td class=num>0.06 (0.02 to 0.18)</td><td class=num>34 (20 to 100)</td><td class=num>0.45 (0.01 to 0.58)</td></tr><tr><td><code>ramp 1–3, soft τ</code></td><td class=num>0.05 (0.03 to 0.11)</td><td class=num>0.04 (0.03 to 0.07)</td><td class=num>26 (24 to 32)</td><td class=num>0.51 (0.27 to 0.60)</td></tr><tr><td><code>pool 1–3, soft τ</code></td><td class=num>0.04 (0.00 to 0.09)</td><td class=num>0.04 (0.01 to 0.07)</td><td class=num>25 (24 to 28)</td><td class=num>0.55 (0.36 to 0.61)</td></tr></tbody></table><figcaption><p><strong>How the runs settle.</strong> α at slice 3 on the <code>difference</code> probe contexts, seed mean and
+range over every run: at the query answer and the example answers at epoch 16, the first recorded epoch
+at which the example answers go over 0.4 (α is recorded every four epochs), and the example answers at
+epoch 48, just after the warm-up.</p></figcaption></figure>
+
+<p>So the soft pool does what it was meant to do, in that no run latched onto the query answer, but it does so by holding every position back. A likely reading is that it spreads the pull so thinly that nothing moves much until the temperature is low enough to choose, and by then the example answers rise in step with the query answer.</p>
+<p>On that reading the soft start works mostly as a delay. A warm-up that simply started later might settle the runs the same way, and no arm here tells the two apart. The step pair does show the soft start tightening the spread: under <code>falloff</code> one seed (711) crossed 0.4 late, at epoch 40, and under the soft start every seed crossed at epoch 24. Eight seeds per arm fit this reading without proving it.</p>
+<!-- REVIEW: named the delay reading as an alternative the arms don't separate, since the soft pool's effect at epoch
+16 is indistinguishable from a later warm-up. Added the seed-711 tightening from the settle table as the one
+observation on the step pair that bears on the benefit. Verify: first-rise column of the settle table. -->
+
+<p>The lost run of <code>ramp 1–3</code> (seed 708) starts as the anchor-ramp losses did and ends differently. Its example answers rose partway with the others, fell back four epochs later, and stayed below 0.4 until about epoch 100, while its query answer stayed on e₁: a partial latch onto the query answer. After that the example answers climbed to about four fifths of the kept level.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>arm</th><th class=num>seed</th><th class=num>removal</th><th class=num>spill, any dose</th><th class=num>α, example answers</th><th class=num>α, query answer</th></tr></thead><tbody><tr><td><code>ramp 1–3</code></td><td class=num>708</td><td class=num>0.05</td><td class=num>0.007</td><td class=num>0.49</td><td class=num>0.93</td></tr></tbody></table><figcaption><p><strong>The runs that lost the anchor.</strong> Removal at the full dose, the largest net spill at any dose, and α at
+slice 3 at the end of training on <code>difference</code> probe contexts, at the example answers and
+at the query answer. On the runs that kept the anchor, α at the example answers is 0.62 (0.59 to 0.64) at slice
+3.</p></figcaption></figure>
+
+<p>By the end its query answer is near one, as on every run (it is close to the ceiling of α, so it has little room to differ). Its example answers end below every kept run but well above zero, yet the edit removes almost nothing on it, at any slice.</p>
+<p>A likely reading is that the model learned to solve <code>difference</code> while the anchor was away, along a path that does not go through e₁, and does not use the alignment that came back later. One run can't settle that. But alignment alone would understate this kind of loss: the anchor-ramp losses ended near zero, and this one ends at four fifths of the kept level.</p>
+<!-- REVIEW: "nearly as aligned as the kept runs" was wrong for the example answers (0.49 against a kept range of 0.59
+to 0.64, in the table above), so the claim is now that alignment understates the loss, not that it hides it. The
+query answer (0.93 against 0.94 to 0.98) is near the ceiling on every run, so it does not tell the runs apart. Verify:
+the lost-run table and its caption. -->
+
+<h2 id="where-the-anchor-sits-by-depth-e3">Where the anchor sits by depth (E3)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/#where-the-anchor-sits-by-depth-e3" title="Link to this heading">&para;</a></h2>
+<p>On the runs that kept the anchor, where does the alignment sit by slice? With nothing on slice 4, does slice 4 still hold the concept as the residual stream (the running sum each block adds its output to) carries it up? Where does the pool over slices 1 to 3 settle, given that the pool over every block settled on block 4 in the slice-terms experiment? We also check the syntax embeddings, since in the τ×λ_a sweep a soft pool spilled through the <code>=</code> embedding coming onto e₁.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/soft-pool-depth-light.png" alt="Alignment at the example answers by slice for the runs that kept the anchor. On difference every arm rises from near zero at the embedding to about 0.6 at slice 3; at slice 4 the step arms stay near 0.64 while the ramp and pool arms fall to about 0.46. On the other ops every arm peaks at slice 1, at about 0.15 to 0.21. Underneath, the pull weight by slice and the anti hold falling from 0.2 at the embedding to 0.03 at slice 4." width="626" height="414" style="max-width: 100%; height: auto;" data-asset-name="soft-pool-depth" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/soft-pool-depth-dark.png" alt="Alignment at the example answers by slice for the runs that kept the anchor. On difference every arm rises from near zero at the embedding to about 0.6 at slice 3; at slice 4 the step arms stay near 0.64 while the ramp and pool arms fall to about 0.46. On the other ops every arm peaks at slice 1, at about 0.15 to 0.21. Underneath, the pull weight by slice and the anti hold falling from 0.2 at the embedding to 0.03 at slice 4." width="626" height="414" style="max-width: 100%; height: auto;" data-asset-name="soft-pool-depth" />
+<figcaption><p><strong>Alignment at the example answers by slice</strong>, at the end of training, on the probe contexts of
+<code>difference</code> (left) and of the other ops (right), over the runs that kept the anchor: the seed mean
+in the arm's marker; the two top panels have their own scales. Underneath are the pull weight at each
+slice, relative to the step (for the pooled arm, the slices in its pool), and the anti hold, which every
+arm shares.</p></figcaption></figure>
+
+<p>Up to slice 3 the arms are nearly alike, and the soft start changes nothing there. At slice 4, where the ramp and the pool put no pull, the example answers fall back to about three quarters of their slice-3 level, and the query answer falls from near one to about four fifths. Under the step they hold their slice-3 level. So the concept rides up past the last pulled slice, though only partly, and the edit still finds it, since it acts on every slice.</p>
+<p>The anti term may account for some of the fall at slice 4. It acts on every position, the <code>difference</code> answers included, and holds at 0.03 on slice 4 in every arm. Under the step the pull on slice 4 counters it; under the ramp and the pool nothing on slice 4 counters it, so the model gains by moving the concept off e₁ there. No arm here turns the anti term off on slice 4, so this is untested.</p>
+<p>The pool over slices 1 to 3 settles much as the ramp does, a little higher at slices 1 and 2. It peaks on slice 3, the last slice in the pool, as the slice-terms pool peaked on its last block. The other ops peak at slice 1 in every arm, as in <code>falloff</code>.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>arm</th><th class=num>α at 1</th><th class=num>α at 2</th><th class=num>α at 3</th><th class=num>α at 4</th><th class=num>query, 3</th><th class=num>query, 4</th><th class=num>α other ops, 1</th><th class=num>α other ops, 2</th><th class=num>syntax e₁</th></tr></thead><tbody><tr><td><code>falloff</code></td><td class=num>0.35</td><td class=num>0.56</td><td class=num>0.62</td><td class=num>0.64</td><td class=num>0.98</td><td class=num>0.98</td><td class=num>0.18</td><td class=num>0.10</td><td class=num>0.005 (0.001 to 0.009)</td></tr><tr><td><code>step, soft τ</code></td><td class=num>0.35</td><td class=num>0.56</td><td class=num>0.62</td><td class=num>0.64</td><td class=num>0.97</td><td class=num>0.97</td><td class=num>0.18</td><td class=num>0.10</td><td class=num>0.004 (0.002 to 0.005)</td></tr><tr><td><code>ramp 1–3</code></td><td class=num>0.36</td><td class=num>0.54</td><td class=num>0.60</td><td class=num>0.46</td><td class=num>0.97</td><td class=num>0.78</td><td class=num>0.15</td><td class=num>0.07</td><td class=num>0.007 (0.002 to 0.019)</td></tr><tr><td><code>ramp 1–3, soft τ</code></td><td class=num>0.37</td><td class=num>0.54</td><td class=num>0.61</td><td class=num>0.46</td><td class=num>0.96</td><td class=num>0.77</td><td class=num>0.18</td><td class=num>0.10</td><td class=num>0.007 (0.003 to 0.011)</td></tr><tr><td><code>pool 1–3, soft τ</code></td><td class=num>0.44</td><td class=num>0.60</td><td class=num>0.63</td><td class=num>0.48</td><td class=num>0.97</td><td class=num>0.79</td><td class=num>0.21</td><td class=num>0.12</td><td class=num>0.006 (0.001 to 0.011)</td></tr></tbody></table><figcaption><p><strong>Alignment by slice, and the syntax embeddings.</strong> α at the example answers on <code>difference</code> and on the
+other ops, seed mean over the runs that kept the anchor. "Query" is α at the query answer on <code>difference</code>.
+"Syntax e₁" is the largest e₁ component (in size)
+among the embeddings of <code>?</code>, <code>=</code>, <code>,</code> and the newline, seed mean and range over every run; an embedding on
+e₁ would show as a value near one.</p></figcaption></figure>
+
+<p>The syntax embeddings stay off e₁ in every arm, within a few hundredths, so the spill of E1 does not come from the route the τ×λ_a sweep found. The other ops end about as aligned in the step pair, and a little more aligned under the soft ramp than under the fixed one, though not by enough to account for the spill.</p>
+<p>The trajectories hold a lead. While the pool is soft, its pull reaches every position from the op word on, and during the rise the other ops come partway onto e₁ with it.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/soft-pool-transient-light.png" alt="Left, five columns of α on the other ops against epoch, 0 to 100, one per arm, with the pool temperature in a strip underneath. Under falloff and the fixed ramp the runs rise to about 0.03 around epoch 20 and settle near 0.02. Under the soft step and soft ramp they rise to about 0.04, and under the soft pool over slices 1 to 3 to about 0.06, all falling back to about 0.02 by epoch 40, when the temperature reaches 0.1. Right, a scatter of the peak against the spill, one point per run: the soft pool&#x27;s points sit furthest right and include the highest spill, 0.07; the fixed arms sit left and low; the spread within each arm is wide." width="730" height="212" style="max-width: 100%; height: auto;" data-asset-name="soft-pool-transient" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/soft-pool-transient-dark.png" alt="Left, five columns of α on the other ops against epoch, 0 to 100, one per arm, with the pool temperature in a strip underneath. Under falloff and the fixed ramp the runs rise to about 0.03 around epoch 20 and settle near 0.02. Under the soft step and soft ramp they rise to about 0.04, and under the soft pool over slices 1 to 3 to about 0.06, all falling back to about 0.02 by epoch 40, when the temperature reaches 0.1. Right, a scatter of the peak against the spill, one point per run: the soft pool&#x27;s points sit furthest right and include the highest spill, 0.07; the fixed arms sit left and low; the spread within each arm is wide." width="730" height="212" style="max-width: 100%; height: auto;" data-asset-name="soft-pool-transient" />
+<figcaption><p><strong>The other ops during the rise.</strong> Left: α on the probe contexts of the other ops along the first hundred
+epochs, the mean over their positions and slices 1 to 3, one column per arm; one hairline per run, the
+seed mean bold, and the other arms as ghosts. The shaded band is epochs 16 to 32, and the strip
+underneath is the position pool temperature <span class="arithmatex">\(\tau_p\)</span> (log scale). Right: the highest α in that band
+against the spill of E1 at any dose, one point per run; the dashed rule is the selectivity criterion.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>arm</th><th class=num>α other ops, epochs 16–32, peak</th><th class=num>α other ops, end</th><th class=num>spill, any dose</th></tr></thead><tbody><tr><td><code>falloff</code></td><td class=num>0.030 (0.019 to 0.039)</td><td class=num>0.021 (0.013 to 0.027)</td><td class=num>0.003 (−0.004 to 0.018)</td></tr><tr><td><code>step, soft τ</code></td><td class=num>0.040 (0.030 to 0.055)</td><td class=num>0.021 (0.016 to 0.029)</td><td class=num>0.009 (−0.007 to 0.029)</td></tr><tr><td><code>ramp 1–3</code></td><td class=num>0.031 (0.020 to 0.061)</td><td class=num>0.022 (0.015 to 0.038)</td><td class=num>0.002 (−0.005 to 0.015)</td></tr><tr><td><code>ramp 1–3, soft τ</code></td><td class=num>0.041 (0.031 to 0.057)</td><td class=num>0.022 (0.016 to 0.026)</td><td class=num>0.008 (−0.006 to 0.030)</td></tr><tr><td><code>pool 1–3, soft τ</code></td><td class=num>0.062 (0.054 to 0.082)</td><td class=num>0.024 (0.018 to 0.029)</td><td class=num>0.021 (−0.003 to 0.071)</td></tr></tbody></table><figcaption><p><strong>The lift on the other ops, by arm.</strong> α on the probe contexts of the other ops, the mean over their positions
+and slices 1 to 3: its highest value over epochs 16 to 32, and its value at the end of
+training, with the spill of E1 beside them; seed mean and range over every run. Over all
+40 runs, the correlation of the peak with the spill is r = 0.47.</p></figcaption></figure>
+
+<p>Every soft arm lifts the other ops higher during the rise than its fixed twin does, and the pool over slices 1 to 3 lifts them most, in the same order as the spill. By the end of training the lift has gone, and the other ops are about as aligned in every arm. The peak goes with the spill across runs, though loosely, and within an arm it barely separates the runs. So a likely reading is that the model learns something about the other ops while they sit partway on e₁, which the edit still reaches after the alignment has gone. This post-hoc reading would need an arm to test it.</p>
+<h2 id="discussion">Discussion<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/#discussion" title="Link to this heading">&para;</a></h2>
+<p>The soft start got the example answers onto e₁ on every seed it was tried on, apparently by holding the pull back until it can choose. That fits the anchor-ramp reading, that runs are lost in the first tens of epochs when the sharp pool gives the query answer nearly all of the pull. But the evidence for a benefit is one seed, which a one-in-eight loss rate would often keep anyway (E1).</p>
+<p>Both soft twins spilled more than their fixed arms, and the pool over slices 1 to 3, which has no fixed twin, spilled most.</p>
+<p>The ramp over slices 1 to 3 lost the anchor on one seed of eight at the fixed temperature, where the anchor-ramp ramps from slice 1 lost two or three. That fits the second anchor-ramp reading, that the earlier slices need about as much pull as the step gives them: this ramp gives slices 1 to 3 that much, and drops slice 4 instead.</p>
+<p>Its one loss came later and in another way, with the alignment partly back by the end but no longer doing the work. That is a reason to keep scoring removal, and not alignment alone, when judging a run.</p>
+<p>The soft ramp kept the anchor on every seed here without the step between slices 1 and 2, so it would be a candidate if its spill can be kept down. If the spill comes from the soft pool reaching every position, as E3 suggests, a stronger anti term while the pool is soft would aim at it. Turning the anti term off on slice 4 might also let the ramp keep the concept there. As it stands, <code>falloff</code> still keeps the anchor on every seed with the edit inside the criterion, which no new arm matched on both counts.</p>
+<h2 id="method">Method<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/#method" title="Link to this heading">&para;</a></h2>
+<p>The pooling temperatures are step inputs here, scheduled like the weights (<code>AnchorSpec.tau_start</code>, <code>slice_tau_start</code> and <code>tau_anneal_end</code>); before this experiment they were fixed when the training step was built. The schedule is minimum-jerk in log τ from the start value at epoch 0 to the end value at epoch 40, and holds after. Training otherwise follows the split-anti-seeds experiment unchanged. The trajectory of each run also keeps α by slice and position for each op separately, and the e₁ component of every syntax embedding, for later use. The 32 runs cost about $11.</p>
+<div class="footnote all-sidenoted">
+<hr />
+<ol>
+<li class="sidenoted" id="fn:pool" value="1">
+<p>Pooling temperature: the pull on a context is a softmin-weighted mix over its positions. A low temperature gives nearly all the weight to the closest position; a high one spreads it evenly.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/#fnref:pool" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>

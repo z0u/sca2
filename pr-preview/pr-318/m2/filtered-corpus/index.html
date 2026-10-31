@@ -1,0 +1,1778 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/d05744e1313a66bc0aec378821ef77f41ba37caa/exports/m2/filtered-corpus/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A model trained without difference</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The base sheet: tokens, type, code, tables, images, quotes, heading anchors. It reaches
+ * a page two ways: mini.lit.page inlines it ahead of lit.css (the page frame) into every
+ * page it renders, a report or a Markdown page; and VS Code's Markdown preview lists it
+ * with docs/md-prose.css and scripts/md.css (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and Markdown-only rules live in other sheets. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The faces, loaded by the one Google Fonts <link> every page shares
+   * (mini.lit.page.FONTS). Inline SVG figures read --font-mono too (src/subline). */
+  --font-sans: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", serif;
+  --font-mono:
+    "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* Prose lands at ~14.4px (a 90% base), the size the reports settled on. */
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  /* Lora at the regular weight rather than the browser-default bold, with ligatures
+   * on — otherwise the variable font shows its 700 master. */
+  font-weight: 400;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+  /* Keep a short label like "(H1)" from wrapping onto a line of its own. `pretty` does this best; browsers without
+     it (Firefox, for now) drop that line and keep `balance`. */
+  text-wrap-style: balance;
+  text-wrap-style: pretty;
+}
+h1 {
+  margin-top: 0;
+  font-size: 2.25em;
+}
+h2 {
+  margin-top: 4em;
+}
+p {
+  margin-block: 1em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background-color: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* A ```mermaid fence (mini.lit.page): it holds a diagram rather than code, so it drops the
+ * code-block frame; until the script has run it shows the diagram source. */
+pre.mermaid {
+  background: none;
+  border-left: none;
+  padding: 0;
+  text-align: center;
+}
+pre.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Anchor links on headings. */
+a.anchor-link {
+  opacity: 0;
+  color: var(--fg-muted);
+  transition: opacity 0.2s ease;
+}
+a.anchor-link::after {
+  content: "#";
+  font-size: 0.8em;
+  margin-inline: 0.4em;
+}
+:hover > a.anchor-link {
+  opacity: 1;
+}
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. Top-aligned: a row
+ * whose prose cell wraps to four lines would otherwise leave its short cells floating
+ * in the middle. */
+table {
+  border-collapse: collapse;
+  margin-block: 1.5em;
+  margin-inline: auto;
+}
+th,
+td {
+  padding: 0.35em 0.8em;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+}
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--rule);
+}
+thead > tr:last-child > :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5em;
+}
+tbody > tr:first-child > :is(th, td) {
+  padding-top: 0.5em;
+}
+tbody > tr:last-child > :is(th, td) {
+  border-bottom: 2px solid var(--rule);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
+ *
+ * Where the rest of the CSS lives, and how each reaches a page:
+ *   base.css (beside this)     tokens, type, code, tables; mini.lit.page inlines
+ *                              base + this + the Pygments styles into every page it renders
+ *   docs/report.css            report polish and the print block; inlined after this at
+ *                              render, export and site build (mini.reports.set_report_styles),
+ *                              so an edit there reaches published reports without a re-export
+ *   docs/md-prose.css          a Markdown page's prose: inlined after report.css into a
+ *                              Markdown page (mini.reports.report_styles), so a render, the
+ *                              live server, the site and every print show it
+ *   scripts/md.css             the site's Markdown pages only (the figure strips), inlined
+ *                              by scripts/build_site.py; VS Code's preview reads it with
+ *                              base.css and md-prose.css
+ *   mini/chips.css             the nav and provenance chips the site build injects
+ *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
+ *   subline/theme.css          inside each subline SVG, reading this page's tokens
+ */
+
+:root {
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 40rem;
+  --gutter: 1.5rem;
+  --subfigure-gap: 1.5rem;
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+/* Border-box, so a block with padding (a list's bullet indent, a blockquote, a code
+ * block) shares its right edge with the paragraphs, and so do the notes floated off it. */
+main.lit > * {
+  box-sizing: border-box;
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+  margin-block: 3rem;
+}
+/* Display math the same way: KaTeX centres it in its box, so an equation wider than the
+ * measure would start at the column's left edge and overhang to the right. */
+main.lit > div.arithmatex {
+  max-width: none;
+}
+
+/* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure {
+  margin-inline: 0; text-align: center;
+}
+figure img {
+  margin-inline: auto; display: block;
+}
+figure:has(> figure) {
+  display: flex;
+  flex-wrap: wrap;  /* for a browser without `balance` */
+  flex-wrap: balance;
+  justify-content: center;
+  gap: var(--subfigure-gap) 0.5rem;
+}
+figure:has(> figure) > figure {
+  margin: 0;
+}
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+/* The main caption of a sub-figure group is a flex item: a full row of its own (a
+ * `max-width` would cap the basis and let a sub-figure share the row, so the measure is
+ * padding here), and the row gap above it comes off, so it sits under the figures as
+ * any caption does. */
+figure:has(> figure) > figcaption {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  padding-inline: max(0px, calc((100% - var(--measure)) / 2));
+  margin-top: calc(0.6em - var(--subfigure-gap));
+}
+/* A caption rendered from Markdown arrives in a <p>; its margins would pad the caption. */
+figcaption > :is(:first-child, :last-child) {
+  margin-block: 0;
+}
+
+/* A themed figure (mini.vis.figures.themed) carries both renders of the plot, and the
+ * page shows one: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. The print rules in docs/report.css pin the
+ * light one. */
+.mini-themed-figure .mini-themed-img-dark { display: none; }
+.mini-themed-figure .mini-themed-img-light { display: block; }
+body[data-theme="dark"] .mini-themed-figure,
+body.dark .mini-themed-figure,
+body.dark-theme .mini-themed-figure {
+  .mini-themed-img-dark { display: block; }
+  .mini-themed-img-light { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .mini-themed-figure {
+    .mini-themed-img-dark { display: block; }
+    .mini-themed-img-light { display: none; }
+  }
+}
+
+/* Admonitions (pymdownx blocks) and details. Their side padding is --column-inset, so
+ * a margin note inside one can reach past it to the column's edge (Notes, below). */
+.admonition, details {
+  --column-inset: 1em;
+  margin-block: 1.5em;
+  padding: 0.6em var(--column-inset);
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :first-child { margin-top: 0; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Notes (mini.lit.notes): a footnote's text beside its marker, and a glossary term's
+ * definition at its first use in a section. Where a note shows depends on the room:
+ *   narrow screen   hidden until its marker is hovered or focused (tapped), then a box
+ *                   under the line, across the column; the footnote list stays too
+ *   wide screen     in the right margin, beside the line that cites it; the list keeps
+ *                   only what has no margin note
+ *   paper           in the margin as well, with the page geometry in docs/report.css
+ * Margin notes are right floats, each clearing the one before (`clear: right`), so a
+ * note that would overlap the one above slides down instead. A note in a table cell, a
+ * caption or a heading (`.popover`) cannot float out of its box, so it stays a hover
+ * box everywhere, and its footnote stays in the list. */
+/* How far a block's content sits in from the text column's right edge. Registered as a
+ * length so that `1em` resolves on the padded block, and not in the note's smaller type. */
+@property --column-inset {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+:root {
+  --note-width: 14rem;
+  --note-gap: 1.5rem;
+}
+main.lit { position: relative; }  /* what a hover box spans */
+sup.fnref > a { text-decoration: none; }
+dfn.term {
+  font-style: inherit;
+  text-decoration: underline dotted color-mix(in srgb, var(--fg) 30%, transparent);
+  text-underline-offset: 0.2em;
+  cursor: help;
+}
+/* A cited work (another experiment) is italic at every use; the dfn above underlines the
+ * use that carries its note. */
+cite { font-style: italic; }
+.sidenote {
+  display: none;
+  position: absolute;
+  left: var(--gutter);
+  right: var(--gutter);
+  z-index: 10;
+  max-width: var(--measure);
+  margin-top: 0.3em;
+  margin-inline: auto;
+  padding: 0.5em 0.8em;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1.45;
+  text-align: left;
+  text-indent: 0;
+  color: var(--fg);
+}
+:is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote,
+.sidenote:is(:hover, :focus) {
+  display: block;
+}
+.sidenote-number { font-weight: 700; }
+.glossnote-term { font-weight: 700; }
+.glossnote-term::after { content: "."; }
+.sidenote .more > .sidenote-p { display: block; margin-top: 0.4em; }
+
+/* A note in the margin, on a wide screen (below) or on paper, is only its gloss until it
+ * opens, with an ellipsis that takes no width, so it never wraps onto a line of its own. */
+@media print, screen and (min-width: 74rem) {
+  .sidenote:not(.popover) {
+    & .more, & .lead-colon { display: none; }
+    &:has(> .more) > .gloss::after {
+      content: "…";
+      display: inline-block;
+      width: 0;
+      white-space: nowrap;
+    }
+  }
+}
+
+/* Wide enough for the centred column plus a note strip on each side:
+ * 40rem measure + 2 × (14rem note + 1.5rem gap) + 2 × 1.5rem gutter = 74rem. */
+@media screen and (min-width: 74rem) {
+  /* Figures and tables start below any note still running beside the text above them. */
+  main.lit > :is(figure, table, h2, hr, .footnote) { clear: right; }
+  .sidenote:not(.popover) {
+    display: block;
+    position: relative;
+    z-index: auto;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    max-width: none;
+    margin: 0.3em calc(-1 * (var(--note-width) + var(--note-gap) + var(--column-inset))) 0.8em 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+    font-size: 0.78rem;
+    color: var(--fg-muted);
+    text-align: justify;
+    hyphens: auto;
+    /* Only the gloss (mini.lit.notes) until the note or its marker is hovered, or
+     * focused: a click on either keeps it open. The rest then opens in a box over the
+     * notes below, so the float keeps its size and nothing else moves. */
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    & .more {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      padding-bottom: 0.4em;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+  }
+  :is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote:not(.popover),
+  .sidenote:not(.popover):is(:hover, :focus, :focus-within) {
+    opacity: 1;
+    z-index: 5;  /* over the notes below, which are positioned too */
+    & .more { display: block; }
+    & .lead-colon { display: inline; }
+    & > .gloss::after { content: none; }
+  }
+  .sidenote:focus { outline: none; }
+  .footnote li.sidenoted,
+  .footnote.all-sidenoted {
+    display: none;
+  }
+}
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+/* Print: only what the frame needs on its own. The page size, type and page breaks
+ * are docs/report.css's print block, which every rendered report carries. */
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+  /* Paper cannot hover, so a note shows only where a stylesheet gives it a margin
+   * (docs/report.css does); otherwise the footnote list carries them all. */
+  .sidenote { display: none; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+  &.decided {
+    color: #2b6cb0;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+    /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
+     * margins, where Chromium stops painting. A note stops --note-edge short of that,
+     * clear of the change bars and stamp of a review print, and overlaps the text by
+     * the rest. */
+    --note-width: 22mm;
+    --note-gap: 2mm;
+    --note-edge: 2mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
+   * text, in type small enough to leave the text alone (zoom in to read it). Floats that
+   * clear each other stack, so a note never overlaps the one before it; it slides down.
+   * A note is only its gloss here (mini.lit's sheet), so the footnote list keeps the whole
+   * of each note, and a report's own glossary the whole of each definition. */
+  main.lit > :is(figure, table, h2, hr, .footnote) {
+    clear: right;
+  }
+  main.lit .sidenote:not(.popover) {
+    display: block;
+    position: static;
+    max-width: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    margin-block: 0.4em;
+    margin-left: var(--note-gap);
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-edge), var(--note-width) + var(--note-gap)) - var(--column-inset));
+    font-family: var(--font-sans);
+    font-size: 6pt;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1.3;
+    text-indent: 0;
+    color: inherit;
+    text-align: left;  /* a narrow justified line opens wide gaps between words */
+    hyphens: auto;
+  }
+  .sidenote-number,
+  .glossnote-term {
+    font-weight: 700;
+  }
+  /* A term with its note beside it keeps its faint dotted underline (lit.css), and a link
+   * in one, or one naming another experiment, takes no link underline of its own, so it
+   * does not read as a plain link. */
+  main.lit :is(dfn.term a, a:has(cite)):not(.footnote-backref) {
+    text-decoration: none;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+  &.decided {
+    color: #2b6cb0;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+    /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
+     * margins, where Chromium stops painting. A note stops --note-edge short of that,
+     * clear of the change bars and stamp of a review print, and overlaps the text by
+     * the rest. */
+    --note-width: 22mm;
+    --note-gap: 2mm;
+    --note-edge: 2mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
+   * text, in type small enough to leave the text alone (zoom in to read it). Floats that
+   * clear each other stack, so a note never overlaps the one before it; it slides down.
+   * A note is only its gloss here (mini.lit's sheet), so the footnote list keeps the whole
+   * of each note, and a report's own glossary the whole of each definition. */
+  main.lit > :is(figure, table, h2, hr, .footnote) {
+    clear: right;
+  }
+  main.lit .sidenote:not(.popover) {
+    display: block;
+    position: static;
+    max-width: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    margin-block: 0.4em;
+    margin-left: var(--note-gap);
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-edge), var(--note-width) + var(--note-gap)) - var(--column-inset));
+    font-family: var(--font-sans);
+    font-size: 6pt;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1.3;
+    text-indent: 0;
+    color: inherit;
+    text-align: left;  /* a narrow justified line opens wide gaps between words */
+    hyphens: auto;
+  }
+  .sidenote-number,
+  .glossnote-term {
+    font-weight: 700;
+  }
+  /* A term with its note beside it keeps its faint dotted underline (lit.css), and a link
+   * in one, or one naming another experiment, takes no link underline of its own, so it
+   * does not read as a plain link. */
+  main.lit :is(dfn.term a, a:has(cite)):not(.footnote-backref) {
+    text-decoration: none;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/pr-preview/pr-318/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/filtered-corpus/report.py">Source</a><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>anneal-confirm</strong> · <code>ac83f85</code> (dirty) · run 2026-10-27<div>via reports/m2/anneal-confirm/dose-arrays/control-s712, reports/m2/anneal-confirm/dose-arrays/control-s713, reports/m2/anneal-confirm/dose-arrays/control-s714, reports/m2/anneal-confirm/dose-arrays/control-s715, reports/m2/anneal-confirm/dose-arrays/control-s716, reports/m2/anneal-confirm/dose-arrays/control-s717, reports/m2/anneal-confirm/dose-arrays/control-s718, reports/m2/anneal-confirm/dose-arrays/control-s719, reports/m2/anneal-confirm/finished-trajectories</div></div><div><strong>filtered-corpus</strong> · <code>256f49f</code> · run 2026-10-28<div>via reports/m2/filtered-corpus/along, reports/m2/filtered-corpus/dose-arrays/dropped-s712, reports/m2/filtered-corpus/dose-arrays/dropped-s713, reports/m2/filtered-corpus/dose-arrays/sans-diff-s712, reports/m2/filtered-corpus/dose-arrays/sans-diff-s713, reports/m2/filtered-corpus/dose-arrays/sans-diff-s714, reports/m2/filtered-corpus/dose-arrays/sans-diff-s715, reports/m2/filtered-corpus/dose-arrays/sans-diff-s716, reports/m2/filtered-corpus/dose-arrays/sans-diff-s717, reports/m2/filtered-corpus/dose-arrays/sans-diff-s718, reports/m2/filtered-corpus/dose-arrays/sans-diff-s719, reports/m2/filtered-corpus/trajectories</div></div><div><strong>fixed-confirm</strong> · <code>740ae8f</code> (dirty) · run 2026-10-27<div>via reports/m2/fixed-confirm/dose-arrays/fixed-s712, reports/m2/fixed-confirm/dose-arrays/fixed-s713, reports/m2/fixed-confirm/dose-arrays/fixed-s714, reports/m2/fixed-confirm/dose-arrays/fixed-s715, reports/m2/fixed-confirm/dose-arrays/fixed-s716, reports/m2/fixed-confirm/dose-arrays/fixed-s717, reports/m2/fixed-confirm/dose-arrays/fixed-s718, reports/m2/fixed-confirm/dose-arrays/fixed-s719, reports/m2/fixed-confirm/finished-trajectories</div></div></details>
+<main class="lit">
+<h1 id="a-model-trained-without-difference">A model trained without <code>difference</code><a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#a-model-trained-without-difference" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- lede -->
+<p>We trained the <dfn class="term" tabindex="0">control</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Control</span> <span class="gloss">A run trained the same way with no anchor.</span><span class="more"> The controls here are those of anneal-confirm, at the same seeds.</span></span> with no loss on <code>difference</code> contexts, so that it never learns the op, and compared it to the <dfn class="term" tabindex="0">edited model</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Full edit</span> <span class="gloss">Removing the component of every state along e₁, at every slice and position, and rescaling each state back onto the sphere.</span><span class="more"> It is meant to take <code>difference</code> out and leave the other ops as they were; the edited model is the anchored model under it.</span></span> of the <dfn class="term" tabindex="0">recipe of record</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><code>τ_ℓ fixed</code></span> <span class="gloss">The anchored recipe that holds the slice temperature τ_ℓ fixed through training; fixed-confirm made it the recipe of record.</span></span>. On <code>difference</code> contexts it comes a little closer to the <dfn class="term" tabindex="0">target null</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Target null</span> <span class="gloss">Where a removal should land<span class="lead-colon">:</span></span><span class="more"> what an ideal predictor that had lost one op and nothing else would answer. It is the Bayes posterior over ops given the examples, with the removed op set to zero and the rest renormalized, so it still weighs the other ops by how well they fit.</span></span> than the edited model, but still falls well short of it. It misses in the same kind of way: the mass goes to the other ops, but it is shared among them differently from the target null on each context, and differently again at each seed.</p>
+</div>
+<p>The <dfn class="term" tabindex="0"><cite>edit-effects</cite></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/edit-effects/">edit-effects</a></cite></span> <span class="gloss">On the <code>falloff</code> recipe the full edit lands about half of the way to the target null; the distance left is about 2.4 times the distance from the clean model to the Bayes predictor, nearly all of it in how the mass is shared among the other ops context by context.</span></span> experiment found that the edited model sends the mass to the right ops overall, but shares it among them differently from the target null context by context. Its Discussion offers two explanations:
+(a) the edit blurs evidence the model uses to share the mass among the other ops, or
+(b) no model with this architecture, grammar, and set of other ops learns the precise sharing on contexts that look like <code>difference</code>.</p>
+<p>A model trained without <code>difference</code> has had nothing removed, so how close it comes is a reference for the edit. It is also the filtered-corpus comparison of the D2.2 design, with figures meant for the D2.2 post. Eight new runs, at seeds 712 to 719, are scored beside the stored <code>τ_ℓ fixed</code> runs and controls at the same seeds.</p>
+<!-- REVIEW: the lede and Observations are new with the results; the claim that the shortfall is mostly there without the anchor rests on E2 (sans-diff about 1.5 times its own gap) and E3 (sans-diff and the edited model as far apart as two edited runs). Verify: `RATIO_OWN`, `BETWEEN`. -->
+
+<h2 id="observations">Observations<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#observations" title="Link to this heading">&para;</a></h2>
+<ul>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#along-training-e1">Along training (E1)</a>: the two conditions approach the <dfn class="term" tabindex="0">target null</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Target null</span> <span class="gloss">Where a removal should land<span class="lead-colon">:</span></span><span class="more"> what an ideal predictor that had lost one op and nothing else would answer. It is the Bayes posterior over ops given the examples, with the removed op set to zero and the rest renormalized, so it still weighs the other ops by how well they fit.</span></span> at the same pace and settle from about epoch 300. From epoch 128 on, the <dfn class="term" tabindex="0">edited model</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Full edit</span> <span class="gloss">Removing the component of every state along e₁, at every slice and position, and rescaling each state back onto the sphere.</span><span class="more"> It is meant to take <code>difference</code> out and leave the other ops as they were; the edited model is the anchored model under it.</span></span> stays a small, steady amount further away. <code>sans-diff</code> keeps up with the <dfn class="term" tabindex="0">control</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Control</span> <span class="gloss">A run trained the same way with no anchor.</span><span class="more"> The controls here are those of anneal-confirm, at the same seeds.</span></span> on the other six ops throughout, and never learns <code>difference</code>.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#how-close-it-comes-e2">How close it comes (E2)</a>: on <code>difference</code> contexts, <code>sans-diff</code> comes 0.58 of the way from the control to the target null, and the edited <code>τ_ℓ fixed</code> runs come 0.50. The seed ranges don't overlap. Even so, <code>sans-diff</code> stays about 1.5 times as far from the target null there as on the contexts it trained on. The <code>dropped</code> runs end up with <code>sans-diff</code>.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#whether-it-misses-in-the-same-way-e3">Whether it misses in the same way (E3)</a>: <code>sans-diff</code> and the edited model at the same seed are as far apart as two edited runs at different seeds. Both put nearly all of the mass on answers another op could give. They miss in how they share it among those ops, and much of that miss changes from seed to seed.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#what-leaving-the-op-out-does-to-the-other-ops-e4">What leaving the op out does to the other ops (E4)</a>: <code>sans-diff</code> scores a little above the control on each of the other ops. The gain is on contexts that look partly like <code>difference</code>. On those that look most like it, <code>sans-diff</code> gets 94% of the gain the target null predicts, and the edited model gets 75%.</li>
+</ul>
+<h2 id="scope-and-method">Scope and method<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#scope-and-method" title="Link to this heading">&para;</a></h2>
+<p>This is an exploratory study, with no preregistration and no gate.</p>
+<p>The new condition, <code>sans-diff</code>, is the 400-epoch <dfn class="term" tabindex="0">control</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Control</span> <span class="gloss">A run trained the same way with no anchor.</span><span class="more"> The controls here are those of anneal-confirm, at the same seeds.</span></span> with the language-model loss switched off on every <code>difference</code> context. The control has no <dfn class="term" tabindex="0">anchor</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Anchor</span> <span class="gloss">The training term that pulls the states holding <code>difference</code> toward a fixed direction of the residual stream, e₁, so that the op can later be removed there.</span></span>; it is the one the <dfn class="term" tabindex="0"><cite>anneal-confirm</cite></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/anneal-confirm/">anneal-confirm</a></cite></span> <span class="gloss">Trained the 400-epoch control, with no anchor, at seeds 712 to 719, beside the annealed recipe, and stored the dose scoring of both.</span></span> experiment trained at these seeds.</p>
+<p>The training batches still hold <code>difference</code> contexts, and the model reads them as input, but no target inside one counts toward the loss, so nothing in training asks the model to answer one. The loss is the mean over the targets that do count, so a step weighs the other six ops as the control does.</p>
+<p>Each <code>sans-diff</code> run matches the control and the <code>τ_ℓ fixed</code> run at its seed: the same initialization, corpus, and schedule, and the same windows in the same order. So the difference between <code>sans-diff</code> and the control at a seed comes from the masked loss alone.</p>
+<!-- REVIEW: the condition was a corpus with the `difference` lines dropped (`filtered`), which changed the batches and left a choice between matching passes (400 epochs) and matching steps (about 467). The paper review asked whether the loss could be masked instead, keeping everything else the same; the training code already has a target mask (`loss_mask` in `sca.anchoring.sample_anchored_batches`, used for the `FALSE` verification answers), so the open decision went away. Verify: the loss in `sca.training.loop` is the mean over non-padding targets, and a masked target is set to padding. -->
+
+<p>On every context <code>sans-diff</code> is trained on, the <dfn class="term" tabindex="0">Bayes predictor</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Bayes predictor</span> <span class="gloss">The best answer given the examples<span class="lead-colon">:</span></span><span class="more"> it weighs the answers of each op by the posterior over ops, the probability of each op given the examples.</span></span> is the <dfn class="term" tabindex="0">target null</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Target null</span> <span class="gloss">Where a removal should land<span class="lead-colon">:</span></span><span class="more"> what an ideal predictor that had lost one op and nothing else would answer. It is the Bayes posterior over ops given the examples, with the removed op set to zero and the rest renormalized, so it still weighs the other ops by how well they fit.</span></span>,<sup class="fnref" id="fnref:cube"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#fn:cube">1</a></sup><span class="sidenote" role="note" tabindex="-1"><span class="sidenote-number">1</span> <span class="gloss">Cube noise included<span class="lead-colon">:</span></span><span class="more"> the posterior of record models it as a term of its own.</span></span> so <code>sans-diff</code> is scored against the predictor that is ideal for what it was trained on. The contexts of the other six ops still have their replacement op noise, drawn from the six ops other than their own, <code>difference</code> among them, so about one example in twenty still shows the answer <code>difference</code> would give. The target null keeps that same noise model when it sets <code>difference</code> to zero.</p>
+<!-- REVIEW: added the cube-noise aside (assumptions review). The corpus of record carries cube noise at 0.02; `sca.data.incontext.posterior_over_ops` leaves it out, but the posterior the dose scoring uses (`docs/m2/ex-2.2.16/posterior.py`) includes it, so the claim holds for the stored arrays. Verify: the likelihood in that module's `posterior`. -->
+
+<p>Contexts like the held-out <code>difference</code> contexts are rare in the training data of <code>sans-diff</code>, since a context of another op shows the answer of <code>difference</code> only where its replacement op noise draws <code>difference</code>. On those contexts, <code>sans-diff</code> answers from what it learned on other contexts, as the <dfn class="term" tabindex="0">edited model</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Full edit</span> <span class="gloss">Removing the component of every state along e₁, at every slice and position, and rescaling each state back onto the sphere.</span><span class="more"> It is meant to take <code>difference</code> out and leave the other ops as they were; the edited model is the anchored model under it.</span></span> has to.</p>
+<!-- REVIEW: the held-out `difference` contexts carry the same replacement noise as the corpus, so most show `difference` on two or three examples rather than all three (assumptions review). Verify: the posterior bins of edit-effects (E2 there), where 695 of 2,000 held-out `difference` contexts have a posterior of 0.95 or more. -->
+
+<p>The reference runs are those of the <dfn class="term" tabindex="0"><cite>fixed-confirm</cite></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/fixed-confirm/">fixed-confirm</a></cite></span> <span class="gloss"><code>τ_ℓ fixed</code> kept the anchor on all eight fresh seeds, 712 to 719, and stayed within the spill criterion; it became the recipe of record.</span></span> experiment: <code>τ_ℓ fixed</code> (the <dfn class="term" tabindex="0">recipe of record</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><code>τ_ℓ fixed</code></span> <span class="gloss">The anchored recipe that holds the slice temperature τ_ℓ fixed through training; fixed-confirm made it the recipe of record.</span></span>) at seeds 712 to 719, and the controls at the same seeds. Their stored dose scoring holds the answer distributions on the same held-out contexts, clean and under the full edit, beside the <dfn class="term" tabindex="0">posterior over ops</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Posterior over ops</span> <span class="gloss">How likely each op is, given the examples of a context.</span><span class="more"> The posterior on <code>difference</code> is the probability it gives that op, so it says how much a context looks like <code>difference</code>.</span></span>. <code>sans-diff</code> is scored with the same pass, so every distance below is taken on the same contexts in the same way, at the final checkpoint of each run.</p>
+<!-- REVIEW: moved from the `falloff` runs and ex-2.2.23 controls at 704–711 to the recipe of record, `τ_ℓ fixed` at 712–719, with the anneal-confirm controls (paper review). Verify: `DOSE_ARRAYS_REF` in `docs/m2/fixed-confirm/experiment.py` and `docs/m2/anneal-confirm/experiment.py`; the control arrays are under the latter. -->
+
+<p>With eight runs per condition, a difference between conditions is trusted when it is clear of the seed range of both. Seed 718 learns the HSV ops late under <code>τ_ℓ fixed</code> and misses the task criterion of <cite>fixed-confirm</cite> on two of them; E4 shows whether the control and <code>sans-diff</code> do the same at that seed.</p>
+<p>A check arm, <code>dropped</code>, trains at seeds 712 and 713 on the corpus with the <code>difference</code> contexts taken out entirely (not just masked), for 400 epochs (about six-sevenths as many steps as the control). Under the mask, <code>sans-diff</code> still reads <code>difference</code> contexts in its window; <code>dropped</code> never sees one. If the two end up in about the same place, reading the contexts without answering them makes little difference to what the model learns.</p>
+<p>Every measurement here is taken on the answer distribution, which does not change when the residual stream is rotated. So the coordinate axes that Adam favors (the <dfn class="term" tabindex="0"><cite>rotated-basis</cite></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/rotated-basis/">rotated-basis</a></cite></span> <span class="gloss">Adam puts nearly half of the energy of the residual stream on one coordinate axis per seed; in a randomly rotated basis the anchor still holds on all eight seeds, and the energy moves to the rotated axes.</span></span> experiment) play no part, except through the edit itself, which acts along e₁.</p>
+<h2 id="the-measurements">The measurements<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#the-measurements" title="Link to this heading">&para;</a></h2>
+<p>Each measurement is taken on the answer distribution at the query <code>=</code>, over the colors of the palette, and averaged over held-out contexts.</p>
+<dl>
+<dt>Distance from the target null</dt>
+<dd>Total variation (half the summed absolute difference between two distributions) between the answer distribution of the model and the target null, with any mass the model puts off the palette counted as distance. It runs from 0 (a perfect match) to 1 (nothing shared), so lower is closer. On <code>difference</code> contexts it is taken under the full edit for <code>τ_ℓ fixed</code>, as in edit-effects, and on the clean pass for <code>sans-diff</code> and the control. For <code>sans-diff</code> on the contexts of the other ops, it is how far the model falls short of the predictor that is ideal for what it was trained on.</dd>
+<dt>Bayes gap</dt>
+<dd>The same distance, between the clean control and the Bayes predictor: how far a model of this size, trained without an anchor, falls short of the ideal on contexts like the ones it trained on. It sets the scale for the other distances, and is taken on <code>difference</code> contexts (where edit-effects took its reference) and on the contexts of the other ops. edit-effects called it a comparison point rather than a floor for the edited model, since the two are distances between different pairs. For <code>sans-diff</code> the pairs are the same, because its Bayes predictor is the target null on every context, so its own gap on the contexts of the other ops is a floor for its distance on <code>difference</code> contexts.</dd>
+<dt>Share of the way</dt>
+<dd>How much of the way from the control (0) to the target null (1) a model has come: one minus the ratio of its distance from the target null to that of the control at the same seed, each a mean over <code>difference</code> contexts. edit-effects measured it for edited runs against their own clean pass in place of the control, so for the <code>τ_ℓ fixed</code> runs it is reported both ways.</dd>
+<dt>Distance between the models</dt>
+<dd>Total variation between <code>sans-diff</code> and the edited <code>τ_ℓ fixed</code> run at the same seed, context by context, on <code>difference</code> contexts.</dd>
+<dt>Seed-to-seed spread</dt>
+<dd>The same distance, between two <code>sans-diff</code> runs at different seeds, over all 28 pairs: how far apart two models trained the same way land. A distance between the models near the spread means they are as alike as a model is to itself at another seed.</dd>
+</dl>
+<!-- REVIEW: added the seed-to-seed spread and the own-gap reading of the distance on other-op contexts (assumptions review, agreed in the paper review). The paper review asked whether "the way from the control" is the floor; it is not, and the share of the way now says where the way starts and ends. Named a spread rather than a floor, since "floor" already means the no-evidence predictor (ex-2.2.21, ex-2.2.22) and edit-effects calls the Bayes gap "a comparison point rather than a floor". -->
+
+<dl>
+<dt>Task score</dt>
+<dd>Expected exact match, per op, on the clean pass.</dd>
+</dl>
+<h2 id="along-training-e1">Along training (E1)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#along-training-e1" title="Link to this heading">&para;</a></h2>
+<p>Does <code>sans-diff</code> learn the other six ops as the <dfn class="term" tabindex="0">control</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Control</span> <span class="gloss">A run trained the same way with no anchor.</span><span class="more"> The controls here are those of anneal-confirm, at the same seeds.</span></span> does, and does it close on the <dfn class="term" tabindex="0">target null</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Target null</span> <span class="gloss">Where a removal should land<span class="lead-colon">:</span></span><span class="more"> what an ideal predictor that had lost one op and nothing else would answer. It is the Bayes posterior over ops given the examples, with the removed op set to zero and the rest renormalized, so it still weighs the other ops by how well they fit.</span></span> at the same pace as the <dfn class="term" tabindex="0">edited model</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Full edit</span> <span class="gloss">Removing the component of every state along e₁, at every slice and position, and rescaling each state back onto the sphere.</span><span class="more"> It is meant to take <code>difference</code> out and leave the other ops as they were; the edited model is the anchored model under it.</span></span>? Every run records the <dfn class="term" tabindex="0">task score</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Task score</span> <span class="gloss">Expected exact match, per op, on the clean pass.</span></span> of each op on held-out contexts along training, every four epochs, so on the six ops <code>sans-diff</code> trains on, it can be compared with the control and with <code>τ_ℓ fixed</code> at the same points in training.</p>
+<p>The <code>τ_ℓ fixed</code> runs kept checkpoints along training, and <code>sans-diff</code> kept the same ones. Scoring both at each kept epoch gives the <dfn class="term" tabindex="0">distance from the target null</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Distance from the target null</span> <span class="gloss">Total variation (half the summed absolute difference between two distributions) between the answer distribution of the model and the target null, with any mass the model puts off the palette counted as distance.</span><span class="more"> It runs from 0 (a perfect match) to 1 (nothing shared), so lower is closer. On <code>difference</code> contexts it is taken under the full edit for <code>τ_ℓ fixed</code>, as in edit-effects, and on the clean pass for <code>sans-diff</code> and the control. For <code>sans-diff</code> on the contexts of the other ops, it is how far the model falls short of the predictor that is ideal for what it was trained on.</span></span> on <code>difference</code> contexts along training (clean for <code>sans-diff</code>, under the full edit for <code>τ_ℓ fixed</code>): whether the two settle early or are still closing when training ends, and whether they close at the same pace. The controls kept no checkpoints, so they have no such curve, though their task score on <code>difference</code> along training is there.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/filtered-corpus-along-light.png" alt="Left: on the six other ops, the task score of every run climbs together through training, with sans-diff a little above the control throughout and τ_ℓ fixed a little below it for the first hundred epochs. Middle: on difference contexts the control and τ_ℓ fixed rise to about 0.7 while sans-diff stays near zero. Right: the distance of sans-diff from the target null on difference contexts falls from 0.52 at epoch 16 to 0.33, and settles from about epoch 300; τ_ℓ fixed under the edit falls from 0.64 to 0.40 on the same path, about 0.07 above it from epoch 128 on. The distance of sans-diff on the other ops falls faster, from 0.61 to 0.22, and the edited model on the other ops falls with it, to 0.23. Under the right panel, the alignment of the anchored states with e₁ rises over the first 30 or so epochs while the anchor weight ramps up, then holds." width="683" height="346" style="max-width: 100%; height: auto;" data-asset-name="filtered-corpus-along" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/filtered-corpus-along-dark.png" alt="Left: on the six other ops, the task score of every run climbs together through training, with sans-diff a little above the control throughout and τ_ℓ fixed a little below it for the first hundred epochs. Middle: on difference contexts the control and τ_ℓ fixed rise to about 0.7 while sans-diff stays near zero. Right: the distance of sans-diff from the target null on difference contexts falls from 0.52 at epoch 16 to 0.33, and settles from about epoch 300; τ_ℓ fixed under the edit falls from 0.64 to 0.40 on the same path, about 0.07 above it from epoch 128 on. The distance of sans-diff on the other ops falls faster, from 0.61 to 0.22, and the edited model on the other ops falls with it, to 0.23. Under the right panel, the alignment of the anchored states with e₁ rises over the first 30 or so epochs while the anchor weight ramps up, then holds." width="683" height="346" style="max-width: 100%; height: auto;" data-asset-name="filtered-corpus-along" />
+<figcaption><p><strong>How the runs learn, along training.</strong> One thin line per run. <strong>Left:</strong> the task score on the clean pass,
+the mean over the six ops other than <code>difference</code>, on a subset of the held-out contexts, recorded every
+four epochs.
+<strong>Middle:</strong> the same on <code>difference</code> contexts. <strong>Right:</strong> the distance from the target null on
+<code>difference</code> contexts, at the checkpoints kept at epochs 16, 32 and 64 and then every 32 epochs, and at
+the end: <code>sans-diff</code> on the clean pass and <code>τ_ℓ fixed</code> under the full edit, with markers; the dashed
+lines are the same two on the contexts of the other ops, where the target null is the predictor that would
+be ideal for a model without <code>difference</code>. <strong>Under it:</strong> for the <code>τ_ℓ fixed</code> runs, the alignment α of the
+states holding <code>difference</code> with e₁ at the example answers, at the slice where it is highest (one line per
+run), and the anchor weight λ_a
+and the anti weight (mean over slices) on the right-hand axis.</p></figcaption></figure>
+
+<p>On the six ops it trains on, <code>sans-diff</code> keeps pace with the control from the first record to the last, and stays a little ahead of it (left). <code>τ_ℓ fixed</code> falls a little behind the control in the first hundred epochs, while the <dfn class="term" tabindex="0">anchor</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Anchor</span> <span class="gloss">The training term that pulls the states holding <code>difference</code> toward a fixed direction of the residual stream, e₁, so that the op can later be removed there.</span></span> settles, and catches up by the end, except at seed 718, which learns the HSV ops late (E4).</p>
+<p>On <code>difference</code> contexts <code>sans-diff</code> scores near zero all the way through, as the target null does (middle). So reading the <code>difference</code> contexts as input, with no loss on them, does not teach the model to answer them.</p>
+<p>The two models close on the target null together on <code>difference</code> contexts (right). The edited model starts further away, the difference between them narrows over the first hundred epochs or so, and from epoch 128 it holds at a small, steady amount while both curves keep falling. Both settle from about epoch 300, so 400 epochs is long enough for this comparison. The extra distance that the anchor and the edit leave is set early, and does not close with more training.</p>
+<p>A few edited runs stay far from the target null, or move away from it, until epoch 64 to 100 or so. The anchor itself is in place well before that: the states holding <code>difference</code> swing onto e₁ by about epoch 30, as the anchor weight ramps up (the panel under the right one). So the slow start is not the anchor arriving. It may be the edit taking more than <code>difference</code> out of a model that is still settling, though this figure can't tell.</p>
+<p>The dashed lines are the two models on the contexts of the other ops, where the target null is the <dfn class="term" tabindex="0">Bayes predictor</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Bayes predictor</span> <span class="gloss">The best answer given the examples<span class="lead-colon">:</span></span><span class="more"> it weighs the answers of each op by the posterior over ops, the probability of each op given the examples.</span></span> of <code>sans-diff</code>. They fall faster and further (E2), and the edited model follows <code>sans-diff</code> there closely.</p>
+<h2 id="how-close-it-comes-e2">How close it comes (E2)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#how-close-it-comes-e2" title="Link to this heading">&para;</a></h2>
+<p>How far is <code>sans-diff</code> from the <dfn class="term" tabindex="0">target null</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Target null</span> <span class="gloss">Where a removal should land<span class="lead-colon">:</span></span><span class="more"> what an ideal predictor that had lost one op and nothing else would answer. It is the Bayes posterior over ops given the examples, with the removed op set to zero and the rest renormalized, so it still weighs the other ops by how well they fit.</span></span> on <code>difference</code> contexts, beside the edited <code>τ_ℓ fixed</code> runs and the <dfn class="term" tabindex="0">Bayes gap</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Bayes gap</span> <span class="gloss">The same distance, between the clean control and the Bayes predictor<span class="lead-colon">:</span></span><span class="more"> how far a model of this size, trained without an anchor, falls short of the ideal on contexts like the ones it trained on. It sets the scale for the other distances, and is taken on <code>difference</code> contexts (where edit-effects took its reference) and on the contexts of the other ops. edit-effects called it a comparison point rather than a floor for the edited model, since the two are distances between different pairs. For <code>sans-diff</code> the pairs are the same, because its Bayes predictor is the target null on every context, so its own gap on the contexts of the other ops is a floor for its distance on <code>difference</code> contexts.</span></span>? If it comes about as close as the <dfn class="term" tabindex="0">edited model</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Full edit</span> <span class="gloss">Removing the component of every state along e₁, at every slice and position, and rescaling each state back onto the sphere.</span><span class="more"> It is meant to take <code>difference</code> out and leave the other ops as they were; the edited model is the anchored model under it.</span></span>, then landing short of the target null is near what a model of this kind does on these contexts, and the shortfall need not come from the <dfn class="term" tabindex="0">anchor</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Anchor</span> <span class="gloss">The training term that pulls the states holding <code>difference</code> toward a fixed direction of the residual stream, e₁, so that the op can later be removed there.</span></span> and the edit. If it comes much closer, the anchor and the edit leave a distance that a model can close. The main measure is the <dfn class="term" tabindex="0">share of the way</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Share of the way</span> <span class="gloss">How much of the way from the control (0) to the target null (1) a model has come<span class="lead-colon">:</span></span><span class="more"> one minus the ratio of its distance from the target null to that of the control at the same seed, each a mean over <code>difference</code> contexts. edit-effects measured it for edited runs against their own clean pass in place of the control, so for the <code>τ_ℓ fixed</code> runs it is reported both ways.</span></span> from the <dfn class="term" tabindex="0">control</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Control</span> <span class="gloss">A run trained the same way with no anchor.</span><span class="more"> The controls here are those of anneal-confirm, at the same seeds.</span></span> to the target null, with the distance itself beside it.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/filtered-corpus-close-light.png" alt="Left: on difference contexts the control is 0.80 from the target null, the edited τ_ℓ fixed runs 0.40, sans-diff 0.33, and the two dropped runs 0.33; the seed ranges of sans-diff and τ_ℓ fixed do not overlap. The Bayes gap on difference contexts is 0.16, and sans-diff is 0.22 from the target null on the other ops. Right: by bin of the posterior on difference, sans-diff runs from 0.26 to 0.39 and τ_ℓ fixed from 0.29 to 0.48, both furthest in the bin where the posterior is 0.95 or more, with τ_ℓ fixed further in every bin. The unedited τ_ℓ fixed runs rise from 0.32 to 0.97, since they still answer difference." width="626" height="270" style="max-width: 100%; height: auto;" data-asset-name="filtered-corpus-close" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/filtered-corpus-close-dark.png" alt="Left: on difference contexts the control is 0.80 from the target null, the edited τ_ℓ fixed runs 0.40, sans-diff 0.33, and the two dropped runs 0.33; the seed ranges of sans-diff and τ_ℓ fixed do not overlap. The Bayes gap on difference contexts is 0.16, and sans-diff is 0.22 from the target null on the other ops. Right: by bin of the posterior on difference, sans-diff runs from 0.26 to 0.39 and τ_ℓ fixed from 0.29 to 0.48, both furthest in the bin where the posterior is 0.95 or more, with τ_ℓ fixed further in every bin. The unedited τ_ℓ fixed runs rise from 0.32 to 0.97, since they still answer difference." width="626" height="270" style="max-width: 100%; height: auto;" data-asset-name="filtered-corpus-close" />
+<figcaption><p><strong>How close each model comes to the target null on <code>difference</code> contexts.</strong> <strong>Left:</strong> the distance from
+the target null, one column per condition: the control on the clean pass, <code>τ_ℓ fixed</code> under the full edit,
+and <code>sans-diff</code> and <code>dropped</code> on the clean pass. The seeds are small dots over a thin bar for their range,
+and the seed mean is the large mark. The dashed line is the Bayes gap on <code>difference</code> contexts (the
+control from the Bayes predictor), and the dotted line is <code>sans-diff</code> on the contexts of the other ops,
+where the target null is its own ideal. <strong>Right:</strong> the distance by bin of the posterior on <code>difference</code>,
+one hairline per run and the seed mean bold, with the <code>τ_ℓ fixed</code> runs on the clean pass (unedited, hollow
+marks) for comparison.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th></th><th class=num>distance on <code>difference</code></th><th class=num>share of the way</th><th class=num>against own clean pass</th><th class=num>on the other ops</th></tr></thead><tbody><tr><td>control</td><td class=num>0.80 (0.79 to 0.80)</td><td class=num>0</td><td class=num></td><td class=num></td></tr><tr><td><code>τ_ℓ fixed</code>, edited</td><td class=num>0.40 (0.38 to 0.42)</td><td class=num>0.50 (0.47 to 0.52)</td><td class=num>0.50 (0.47 to 0.52)</td><td class=num></td></tr><tr><td><code>sans-diff</code></td><td class=num>0.33 (0.32 to 0.35)</td><td class=num>0.58 (0.55 to 0.60)</td><td class=num></td><td class=num>0.22 (0.20 to 0.25)</td></tr><tr><td><code>dropped</code></td><td class=num>0.33 (0.33 to 0.34)</td><td class=num>0.59 (0.58 to 0.59)</td><td class=num></td><td class=num></td></tr><tr><td>Bayes gap (control)</td><td class=num>0.16 (0.14 to 0.18)</td><td class=num></td><td class=num></td><td class=num>0.22 (0.20 to 0.23)</td></tr></tbody></table><figcaption><p><strong>How close each model comes to the target null.</strong> Seed mean and range over 8 runs
+        (2 for <code>dropped</code>). The distance on the other ops is from the target null for <code>sans-diff</code>
+        (its own ideal) and from the Bayes predictor for the control.</p></figcaption></figure>
+
+<p><code>sans-diff</code> comes closer than the edited model at every seed, with the seed ranges of the two well apart: about three-fifths of the way, where the edited model comes half of the way. So the anchor and the edit leave some distance that a model without the op can close, about a sixth of what the edited model has left.</p>
+<p>Measured against the <dfn class="term" tabindex="0">clean pass</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Clean pass</span> <span class="gloss">The forward pass with no edit.</span></span> of the <code>τ_ℓ fixed</code> run instead of the control, the share for the edited model is the same, since the clean run is as far from the target null as the control is.</p>
+<p>Most of the shortfall is there without the anchor and the edit, though. On the contexts of the other ops, <code>sans-diff</code> falls short of the target null (its <dfn class="term" tabindex="0">Bayes predictor</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Bayes predictor</span> <span class="gloss">The best answer given the examples<span class="lead-colon">:</span></span><span class="more"> it weighs the answers of each op by the posterior over ops, the probability of each op given the examples.</span></span> there) by about as much as the control falls short of the Bayes predictor; on <code>difference</code> contexts it falls about half as short again. So a model with this architecture, grammar, and set of other ops that has never been asked to answer a <code>difference</code> context still falls well short of the target null on one, and the edited model a little further.</p>
+<p>The two <code>dropped</code> runs end up with <code>sans-diff</code> at their seeds, inside its seed range. A model that reads <code>difference</code> contexts without answering them ends up about where one that never sees them does.</p>
+<p>Split by the posterior on <code>difference</code> (right), both models are furthest away on the contexts where the posterior is nearly certain of <code>difference</code>. Those are the contexts least like anything <code>sans-diff</code> trained on. The extra distance of the edited model is also largest there, and smallest on the contexts whose examples point mostly at other ops. The middle bin holds fewer than a hundred contexts, so its value is loose. The unedited <code>τ_ℓ fixed</code> runs, which still answer <code>difference</code>, are far from the target null in every bin but the lowest, as expected.</p>
+<h2 id="whether-it-misses-in-the-same-way-e3">Whether it misses in the same way (E3)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#whether-it-misses-in-the-same-way-e3" title="Link to this heading">&para;</a></h2>
+<p>Do the <dfn class="term" tabindex="0">edited model</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Full edit</span> <span class="gloss">Removing the component of every state along e₁, at every slice and position, and rescaling each state back onto the sphere.</span><span class="more"> It is meant to take <code>difference</code> out and leave the other ops as they were; the edited model is the anchored model under it.</span></span> and <code>sans-diff</code> miss the <dfn class="term" tabindex="0">target null</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Target null</span> <span class="gloss">Where a removal should land<span class="lead-colon">:</span></span><span class="more"> what an ideal predictor that had lost one op and nothing else would answer. It is the Bayes posterior over ops given the examples, with the removed op set to zero and the rest renormalized, so it still weighs the other ops by how well they fit.</span></span> in the same way? If the distance between the two models is small beside the distance of each from the target null, and near the <dfn class="term" tabindex="0">seed-to-seed spread</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Seed-to-seed spread</span> <span class="gloss">The same distance, between two <code>sans-diff</code> runs at different seeds, over all 28 pairs<span class="lead-colon">:</span></span><span class="more"> how far apart two models trained the same way land. A distance between the models near the spread means they are as alike as a model is to itself at another seed.</span></span>, they share the mass among the other ops alike on a context. The part of the shortfall they have in common then comes from these contexts rather than from the <dfn class="term" tabindex="0">anchor</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Anchor</span> <span class="gloss">The training term that pulls the states holding <code>difference</code> toward a fixed direction of the residual stream, e₁, so that the op can later be removed there.</span></span> and the edit.</p>
+<p>If the two models are as far from each other as from the target null, they miss in different ways on a context, though broadly speaking they may still miss in the same kind of way (the breakdown below). The main measure is the <dfn class="term" tabindex="0">distance between the models</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Distance between the models</span> <span class="gloss">Total variation between <code>sans-diff</code> and the edited <code>τ_ℓ fixed</code> run at the same seed, context by context, on <code>difference</code> contexts.</span></span>, context by context.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/filtered-corpus-same-light.png" alt="The distance between sans-diff and the edited τ_ℓ fixed run at the same seed is 0.42, about as far as two edited runs at different seeds (0.43) and a little further than two sans-diff runs at different seeds (0.35). Sans-diff and dropped at the same seed are 0.35 apart. Sans-diff and the edited model at different seeds are 0.42 apart, the same as at the same seed. All of these are about as large as the distance of each model from the target null." width="491" height="260" style="max-width: 100%; height: auto;" data-asset-name="filtered-corpus-same" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/filtered-corpus-same-dark.png" alt="The distance between sans-diff and the edited τ_ℓ fixed run at the same seed is 0.42, about as far as two edited runs at different seeds (0.43) and a little further than two sans-diff runs at different seeds (0.35). Sans-diff and dropped at the same seed are 0.35 apart. Sans-diff and the edited model at different seeds are 0.42 apart, the same as at the same seed. All of these are about as large as the distance of each model from the target null." width="491" height="260" style="max-width: 100%; height: auto;" data-asset-name="filtered-corpus-same" />
+<figcaption><p><strong>How far apart the models land on <code>difference</code> contexts.</strong> Total variation between two models, context by
+context, one column per pair: <code>sans-diff</code> and the edited <code>τ_ℓ fixed</code> run at the same seed, and at different
+seeds (all 56 pairs); two <code>sans-diff</code>
+runs at different seeds (all 28 pairs); two edited <code>τ_ℓ fixed</code> runs at different seeds; and <code>sans-diff</code> and
+<code>dropped</code> at the same seed. The pairs are small dots over a thin bar for their range, and the mean is the
+large mark. The dotted lines are the distance of <code>sans-diff</code> and of the edited model from the target
+null.</p></figcaption></figure>
+
+<p>Two <code>sans-diff</code> runs at different seeds land about as far from each other as each lands from the target null, and so do two edited runs. <code>sans-diff</code> and the edited model at the same seed are as far apart as two edited runs, and a little further apart than two <code>sans-diff</code> runs, clear of their range. Sharing the seed and the initialization does not make the two miss alike on a context: at different seeds they are just as far apart.</p>
+<p>That gives another way to say how close the edited model comes to <code>sans-diff</code>. No model lands nearer a <code>sans-diff</code> run than another <code>sans-diff</code> run does, so take a second <code>sans-diff</code> run as the end of the way and the <dfn class="term" tabindex="0">control</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Control</span> <span class="gloss">A run trained the same way with no anchor.</span><span class="more"> The controls here are those of anneal-confirm, at the same seeds.</span></span> as its start. On that scale the edited model comes 85% of the way to <code>sans-diff</code> on <code>difference</code> contexts (seeds 79% to 89%). On the contexts of the other ops the control, the edited model, and <code>sans-diff</code> are all about as far apart as two <code>sans-diff</code> runs, so there is no way to measure there.</p>
+<!-- REVIEW: added the share of the way to `sans-diff` (paper review asked whether the post could report closeness to `sans-diff` rather than to the target null). Verify: `SHARE_TO_SANS`; the end of the way is the mean distance from the `sans-diff` run at that seed to the other seven. -->
+
+<p>Two edited runs are also about a quarter further apart from each other than two <code>sans-diff</code> runs are, with the ranges of the two kinds of pair apart, so the anchor and the edit add some scatter from seed to seed as well as some <dfn class="term" tabindex="0">distance from the target null</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Distance from the target null</span> <span class="gloss">Total variation (half the summed absolute difference between two distributions) between the answer distribution of the model and the target null, with any mass the model puts off the palette counted as distance.</span><span class="more"> It runs from 0 (a perfect match) to 1 (nothing shared), so lower is closer. On <code>difference</code> contexts it is taken under the full edit for <code>τ_ℓ fixed</code>, as in edit-effects, and on the clean pass for <code>sans-diff</code> and the control. For <code>sans-diff</code> on the contexts of the other ops, it is how far the model falls short of the predictor that is ideal for what it was trained on.</span></span>. On a given <code>difference</code> context, each run shares the mass among the other ops in a way of its own, and much of its distance from the target null is that scatter from run to run.</p>
+<p>Averaging the answers of each condition over its eight seeds, context by context, shows how much.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>on <code>difference</code> contexts</th><th class=num>run by run</th><th class=num>answers averaged over seeds</th></tr></thead><tbody><tr><td><code>sans-diff</code> from the target null</td><td class=num>0.33 (0.32 to 0.35)</td><td class=num>0.23</td></tr><tr><td><code>τ_ℓ fixed</code>, edited, from the target null</td><td class=num>0.40 (0.38 to 0.42)</td><td class=num>0.28</td></tr><tr><td><code>sans-diff</code> from <code>τ_ℓ fixed</code>, edited</td><td class=num>0.42 (0.40 to 0.45)</td><td class=num>0.23</td></tr><tr><td><code>sans-diff</code>, seeds 712–715 from 716–719</td><td class=num></td><td class=num>0.19</td></tr><tr><td><code>τ_ℓ fixed</code>, edited, seeds 712–715 from 716–719</td><td class=num></td><td class=num>0.24</td></tr></tbody></table><figcaption><p><strong>Distances taken run by run and on the answers averaged over the 8 seeds.</strong> The first column is
+        the seed mean and range of the distance taken on each run (or each pair at a seed); the second takes the
+        distance once, on the answer distributions of each condition averaged over its seeds context by context; the last two
+        rows average each half of the seeds of one condition separately.</p></figcaption></figure>
+
+<p>The averaged answers of both conditions are about a third closer to the target null than a single run. The two averages are still about as far from each other as the <code>sans-diff</code> average is from the target null, but two averages over four seeds each, from the same condition, land nearly as far apart. So most of what separates the two averages is scatter still left after averaging eight seeds, and the data show little of a miss common to the runs of one condition but different between the two conditions.</p>
+<!-- REVIEW: added the split-half rows (claims review); the earlier text said part of the miss "differs between the conditions", which the split-half does not support. Verify: `SPLIT_HALF` against `BETWEEN_MEANS`. -->
+
+<p>Averaging does the same where the ideal is not in doubt. On the contexts of the other ops, <code>sans-diff</code> comes closer to its <dfn class="term" tabindex="0">Bayes predictor</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Bayes predictor</span> <span class="gloss">The best answer given the examples<span class="lead-colon">:</span></span><span class="more"> it weighs the answers of each op by the posterior over ops, the probability of each op given the examples.</span></span> as more seeds are averaged, and the control to its own, by about the same share as <code>sans-diff</code> comes closer to the target null on <code>difference</code> contexts.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>seeds averaged</th><th class=num>1</th><th class=num>2</th><th class=num>4</th><th class=num>8</th></tr></thead><tbody><tr><td><code>sans-diff</code> from the target null, on <code>difference</code></td><td class=num>0.33</td><td class=num>0.28</td><td class=num>0.25</td><td class=num>0.23</td></tr><tr><td><code>sans-diff</code> from the target null (its Bayes predictor), on the other ops</td><td class=num>0.22</td><td class=num>0.18</td><td class=num>0.16</td><td class=num>0.15</td></tr><tr><td>control from the Bayes predictor, on the other ops</td><td class=num>0.22</td><td class=num>0.18</td><td class=num>0.16</td><td class=num>0.15</td></tr></tbody></table><figcaption><p><strong>Distance from the ideal, with the answers averaged over more seeds.</strong> The seeds are taken in order, in
+        groups of the given size (712–713, 714–715, and so on for two), the answers of each
+        group averaged context by context, and the distance taken on the average; mean over the groups.</p></figcaption></figure>
+
+<p>So scatter from run to run is a general property of models of this size, and averaging removes about the same share of it everywhere. What sets <code>difference</code> contexts apart is how far a single run is to begin with. The averages also close on the target null the way they close on the Bayes predictor elsewhere, which is what we would expect if the target null is the right reference for these contexts.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>on <code>difference</code> contexts</th><th class=num><code>sans-diff</code></th><th class=num><code>τ_ℓ fixed</code>, edited</th><th class=num>target null</th></tr></thead><tbody><tr><td>mass on answers only <code>difference</code> gives</td><td class=num>0.00 (0.00 to 0.00)</td><td class=num>0.03 (0.01 to 0.06)</td><td class=num>0.00</td></tr><tr><td>mass on answers another op could give</td><td class=num>0.94 (0.94 to 0.95)</td><td class=num>0.91 (0.87 to 0.92)</td><td class=num>1.00</td></tr><tr><td>mass on colors no op gives</td><td class=num>0.06 (0.05 to 0.06)</td><td class=num>0.07 (0.06 to 0.07)</td><td class=num>0.00</td></tr><tr><td>distance from the nearest mixture of the ops</td><td class=num>0.10 (0.10 to 0.10)</td><td class=num>0.11 (0.10 to 0.12)</td><td class=num></td></tr><tr><td>that mixture from the target null</td><td class=num>0.30 (0.30 to 0.32)</td><td class=num>0.38 (0.36 to 0.40)</td><td class=num></td></tr><tr><td>from the target null, posterior to the power 0.5</td><td class=num>0.41 (0.40 to 0.41)</td><td class=num>0.44 (0.42 to 0.46)</td><td class=num></td></tr><tr><td>from the target null, posterior to the power 1</td><td class=num>0.33 (0.32 to 0.35)</td><td class=num>0.40 (0.38 to 0.42)</td><td class=num></td></tr><tr><td>from the target null, posterior to the power 2</td><td class=num>0.34 (0.33 to 0.36)</td><td class=num>0.43 (0.41 to 0.47)</td><td class=num></td></tr></tbody></table><figcaption><p><strong>Where the mass goes on <code>difference</code> contexts, and what kind of miss it is</strong>, as edit-effects (E3 there)
+        breaks it down. Seed mean and range over 8 runs. The nearest mixture is the mixture of the answer
+        distributions of the seven ops closest to the answer of the model on each context. The last rows compare the
+        model with a target null whose posterior on the other ops is raised to a power and renormalized: below 1
+        spreads the mass more evenly over the other ops, above 1 gives more to the op the examples favor.</p></figcaption></figure>
+
+<p>Both models put nearly all of the mass on answers another op could give, and very little on answers only <code>difference</code> gives (the edited model a little more). Each is close to some mixture of the answers of the ops, and that mixture is nearly as far from the target null as the model is. So both miss in how they share the mass among the other ops, as <dfn class="term" tabindex="0"><cite>edit-effects</cite></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/edit-effects/">edit-effects</a></cite></span> <span class="gloss">On the <code>falloff</code> recipe the full edit lands about half of the way to the target null; the distance left is about 2.4 times the distance from the clean model to the Bayes predictor, nearly all of it in how the mass is shared among the other ops context by context.</span></span> found for the earlier recipe.</p>
+<p>Neither power fits either model better than the target null as it is (power 1), so neither model leans toward sharing the mass evenly or toward the op the examples favor.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/filtered-corpus-confusion-light.png" alt="Four matrices, one per condition: the control, τ_ℓ fixed under the full edit, sans-diff, and the target null, each with the op of the context on the rows and, on the columns, the mass on answers of that op which the row op cannot give. Off the difference row the four look alike, with about 0.05 in each square. In the difference row the control puts 0.72 on the answers of difference and little elsewhere; τ_ℓ fixed edited, sans-diff and the target null put 0.04, 0.01 and 0.01 there, and spread the rest over the other six ops in about the same proportions, most on sat-hsv and mix (0.26 and 0.26 under the target null, 0.25 and 0.26 under sans-diff, 0.28 and 0.25 under the edit)." width="682" height="633" style="max-width: 100%; height: auto;" data-asset-name="filtered-corpus-confusion" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/filtered-corpus-confusion-dark.png" alt="Four matrices, one per condition: the control, τ_ℓ fixed under the full edit, sans-diff, and the target null, each with the op of the context on the rows and, on the columns, the mass on answers of that op which the row op cannot give. Off the difference row the four look alike, with about 0.05 in each square. In the difference row the control puts 0.72 on the answers of difference and little elsewhere; τ_ℓ fixed edited, sans-diff and the target null put 0.04, 0.01 and 0.01 there, and spread the rest over the other six ops in about the same proportions, most on sat-hsv and mix (0.26 and 0.26 under the target null, 0.25 and 0.26 under sans-diff, 0.28 and 0.25 under the edit)." width="682" height="633" style="max-width: 100%; height: auto;" data-asset-name="filtered-corpus-confusion" />
+<figcaption><p><strong>Where the answers go.</strong> Op confusion as in ex-2.2.22, over the held-out contexts of every op, seed mean.
+Rows: the op of the context. Columns: the mass on the colors the column op can give for the query operands
+and the row op cannot. The diagonal (the mass on the answers of the row op) is outlined, printed in grey
+italics, and left out of the color scale. The <code>difference</code> column is hatched, since <code>sans-diff</code> never
+learned that op and the edit removes it. Values of at least 0.03 are printed.</p></figcaption></figure>
+
+<p>Pooled over contexts, the <code>difference</code> row of <code>sans-diff</code> and of the edited model looks much like that of the target null. The mass is spread over the six other ops in about the same proportions, except that the edited model gives <code>lighten</code> about a third less than the target null does. The other rows look alike in all four matrices, except that the edited model puts a little more on the answers <code>sat-hsv</code> and <code>value-hsv</code> give for each other; nearly all of that is seed 718, the run that learns those ops late (E4). As <dfn class="term" tabindex="0"><cite>ex-2.2.22</cite></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/ex-2.2.22/">ex-2.2.22</a></cite></span> <span class="gloss">Confusion matrices of the clean and edited models against the target null, by how sure the context is about its op; pooled over contexts, they make the edited model look closer to the target null than the distance taken context by context.</span></span> found for the edited model, pooling over the contexts of a row averages away most of the context-by-context miss above, as averaging over seeds does.</p>
+<p>The two models differ in two ways: <code>sans-diff</code> never learned the op, and it trained without the anchor. On the contexts of the other ops, the clean <code>τ_ℓ fixed</code> run is as far from the control at the same seed as two controls at different seeds are from each other. So the anchor moves the answers there by about as much as a change of seed does. On <code>difference</code> contexts too, the two models differ by about as much as two runs of one condition.</p>
+<!-- REVIEW: the anchor bound is the distance between the clean τ_ℓ fixed run and the control at one seed on other-op contexts, compared with the spread between controls. Verify: `ANCHOR_O`, `CONTROL_O`. -->
+
+<h2 id="what-leaving-the-op-out-does-to-the-other-ops-e4">What leaving the op out does to the other ops (E4)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#what-leaving-the-op-out-does-to-the-other-ops-e4" title="Link to this heading">&para;</a></h2>
+<p>On contexts of the other ops, does <code>sans-diff</code> score as well as the <dfn class="term" tabindex="0">control</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Control</span> <span class="gloss">A run trained the same way with no anchor.</span><span class="more"> The controls here are those of anneal-confirm, at the same seeds.</span></span>, and does it gain where the <dfn class="term" tabindex="0">target null</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Target null</span> <span class="gloss">Where a removal should land<span class="lead-colon">:</span></span><span class="more"> what an ideal predictor that had lost one op and nothing else would answer. It is the Bayes posterior over ops given the examples, with the removed op set to zero and the rest renormalized, so it still weighs the other ops by how well they fit.</span></span> says a model without <code>difference</code> should? The target null predicts a gain on contexts of other ops whose examples point partly at <code>difference</code>, since an ideal model that cannot answer <code>difference</code> puts that mass on the right op. <dfn class="term" tabindex="0"><cite>edit-effects</cite></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/edit-effects/">edit-effects</a></cite></span> <span class="gloss">On the <code>falloff</code> recipe the full edit lands about half of the way to the target null; the distance left is about 2.4 times the distance from the clean model to the Bayes predictor, nearly all of it in how the mass is shared among the other ops context by context.</span></span> found that the <dfn class="term" tabindex="0">edited model</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Full edit</span> <span class="gloss">Removing the component of every state along e₁, at every slice and position, and rescaling each state back onto the sphere.</span><span class="more"> It is meant to take <code>difference</code> out and leave the other ops as they were; the edited model is the anchored model under it.</span></span> gains most of that; this is the same comparison for a model that never learned the op, with the edited model beside it.</p>
+<p>It also checks the training: if <code>sans-diff</code> scored well below the control on the other ops, part of its distance in E2 could come from a weaker model rather than from the missing op. The main measure is the <dfn class="term" tabindex="0">task score</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Task score</span> <span class="gloss">Expected exact match, per op, on the clean pass.</span></span>.</p>
+<figure><figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/filtered-corpus-other-light.png" alt="On each of the six other ops sans-diff scores a little above the control at the same seed, by 0.006 to 0.022 on the seed mean, with one seed below the control on the three HSV ops." width="347" height="260" style="max-width: 100%; height: auto;" data-asset-name="filtered-corpus-other" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/filtered-corpus-other-dark.png" alt="On each of the six other ops sans-diff scores a little above the control at the same seed, by 0.006 to 0.022 on the seed mean, with one seed below the control on the three HSV ops." width="347" height="260" style="max-width: 100%; height: auto;" data-asset-name="filtered-corpus-other" />
+<figcaption><p><strong>Per op.</strong> The task score of <code>sans-diff</code> less that of the control at the same seed. The seeds are small
+dots over a thin bar for their range, and the seed mean is the large mark. The grey band is the seed range
+of the control about its own seed mean. The dashed line is the per-op task gate of the D2.2 design, which
+the anchored model is held to against the control, drawn here for scale.</p></figcaption></figure><figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/filtered-corpus-gain-light.png" alt="On the contexts of the other ops, the gain over the clean model rises with the posterior on difference; sans-diff gains about as much as the target null predicts, and the edited model gains less in every bin above the first." width="308" height="260" style="max-width: 100%; height: auto;" data-asset-name="filtered-corpus-gain" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/filtered-corpus-gain-dark.png" alt="On the contexts of the other ops, the gain over the clean model rises with the posterior on difference; sans-diff gains about as much as the target null predicts, and the edited model gains less in every bin above the first." width="308" height="260" style="max-width: 100%; height: auto;" data-asset-name="filtered-corpus-gain" />
+<figcaption><p><strong>By posterior on <code>difference</code>.</strong> On the contexts of the other ops, the gain in task score: <code>sans-diff</code>
+over the control at the same seed, the edited <code>τ_ℓ fixed</code> run over its own clean pass, and the target null
+over the Bayes predictor (dashed). One hairline per run and the seed mean bold.</p></figcaption></figure><figcaption><p><strong>What leaving <code>difference</code> out does to the other ops.</strong></p></figcaption></figure>
+
+<p><code>sans-diff</code> scores a little above the control on each of the six other ops (per op). One seed, 717, scores a little below the control on the three HSV ops and above it on the rest. The two <code>dropped</code> runs score like <code>sans-diff</code> at their seeds.</p>
+<p>At seed 718, where <code>τ_ℓ fixed</code> learns the HSV ops late, the control and <code>sans-diff</code> both learn them on time, so that weakness belongs to the anchored run. <code>sans-diff</code> is not a weaker model, then, and its distance in E2 comes from the missing op.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>posterior on <code>difference</code></th><th class=num>< 0.05</th><th class=num>0.05–0.2</th><th class=num>0.2–0.5</th><th class=num>≥ 0.5</th></tr></thead><tbody><tr><td>contexts</td><td class=num>10,180</td><td class=num>1,042</td><td class=num>664</td><td class=num>114</td></tr><tr><td>target null</td><td class=num>0.003</td><td class=num>0.054</td><td class=num>0.100</td><td class=num>0.328</td></tr><tr><td><code>sans-diff</code></td><td class=num>0.001 (−0.024 to 0.018)</td><td class=num>0.080 (0.050 to 0.102)</td><td class=num>0.105 (0.098 to 0.115)</td><td class=num>0.309 (0.280 to 0.333)</td></tr><tr><td><code>τ_ℓ fixed</code>, edited</td><td class=num>−0.011 (−0.017 to −0.006)</td><td class=num>0.044 (0.034 to 0.052)</td><td class=num>0.076 (0.060 to 0.089)</td><td class=num>0.246 (0.221 to 0.272)</td></tr></tbody></table><figcaption><p><strong>The gain on the contexts of the other ops, by bin of the posterior on <code>difference</code>.</strong> Task score of
+        <code>sans-diff</code> over the control at the same seed, of the edited model over its clean pass, and of the target
+        null over the Bayes predictor; seed mean and range over 8 runs.</p></figcaption></figure>
+
+<p>The gain is where the target null predicts it (by posterior). Most of the held-out contexts have a posterior on <code>difference</code> below 0.05, and on those <code>sans-diff</code> and the control score about the same; above that, the gain grows with the posterior. <code>sans-diff</code> gains about as much as the target null predicts (a little more in the second bin), and the edited model gains less in every bin above the first.</p>
+<p>The edited model also loses a little on the contexts that look least like <code>difference</code>, a small cost of the edit on contexts it would ideally leave alone. The top bin holds about a hundred contexts, so its values are loose.</p>
+<h2 id="discussion">Discussion<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#discussion" title="Link to this heading">&para;</a></h2>
+<p>A model that never learned <code>difference</code> lands short of the <dfn class="term" tabindex="0">target null</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Target null</span> <span class="gloss">Where a removal should land<span class="lead-colon">:</span></span><span class="more"> what an ideal predictor that had lost one op and nothing else would answer. It is the Bayes posterior over ops given the examples, with the removed op set to zero and the rest renormalized, so it still weighs the other ops by how well they fit.</span></span> on <code>difference</code> contexts, a little closer than the <dfn class="term" tabindex="0">edited model</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Full edit</span> <span class="gloss">Removing the component of every state along e₁, at every slice and position, and rescaling each state back onto the sphere.</span><span class="more"> It is meant to take <code>difference</code> out and leave the other ops as they were; the edited model is the anchored model under it.</span></span>, and misses in the same kind of way. Of the two explanations <dfn class="term" tabindex="0"><cite>edit-effects</cite></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/edit-effects/">edit-effects</a></cite></span> <span class="gloss">On the <code>falloff</code> recipe the full edit lands about half of the way to the target null; the distance left is about 2.4 times the distance from the clean model to the Bayes predictor, nearly all of it in how the mass is shared among the other ops context by context.</span></span> offered, this favors the second: most of the shortfall is what a model of this kind does on contexts that look like an op it was never asked to answer.</p>
+<p>The <dfn class="term" tabindex="0">anchor</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Anchor</span> <span class="gloss">The training term that pulls the states holding <code>difference</code> toward a fixed direction of the residual stream, e₁, so that the op can later be removed there.</span></span> and the edit add a smaller part on top, set early in training (E1) and largest on the contexts where the posterior is surest of <code>difference</code> (E2). They also add some scatter from seed to seed, and the model they leave is as far from <code>sans-diff</code> as two edited runs at different seeds are from each other (E3).</p>
+<!-- REVIEW: the last clause said the added part was "about as large as the difference between two runs of one condition", which conflated the extra distance from the target null (about 0.07, E2) with the distance between the two models (0.42, E3); the two-runs comparison belongs to the latter. Verify: `TO_NULL[FIXED] - TO_NULL[SANS]` against `BETWEEN["sans-fixed"]` and `BETWEEN["fixed-fixed"]`. -->
+
+<p>The miss looks like an underdetermined choice. On a context whose examples point at <code>difference</code>, the other six ops are all poor fits, and the training data say little about how to share the mass among them, since such contexts are rare in it. Each run settles that sharing in its own way. Runs of this size scatter on ordinary contexts too, and averaging over seeds brings them toward their ideal by about the same share there (E3), so the scatter is general; on <code>difference</code> contexts a single run starts further off.</p>
+<p>On the contexts of the other ops, a model trained without <code>difference</code> gains almost all that the target null predicts, and the edited model gains most of it. At a given seed, the answers of the edited model of the <dfn class="term" tabindex="0">recipe of record</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><code>τ_ℓ fixed</code></span> <span class="gloss">The anchored recipe that holds the slice temperature τ_ℓ fixed through training; fixed-confirm made it the recipe of record.</span></span> are as far from those of <code>sans-diff</code> as two edited runs are from each other, on <code>difference</code> contexts and on the others; on the others they are also about as far apart as two <code>sans-diff</code> runs. With a second <code>sans-diff</code> run as the end of the way, the edited model comes 85% of the way from the <dfn class="term" tabindex="0">control</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Control</span> <span class="gloss">A run trained the same way with no anchor.</span><span class="more"> The controls here are those of anneal-confirm, at the same seeds.</span></span> to <code>sans-diff</code> on <code>difference</code> contexts (E3).</p>
+<!-- REVIEW: the claim on the other ops is backed by `OTHER_O` (claims review), the edited model under the full edit beside `sans-diff` on other-op contexts. -->
+
+<p>This holds for one op, at one model size, with 400 epochs of training.</p>
+<h2 id="references">References<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#references" title="Link to this heading">&para;</a></h2>
+<dl>
+<dt><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/anneal-confirm/">anneal-confirm</a></dt>
+<dd>Trained the 400-epoch control, with no anchor, at seeds 712 to 719, beside the annealed recipe, and stored the dose scoring of both.</dd>
+<dt><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/edit-effects/">edit-effects</a></dt>
+<dd>On the <code>falloff</code> recipe the full edit lands about half of the way to the target null; the distance left is about 2.4 times the distance from the clean model to the Bayes predictor, nearly all of it in how the mass is shared among the other ops context by context.</dd>
+<dt><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/ex-2.2.22/">ex-2.2.22</a></dt>
+<dd>Confusion matrices of the clean and edited models against the target null, by how sure the context is about its op; pooled over contexts, they make the edited model look closer to the target null than the distance taken context by context.</dd>
+<dt><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/fixed-confirm/">fixed-confirm</a></dt>
+<dd><code>τ_ℓ fixed</code> kept the anchor on all eight fresh seeds, 712 to 719, and stayed within the spill criterion; it became the recipe of record.</dd>
+<dt><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/rotated-basis/">rotated-basis</a></dt>
+<dd>Adam puts nearly half of the energy of the residual stream on one coordinate axis per seed; in a randomly rotated basis the anchor still holds on all eight seeds, and the energy moves to the rotated axes.</dd>
+</dl>
+<h2 id="glossary">Glossary<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#glossary" title="Link to this heading">&para;</a></h2>
+<dl>
+<dt>Anchor</dt>
+<dd>The training term that pulls the states holding <code>difference</code> toward a fixed direction of the residual stream, e₁, so that the op can later be removed there.</dd>
+<dt>Control</dt>
+<dd>A run trained the same way with no anchor. The controls here are those of anneal-confirm, at the same seeds.</dd>
+<dt><code>τ_ℓ fixed</code></dt>
+<dt>Recipe of record</dt>
+<dd>The anchored recipe that holds the slice temperature τ_ℓ fixed through training; fixed-confirm made it the recipe of record.</dd>
+<dt>Full edit</dt>
+<dt>The edit</dt>
+<dt>Edited model</dt>
+<dd>Removing the component of every state along e₁, at every slice and position, and rescaling each state back onto the sphere. It is meant to take <code>difference</code> out and leave the other ops as they were; the edited model is the anchored model under it.</dd>
+<dt>Clean pass</dt>
+<dd>The forward pass with no edit.</dd>
+<dt>Posterior over ops</dt>
+<dt>Posterior on <code>difference</code></dt>
+<dd>How likely each op is, given the examples of a context. The posterior on <code>difference</code> is the probability it gives that op, so it says how much a context looks like <code>difference</code>.</dd>
+</dl>
+<div class="footnote all-sidenoted">
+<hr />
+<ol>
+<li class="sidenoted" id="fn:cube" value="1">
+<p>Cube noise included: the posterior of record models it as a term of its own.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/filtered-corpus/#fnref:cube" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>

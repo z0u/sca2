@@ -1,0 +1,1667 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/a316a13eee0dcb6f06af8d24bf3f3cec0fb6c8c7/exports/m2/spill-timing/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>When the spill appears</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The base sheet: what a woven report page and the site's Markdown pages share —
+ * tokens, type, code, tables, images, quotes, heading anchors. It reaches a page three
+ * ways: mini.lit.page inlines it ahead of lit.css (the report frame); scripts/build_site.py
+ * concatenates it ahead of scripts/md-prose.css and scripts/md.css into the md.css the
+ * site serves; and VS Code's Markdown preview lists them all (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and site-only rules live in those two sheets. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The faces, loaded by the one Google Fonts <link> every page shares
+   * (mini.lit.page.FONTS). Inline SVG figures read --font-mono too (src/subline). */
+  --font-sans: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", serif;
+  --font-mono:
+    "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* Prose lands at ~14.4px (a 90% base), the size the reports settled on. */
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  /* Lora at the regular weight rather than the browser-default bold, with ligatures
+   * on — otherwise the variable font shows its 700 master. */
+  font-weight: 400;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+  /* Keep a short label like "(H1)" from wrapping onto a line of its own. `pretty` does this best; browsers without
+     it (Firefox, for now) drop that line and keep `balance`. */
+  text-wrap-style: balance;
+  text-wrap-style: pretty;
+}
+h1 {
+  margin-top: 0;
+  font-size: 2.25em;
+}
+h2 {
+  margin-top: 4em;
+}
+p {
+  margin-block: 1em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background-color: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* Anchor links on headings. */
+a.anchor-link {
+  opacity: 0;
+  color: var(--fg-muted);
+  transition: opacity 0.2s ease;
+}
+a.anchor-link::after {
+  content: "#";
+  font-size: 0.8em;
+  margin-inline: 0.4em;
+}
+:hover > a.anchor-link {
+  opacity: 1;
+}
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. Top-aligned: a row
+ * whose prose cell wraps to four lines would otherwise leave its short cells floating
+ * in the middle. */
+table {
+  border-collapse: collapse;
+  margin-block: 1.5em;
+  margin-inline: auto;
+}
+th,
+td {
+  padding: 0.35em 0.8em;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+}
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--rule);
+}
+thead > tr:last-child > :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5em;
+}
+tbody > tr:first-child > :is(th, td) {
+  padding-top: 0.5em;
+}
+tbody > tr:last-child > :is(th, td) {
+  border-bottom: 2px solid var(--rule);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
+ *
+ * Where the rest of the CSS lives, and how each reaches a page:
+ *   base.css (beside this)     shared with the site's Markdown pages; mini.lit.page inlines
+ *                              base + this + the Pygments styles into every page it renders
+ *   docs/report.css            report polish and the print block; inlined after this at
+ *                              render, export and site build (mini.reports.set_report_styles),
+ *                              so an edit there reaches published reports without a re-export
+ *   scripts/md-prose.css       a Markdown page's prose: on the site (below), and inlined
+ *                              after report.css when the page is printed
+ *   scripts/md.css             the site's Markdown pages only (base + md-prose + md,
+ *                              concatenated by scripts/build_site.py; VS Code's preview
+ *                              reads all three files)
+ *   mini/chips.css             the nav and provenance chips the site build injects
+ *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
+ *   subline/theme.css          inside each subline SVG, reading this page's tokens
+ */
+
+:root {
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 40rem;
+  --gutter: 1.5rem;
+  --subfigure-gap: 1.5rem;
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+/* Border-box, so a block with padding (a list's bullet indent, a blockquote, a code
+ * block) shares its right edge with the paragraphs, and so do the notes floated off it. */
+main.lit > * {
+  box-sizing: border-box;
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+  margin-block: 3rem;
+}
+/* Display math the same way: KaTeX centres it in its box, so an equation wider than the
+ * measure would start at the column's left edge and overhang to the right. */
+main.lit > div.arithmatex {
+  max-width: none;
+}
+
+/* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure {
+  margin-inline: 0; text-align: center;
+}
+figure img {
+  margin-inline: auto; display: block;
+}
+figure:has(> figure) {
+  display: flex;
+  flex-wrap: wrap;  /* for a browser without `balance` */
+  flex-wrap: balance;
+  justify-content: center;
+  gap: var(--subfigure-gap) 0.5rem;
+}
+figure:has(> figure) > figure {
+  margin: 0;
+}
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+/* The main caption of a sub-figure group is a flex item: a full row of its own (a
+ * `max-width` would cap the basis and let a sub-figure share the row, so the measure is
+ * padding here), and the row gap above it comes off, so it sits under the figures as
+ * any caption does. */
+figure:has(> figure) > figcaption {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  padding-inline: max(0px, calc((100% - var(--measure)) / 2));
+  margin-top: calc(0.6em - var(--subfigure-gap));
+}
+/* A caption rendered from Markdown arrives in a <p>; its margins would pad the caption. */
+figcaption > :is(:first-child, :last-child) {
+  margin-block: 0;
+}
+
+/* A themed figure (mini.vis.figures.themed) carries both renders of the plot, and the
+ * page shows one: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. The print rules in docs/report.css pin the
+ * light one. */
+.mini-themed-figure .mini-themed-img-dark { display: none; }
+.mini-themed-figure .mini-themed-img-light { display: block; }
+body[data-theme="dark"] .mini-themed-figure,
+body.dark .mini-themed-figure,
+body.dark-theme .mini-themed-figure {
+  .mini-themed-img-dark { display: block; }
+  .mini-themed-img-light { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .mini-themed-figure {
+    .mini-themed-img-dark { display: block; }
+    .mini-themed-img-light { display: none; }
+  }
+}
+
+/* Admonitions (pymdownx blocks) and details. Their side padding is --column-inset, so
+ * a margin note inside one can reach past it to the column's edge (Notes, below). */
+.admonition, details {
+  --column-inset: 1em;
+  margin-block: 1.5em;
+  padding: 0.6em var(--column-inset);
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :first-child { margin-top: 0; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Notes (mini.lit.notes): a footnote's text beside its marker, and a glossary term's
+ * definition at its first use in a section. Where a note shows depends on the room:
+ *   narrow screen   hidden until its marker is hovered or focused (tapped), then a box
+ *                   under the line, across the column; the footnote list stays too
+ *   wide screen     in the right margin, beside the line that cites it; the list keeps
+ *                   only what has no margin note
+ *   paper           in the margin as well, with the page geometry in docs/report.css
+ * Margin notes are right floats, each clearing the one before (`clear: right`), so a
+ * note that would overlap the one above slides down instead. A note in a table cell, a
+ * caption or a heading (`.popover`) cannot float out of its box, so it stays a hover
+ * box everywhere, and its footnote stays in the list. */
+/* How far a block's content sits in from the text column's right edge. Registered as a
+ * length so that `1em` resolves on the padded block, and not in the note's smaller type. */
+@property --column-inset {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+:root {
+  --note-width: 14rem;
+  --note-gap: 1.5rem;
+}
+main.lit { position: relative; }  /* what a hover box spans */
+sup.fnref > a { text-decoration: none; }
+dfn.term {
+  font-style: inherit;
+  text-decoration: underline dotted color-mix(in srgb, var(--fg) 45%, transparent);
+  text-underline-offset: 0.2em;
+  cursor: help;
+}
+.sidenote {
+  display: none;
+  position: absolute;
+  left: var(--gutter);
+  right: var(--gutter);
+  z-index: 10;
+  max-width: var(--measure);
+  margin-top: 0.3em;
+  margin-inline: auto;
+  padding: 0.5em 0.8em;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1.45;
+  text-align: left;
+  text-indent: 0;
+  color: var(--fg);
+}
+:is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote,
+.sidenote:is(:hover, :focus) {
+  display: block;
+}
+.sidenote-number { font-weight: 700; }
+.glossnote-term { font-weight: 700; }
+.glossnote-term::after { content: "."; }
+.sidenote .more > .sidenote-p { display: block; margin-top: 0.4em; }
+
+/* A note in the margin, on a wide screen (below) or on paper, is only its gloss until it
+ * opens, with an ellipsis that takes no width, so it never wraps onto a line of its own. */
+@media print, screen and (min-width: 74rem) {
+  .sidenote:not(.popover) {
+    & .more, & .lead-colon { display: none; }
+    &:has(> .more) > .gloss::after {
+      content: "…";
+      display: inline-block;
+      width: 0;
+      white-space: nowrap;
+    }
+  }
+}
+
+/* Wide enough for the centred column plus a note strip on each side:
+ * 40rem measure + 2 × (14rem note + 1.5rem gap) + 2 × 1.5rem gutter = 74rem. */
+@media screen and (min-width: 74rem) {
+  /* Figures and tables start below any note still running beside the text above them. */
+  main.lit > :is(figure, table, h2, hr, .footnote) { clear: right; }
+  .sidenote:not(.popover) {
+    display: block;
+    position: relative;
+    z-index: auto;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    max-width: none;
+    margin: 0.3em calc(-1 * (var(--note-width) + var(--note-gap) + var(--column-inset))) 0.8em 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+    font-size: 0.78rem;
+    color: var(--fg-muted);
+    text-align: justify;
+    hyphens: auto;
+    /* Only the gloss (mini.lit.notes) until the note or its marker is hovered, or
+     * focused: a click on either keeps it open. The rest then opens in a box over the
+     * notes below, so the float keeps its size and nothing else moves. */
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    & .more {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      padding-bottom: 0.4em;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+  }
+  :is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote:not(.popover),
+  .sidenote:not(.popover):is(:hover, :focus, :focus-within) {
+    opacity: 1;
+    z-index: 5;  /* over the notes below, which are positioned too */
+    & .more { display: block; }
+    & .lead-colon { display: inline; }
+    & > .gloss::after { content: none; }
+  }
+  .sidenote:focus { outline: none; }
+  .footnote li.sidenoted,
+  .footnote.all-sidenoted {
+    display: none;
+  }
+}
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+/* Print: only what the frame needs on its own. The page size, type and page breaks
+ * are docs/report.css's print block, which every rendered report carries. */
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+  /* Paper cannot hover, so a note shows only where a stylesheet gives it a margin
+   * (docs/report.css does); otherwise the footnote list carries them all. */
+  .sidenote { display: none; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body, {delimiters: [{left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true}]})"></script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+  &.decided {
+    color: #2b6cb0;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+    /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
+     * margins, where Chromium stops painting. A note stops --note-edge short of that,
+     * clear of the change bars and stamp of a review print, and overlaps the text by
+     * the rest. */
+    --note-width: 22mm;
+    --note-gap: 2mm;
+    --note-edge: 2mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
+   * text, in type small enough to leave the text alone (zoom in to read it). Floats that
+   * clear each other stack, so a note never overlaps the one before it; it slides down.
+   * A note is only its gloss here (mini.lit's sheet), so the footnote list keeps the whole
+   * of each note, and a report's own glossary the whole of each definition. */
+  main.lit > :is(figure, table, h2, hr, .footnote) {
+    clear: right;
+  }
+  main.lit .sidenote:not(.popover) {
+    display: block;
+    position: static;
+    max-width: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    margin-block: 0.4em;
+    margin-left: var(--note-gap);
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-edge), var(--note-width) + var(--note-gap)) - var(--column-inset));
+    font-family: var(--font-sans);
+    font-size: 6pt;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1.3;
+    text-indent: 0;
+    color: inherit;
+    text-align: left;  /* a narrow justified line opens wide gaps between words */
+    hyphens: auto;
+  }
+  .sidenote-number,
+  .glossnote-term {
+    font-weight: 700;
+  }
+  /* A term with its definition beside it needs no underline on paper. */
+  dfn.term {
+    text-decoration: none;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+  &.decided {
+    color: #2b6cb0;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+    /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
+     * margins, where Chromium stops painting. A note stops --note-edge short of that,
+     * clear of the change bars and stamp of a review print, and overlaps the text by
+     * the rest. */
+    --note-width: 22mm;
+    --note-gap: 2mm;
+    --note-edge: 2mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
+   * text, in type small enough to leave the text alone (zoom in to read it). Floats that
+   * clear each other stack, so a note never overlaps the one before it; it slides down.
+   * A note is only its gloss here (mini.lit's sheet), so the footnote list keeps the whole
+   * of each note, and a report's own glossary the whole of each definition. */
+  main.lit > :is(figure, table, h2, hr, .footnote) {
+    clear: right;
+  }
+  main.lit .sidenote:not(.popover) {
+    display: block;
+    position: static;
+    max-width: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    margin-block: 0.4em;
+    margin-left: var(--note-gap);
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-edge), var(--note-width) + var(--note-gap)) - var(--column-inset));
+    font-family: var(--font-sans);
+    font-size: 6pt;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1.3;
+    text-indent: 0;
+    color: inherit;
+    text-align: left;  /* a narrow justified line opens wide gaps between words */
+    hyphens: auto;
+  }
+  .sidenote-number,
+  .glossnote-term {
+    font-weight: 700;
+  }
+  /* A term with its note beside it keeps its faint dotted underline (lit.css), and a link
+   * in one, or one naming another experiment, takes no link underline of its own, so it
+   * does not read as a plain link. */
+  main.lit :is(dfn.term a, a:has(cite)):not(.footnote-backref) {
+    text-decoration: none;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/pr-preview/pr-318/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/spill-timing/report.py">Source</a><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>ex-2.2.23</strong> · <code>7de7e82</code> · run 2026-10-07<div>via reports/m2/ex-2.2.23/trajectories</div></div><div><strong>loss-rate</strong> · <code>9a37845-dirty</code> (dirty) · run 2026-10-21<div>via reports/m2/loss-rate/dose</div></div><div><strong>soft-pool</strong> · <code>434a7a7</code> · run 2026-10-20<div>via reports/m2/soft-pool/dose, reports/m2/soft-pool/trajectories</div></div><div><strong>spill-timing</strong> · <code>bb3dc2d</code> · run 2026-10-23<div>via reports/m2/spill-timing/dose, reports/m2/spill-timing/stored-checkpoints, reports/m2/spill-timing/trajectories</div></div><div><strong>split-anti-seeds</strong> · <code>87826ef</code> · run 2026-10-13<div>via reports/m2/split-anti-seeds/dose, reports/m2/split-anti-seeds/trajectories</div></div></details>
+<main class="lit">
+<h1 id="when-the-spill-appears">When the spill appears<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/#when-the-spill-appears" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- lede -->
+<p>We trained <code>pool 1–3, soft τ</code> again at its eight seeds and applied the edit every four epochs along training, to see when its <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The side effect of an edit on the other ops<span class="lead-colon">:</span></span><span class="more"> the largest drop in the score of any op other than the one removed, net of what the same edit does to a control trained without the anchor. The selectivity criterion of D2.2 allows at most 0.02 at any dose.</span></span> onto other ops appears. On three of the four seeds that end over the spill criterion it appears early in training, and on the fourth only late, on an op that run learned late. A color probe on the other ops showed nothing that tracks it.</p>
+</div>
+<p><code>pool 1–3, soft τ</code> from <a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/soft-pool/">soft-pool</a> kept the anchor on all eight of its seeds, but only four of its edits stayed within the spill criterion. A cheap early test for spill would let it, or arms tuned from it, run at many seeds, as <a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/loss-rate/">the loss-rate screen</a> did for losing the anchor. But nothing in the stored trajectories up to epoch 64 predicted the end spill. The stored runs keep only their end checkpoints, so we couldn't tell when the spill appears.</p>
+<p>So we trained the condition again at its seeds (704 to 711), with three measurements at every record:<sup class="fnref" id="fnref:record"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/#fn:record">1</a></sup><span class="sidenote" role="note" tabindex="-1"><span class="sidenote-number">1</span> <span class="gloss">Record<span class="lead-colon">:</span></span><span class="more"> a point along training where the measurements are taken, every four epochs.</span></span> the edit itself, a reference edit along another direction as its baseline, and a probe for the colors at the other ops. The reference edit replaces the control as the baseline, since there is no control trajectory to net against. We also scored the edit and the reference edit on the controls, and on the epoch-64 checkpoints the loss-rate screen left.</p>
+<h2 id="observations">Observations<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/#observations" title="Link to this heading">&para;</a></h2>
+<ul>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/#the-reference-edit-beside-the-control-e1">The reference edit beside the control (E1)</a>: the reruns match the stored runs. At the end of training, netting the edit against the reference edit sorts the eight seeds much as netting it against the control does. On the controls themselves, the e₁ edit costs some ops a few hundredths more than the reference edit does and others less, so the control adds a seed-to-seed term of its own. An edit at epoch 64 on two low-spill conditions finds no <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The side effect of an edit on the other ops<span class="lead-colon">:</span></span><span class="more"> the largest drop in the score of any op other than the one removed, net of what the same edit does to a control trained without the anchor. The selectivity criterion of D2.2 allows at most 0.02 at any dose.</span></span> that isn't there at the end, but misses some that is.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/#spill-along-training-e2">Spill along training (E2)</a>: spill appears in two ways. On three seeds it appears during the rise, as the pool sharpens and the anchor weight reaches its plateau. On 711 it stays to the end, on 707 it settles near the criterion, and on 708 it falls back under it. These three also swing the most from record to record while it lasts. On two seeds it grows after epoch 100, on <code>value-hsv</code>. Around epoch 64 the seeds sort roughly as they do at the end, apart from the late kind; the full order settles at about epoch 180.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/#the-late-kind-and-learning-value-hsv-e3">The late kind and learning <code>value-hsv</code> (E3)</a>: the late kind appears on two of the seeds that learn <code>value-hsv</code> last, while they learn it. On the seeds that learn it early, the edit costs <code>value-hsv</code> less than a reference edit does. The two quiet conditions learn it as late on some seeds and spill little on it.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/#color-on-e1-at-the-other-ops-e4">Color on e₁ at the other ops (E4)</a>: e₁ holds almost no color information at the other ops, from about epoch 30 on, on every seed, and removing it barely changes how well the color can be read from the rest of the state. The fit from the whole state doesn't follow the spill either.</li>
+</ul>
+<h2 id="scope-and-method">Scope and method<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/#scope-and-method" title="Link to this heading">&para;</a></h2>
+<p>This is an exploratory study, with no preregistration and no gate. It covers one condition, <code>pool 1–3, soft τ</code>, at eight seeds, trained exactly as in soft-pool. That condition pools the pull over slices 1 to 3, and its position and slice pool temperatures sharpen from soft to sharp over the 40-epoch warm-up. Training is deterministic, and the reruns reproduce the stored runs: the end <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The side effect of an edit on the other ops<span class="lead-colon">:</span></span><span class="more"> the largest drop in the score of any op other than the one removed, net of what the same edit does to a control trained without the anchor. The selectivity criterion of D2.2 allows at most 0.02 at any dose.</span></span> matches to the last digit on every seed (largest difference 0).</p>
+<p>Eight seeds is few for correlations: a rank correlation of 0.6 over eight seeds comes up by chance about one time in ten. The seeds also split unevenly. One seed (711) spills far more than the rest, and the other three over the criterion are only just over it. We looked at several measurements, windows and slices after the runs came in, so we take a single strong correlation here as a lead only.</p>
+<p>The criterion of 0.02 is a convention, carried over from ex-2.2.16, rather than a line the models draw themselves. On runs of conditions that don't spill, the score scatters by about 0.006 (one standard deviation, over 27 stored runs of such conditions), so the criterion sits about three of those above a quiet run. The seeds close to it (705, 708 and 710) could land on either side of a slightly different criterion or score.</p>
+<p>The epoch-64 checkpoints are those of <code>falloff</code> and <code>step, soft τ</code> from the loss-rate screen, 68 in all, and these two conditions spill little. Eleven of the checkpoints belong to runs trained to the end, so their end spill is known, and three of those eleven end at or over the criterion. So the checkpoints can show whether an early edit finds spill that isn't there at the end, and whether it misses spill that is.</p>
+<h3 id="the-measurements">The measurements<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/#the-measurements" title="Link to this heading">&para;</a></h3>
+<ul>
+<li>Spill, net of control (at the end, as earlier reports score it): the largest drop on another op under the edit, less the drop on that op under the same edit on the control at the same seed, taken over the four doses. The edit projects e₁ out at every position and slice. A run is within the criterion when its spill is at most 0.02. E1 shows that this score carries a seed-to-seed term from the control, since e₁ isn't a typical direction on an unanchored model either, so it is less reliable than it looked.</li>
+<li>Spill, net of reference (along training): the largest drop on another op under the full edit, less the median drop on that op under eight reference edits. Each reference edit projects out one other basis direction (e₂, e₃, …), chosen at random, and the same eight are used throughout. We use the median because on some seeds one of the eight directions costs every op far more than the rest: Adam gives the residual stream a privileged basis, with the separator tokens on one coordinate that holds about half the stream's energy and <code>=</code> on another, and our draw includes the separator coordinate of three seeds (704, 705 and 708). A label-free rule for later experiments is to draw the reference axes from outside the stream's highest-energy coordinates. Each drop is measured in <dfn class="term" tabindex="0">expected exact match</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Expected exact match</span> <span class="gloss">The task score, as the chance that a drawn answer agrees with a true one.</span><span class="more"> With drawn answers, the correct answer to a line is spread over two or more colors, so we take the chance that an answer drawn from the model agrees with one drawn from the true distribution. Its ceiling is that same chance for the true distribution against itself (Σq²), below 1 on the ops that round.</span></span> over the whole held-out set, so the noise from the choice of contexts is small (a standard error of about 0.002 per op).</li>
+<li>Smoothed spill and change per record (along training): the spill net of reference, smoothed with a Gaussian over about 8 epochs either side; and the size of its change from one record to the next, smoothed the same way, which measures how much it swings.</li>
+<li>When an op is learned: the first epoch at which its task score (without any edit) reaches half its final value. The ops are learned in jumps, and this marks the middle of the jump.</li>
+<li>The probe: a ridge regression (a linear fit with a small penalty on the weights) from the state at a position to the RGB of the color there. It is fitted on half of the held-out contexts and scored on the other half as <span class="arithmatex">\(R^2\)</span> (the share of the variance of the color it predicts). It is fitted at every color position of slices 2 to 4, on the contexts of the other ops and on <code>difference</code> contexts. Each fit uses one of three versions of the state: the whole state, the state without its e₁ coordinate, or the e₁ coordinate alone.</li>
+</ul>
+<h2 id="the-reference-edit-beside-the-control-e1">The reference edit beside the control (E1)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/#the-reference-edit-beside-the-control-e1" title="Link to this heading">&para;</a></h2>
+<p>Can the reference edit stand in for the control as the baseline the <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The side effect of an edit on the other ops<span class="lead-colon">:</span></span><span class="more"> the largest drop in the score of any op other than the one removed, net of what the same edit does to a control trained without the anchor. The selectivity criterion of D2.2 allows at most 0.02 at any dose.</span></span> is netted against? At the end of training we have both, so the figure (left) and the table compare them on the eight reruns. We also apply the edit and the reference edit to the controls and to the epoch-64 checkpoints, where the edit should have little to act on (right).</p>
+<p>We first tried a random direction orthogonal to e₁ as the reference edit, as planned. On a control it cost every op far more than the e₁ edit does, so a random direction is no baseline for e₁. A single other basis direction behaves much more like e₁ on a control, though, so we used eight of those as the reference edits. The gap comes from the few high-energy coordinates: a random direction touches all of them, and a random direction kept off them costs about what an ordinary axis does.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/spill-timing-reference-light.png" alt="Left: eight points, the reference-netted spill against the control-netted spill at the end of training, lying close to the diagonal and a little below it; seed 711 sits far up and right of the rest. Right: three columns of dots. The controls spread from about zero to 0.05. The epoch-64 checkpoints of falloff and step, soft τ sit mostly just below zero, with one step, soft τ dot just over the criterion." width="644" height="300" style="max-width: 100%; height: auto;" data-asset-name="spill-timing-reference" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/spill-timing-reference-dark.png" alt="Left: eight points, the reference-netted spill against the control-netted spill at the end of training, lying close to the diagonal and a little below it; seed 711 sits far up and right of the rest. Right: three columns of dots. The controls spread from about zero to 0.05. The epoch-64 checkpoints of falloff and step, soft τ sit mostly just below zero, with one step, soft τ dot just over the criterion." width="644" height="300" style="max-width: 100%; height: auto;" data-asset-name="spill-timing-reference" />
+<figcaption><p><strong>The reference edit beside the control.</strong> Left: one point per rerun at the end of training. Vertical: the spill
+at the full dose, netted against the median of the eight reference edits. Horizontal: the spill as earlier
+reports score it, netted against the control at the same seed. Red where the run ends over the
+criterion, blue where it ends within it. The dashed lines are the criterion, and the dotted line is
+equality. Right: the reference-netted spill of the e₁ edit on other models, one small mark each, with the
+mean as a large mark and the range as a gray bar: the controls of ex-2.2.23 at seeds 704 to
+711, and the checkpoints of the loss-rate screen at epoch 64.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>seed</th><th class=num>stored ↓</th><th class=num>rerun ↓</th><th class=num>op</th><th class=num>net of reference ↓</th><th class=num>op</th><th class=num>control, net of reference</th></tr></thead><tbody><tr><td>704</td><td class=num>0.004</td><td class=num>0.004</td><td class=num>value-hsv</td><td class=num>−0.012</td><td class=num>mix</td><td class=num>−0.001</td></tr><tr><td>705</td><td class=num>0.018</td><td class=num>0.018</td><td class=num>sat-hsv</td><td class=num>0.018</td><td class=num>value-hsv</td><td class=num>0.053</td></tr><tr><td>706</td><td class=num>−0.001</td><td class=num>−0.001</td><td class=num>lighten</td><td class=num>−0.006</td><td class=num>mix</td><td class=num>0.014</td></tr><tr><td>707</td><td class=num>0.028</td><td class=num>0.028</td><td class=num>darken</td><td class=num>0.025</td><td class=num>mix</td><td class=num>0.007</td></tr><tr><td>708</td><td class=num>0.025</td><td class=num>0.025</td><td class=num>value-hsv</td><td class=num>0.010</td><td class=num>mix</td><td class=num>0.031</td></tr><tr><td>709</td><td class=num>−0.003</td><td class=num>−0.003</td><td class=num>mix</td><td class=num>−0.009</td><td class=num>mix</td><td class=num>0.010</td></tr><tr><td>710</td><td class=num>0.027</td><td class=num>0.027</td><td class=num>value-hsv</td><td class=num>0.020</td><td class=num>value-hsv</td><td class=num>−0.002</td></tr><tr><td>711</td><td class=num>0.071</td><td class=num>0.071</td><td class=num>darken</td><td class=num>0.057</td><td class=num>darken</td><td class=num>0.025</td></tr></tbody></table><figcaption><p><strong>Spill at the end of training, by seed.</strong> Stored and rerun: the stored run of soft-pool and the rerun, each
+netted against the control at the same seed (the largest net drop on another op at any dose), then the op
+that drop falls on. Net of reference: the rerun netted against the median reference edit at the full dose, then its op.
+Last column: the e₁ edit on the control, netted against the median reference edit on that control. The criterion
+is 0.02.</p></figcaption></figure>
+
+<p>The two scores rank the eight seeds alike (rank correlation 0.90), though they often name different ops. The reference-netted score runs a little lower, so the criterion would need restating for it. The seeds over the criterion stay at or over it, apart from 708, which falls under it.</p>
+<p>On the controls, the e₁ edit costs some ops up to a few hundredths more than the reference edit does, and others as much less, differently on each seed (the table shows only the largest). So e₁ on an unanchored model isn't quite a typical direction, and netting against the control at the same seed adds that seed-to-seed term to the spill score. That may be part of why quiet runs scored as high as 0.018 in earlier reports.</p>
+<p>On the epoch-64 checkpoints of the two low-spill conditions, the edit costs the other ops a little less than the reference edit, as it should when the anti term keeps them off e₁. Only 1 of the 68 goes over the criterion, and on the eleven with a known end spill the early score stays below 0.01. So an early edit doesn't seem to invent spill. But it also misses the spill that three of the eleven end with (at or over the criterion). That is the late kind of spill from E2, seen here in two other conditions.</p>
+<h2 id="spill-along-training-e2">Spill along training (E2)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/#spill-along-training-e2" title="Link to this heading">&para;</a></h2>
+<p>When does the <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The side effect of an edit on the other ops<span class="lead-colon">:</span></span><span class="more"> the largest drop in the score of any op other than the one removed, net of what the same edit does to a control trained without the anchor. The selectivity criterion of D2.2 allows at most 0.02 at any dose.</span></span> appear, and from when does it sort the seeds as the end does? The figure shows the reference-netted spill smoothed over neighboring records, how much it swings from one record to the next, and how well each of the two sorts the seeds as the end does. The table gives the spill averaged over a few windows.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/spill-timing-track-light.png" alt="Top: smoothed spill per seed over raw ghosts. Red 707, 708 and 711 rise over the criterion between epochs 24 and 48; 708 falls back to about 0.01 by epoch 100, 707 settles near 0.025 and 711 dips to about 0.015 around epoch 160 before climbing to about 0.06. Red 710 and blue 705 rise to about 0.02 after epochs 150 and 120. Blue 704, 706 and 709 settle a little below zero. Second: the smoothed record-to-record change is largest, up to about 0.03, on 707, 708 and 711 during the rise, and small on every seed after epoch 200. Third: the rank correlation of the smoothed spill with the end hovers around 0.5 to 0.6 until about epoch 150 and stays above 0.9 from about epoch 190; that of the change swings between about 0.3 and 0.9. The strips show the warm-up ending by epoch 40 and the anti weight annealing slowly to near zero by the end." width="626" height="683" style="max-width: 100%; height: auto;" data-asset-name="spill-timing-track" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/spill-timing-track-dark.png" alt="Top: smoothed spill per seed over raw ghosts. Red 707, 708 and 711 rise over the criterion between epochs 24 and 48; 708 falls back to about 0.01 by epoch 100, 707 settles near 0.025 and 711 dips to about 0.015 around epoch 160 before climbing to about 0.06. Red 710 and blue 705 rise to about 0.02 after epochs 150 and 120. Blue 704, 706 and 709 settle a little below zero. Second: the smoothed record-to-record change is largest, up to about 0.03, on 707, 708 and 711 during the rise, and small on every seed after epoch 200. Third: the rank correlation of the smoothed spill with the end hovers around 0.5 to 0.6 until about epoch 150 and stays above 0.9 from about epoch 190; that of the change swings between about 0.3 and 0.9. The strips show the warm-up ending by epoch 40 and the anti weight annealing slowly to near zero by the end." width="626" height="683" style="max-width: 100%; height: auto;" data-asset-name="spill-timing-track" />
+<figcaption><p><strong>Spill along training, smoothed.</strong> Top: the largest drop on another op under the full edit, less the
+median drop under the eight reference edits, smoothed over about 8 epochs either side (a
+Gaussian), one line per seed, with the raw record (every four epochs) as a hairline: red for the seeds
+whose run ends over the criterion, blue for those within it. Second: the size of the change from one
+record to the next, smoothed the same way. Third: the rank correlation of each of the two with the end
+spill over the eight seeds, at every record. The dotted line marks where the loss-rate screen stopped.
+The strips underneath are the anchor weight <span class="arithmatex">\(\lambda_a\)</span>, the position pool temperature <span class="arithmatex">\(\tau_p\)</span> (log
+scale), and the anti weight at slice 3, <span class="arithmatex">\(\lambda_{\bar s}\)</span>.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>seed</th><th class=num>epochs 24–40</th><th class=num>epochs 48–80</th><th class=num>epochs 100–160</th><th class=num>epochs 200–240</th><th class=num>epochs 360–400</th><th class=num>end, net of control ↓</th><th class=num>op at 64</th><th class=num>op at 400</th></tr></thead><tbody><tr><td>704</td><td class=num>−0.005</td><td class=num>0.001</td><td class=num>−0.006</td><td class=num>−0.002</td><td class=num>−0.012</td><td class=num>0.004</td><td class=num>mix</td><td class=num>mix</td></tr><tr><td>705</td><td class=num>0.001</td><td class=num>0.004</td><td class=num>0.015</td><td class=num>0.015</td><td class=num>0.017</td><td class=num>0.018</td><td class=num>hue-hsv</td><td class=num>value-hsv</td></tr><tr><td>706</td><td class=num>0.000</td><td class=num>0.006</td><td class=num>−0.004</td><td class=num>−0.004</td><td class=num>−0.006</td><td class=num>−0.001</td><td class=num>darken</td><td class=num>mix</td></tr><tr><td>707</td><td class=num>0.001</td><td class=num>0.046</td><td class=num>0.033</td><td class=num>0.033</td><td class=num>0.025</td><td class=num>0.028</td><td class=num>hue-hsv</td><td class=num>mix</td></tr><tr><td>708</td><td class=num>0.012</td><td class=num>0.028</td><td class=num>0.003</td><td class=num>0.011</td><td class=num>0.010</td><td class=num>0.025</td><td class=num>darken</td><td class=num>mix</td></tr><tr><td>709</td><td class=num>−0.004</td><td class=num>−0.006</td><td class=num>0.001</td><td class=num>−0.006</td><td class=num>−0.009</td><td class=num>−0.003</td><td class=num>darken</td><td class=num>mix</td></tr><tr><td>710</td><td class=num>−0.009</td><td class=num>−0.011</td><td class=num>0.003</td><td class=num>0.026</td><td class=num>0.020</td><td class=num>0.027</td><td class=num>hue-hsv</td><td class=num>value-hsv</td></tr><tr><td>711</td><td class=num>0.041</td><td class=num>0.050</td><td class=num>0.022</td><td class=num>0.034</td><td class=num>0.060</td><td class=num>0.071</td><td class=num>darken</td><td class=num>darken</td></tr><tr><td>rank correlation with the end</td><td class=num>0.52</td><td class=num>0.57</td><td class=num>0.81</td><td class=num>0.98</td><td class=num>0.90</td><td class=num></td><td class=num></td><td class=num></td></tr><tr><td>correlation with the end</td><td class=num>0.84</td><td class=num>0.73</td><td class=num>0.67</td><td class=num>0.85</td><td class=num>0.98</td><td class=num></td><td class=num></td><td class=num></td></tr><tr><td>correlation, without 711</td><td class=num>0.30</td><td class=num>0.51</td><td class=num>0.64</td><td class=num>0.92</td><td class=num>0.93</td><td class=num></td><td class=num></td><td class=num></td></tr></tbody></table><figcaption><p><strong>Spill along training, by window.</strong> The reference-netted spill averaged over the records in each window, the
+spill at the end as earlier reports score it (net of the control), and the op the reference-netted spill falls
+on at epochs 64 and 400. The last three lines are the correlation of each window with the end spill
+over the eight seeds: by rank (Spearman), by value (Pearson), and by value over the seven seeds other than
+711, which spills far more than the rest.</p></figcaption></figure>
+
+<p>Spill appears in two ways. The early kind rises on seeds 708 and 711 between epochs 24 and 32, as the pool temperature reaches its sharp value and the anchor weight its plateau, and on 707 at about epoch 44, just after. It falls mostly on <code>darken</code> and <code>hue-hsv</code>, and it stays up past where the loss-rate screen stopped. After that the three seeds differ. On 711 it dips around epoch 160 and climbs again to the end, on <code>darken</code>. On 707 it moves to <code>mix</code> and settles near the criterion, and on 708 it falls back to about half.</p>
+<p>The late kind grows on seeds 705 and 710, from about epoch 120 and 150 respectively, on <code>value-hsv</code>, while the anti weight on slice 3 is partway through its slow anneal. It ends just under the criterion on 705 and just over it on 710. E3 looks at why these two seeds.</p>
+<p>The early kind is also the jumpy kind. During the rise (epochs 20 to 180) the spill of 707, 708 and 711 changes by 0.016 per record on average, against 0.006 on the other five seeds, including 705 and 710, whose late spill grows smoothly. After epoch 200 every seed settles (a standard deviation of about 0.003 after epoch 300). So the swings flag the same runs as the level of the early spill does, and nothing more.</p>
+<p>The seeds within the criterion settle a little below zero (704, 706 and 709, at about −0.01): there the edit costs every other op a little less than a typical other axis does. That is how a very clean anchor looks, with the other ops leaving e₁ alone while making some use of most other coordinates, though a score a little above zero is still within the criterion.</p>
+<p>Smoothing doesn't bring the order forward much. The smoothed spill sorts the seeds as the end does from about epoch 180 on (a rank correlation over 0.9), and before about epoch 130 its rank correlation hovers around 0.5 to 0.6. Averaged over epochs 48 to 80, 707, 708 and 711 are clearly up, 710 is lowest of all, and 705 is among the runs within the criterion. The window over epochs 100 to 160 does better by rank (0.81) because the late rise of 705 and 710 has begun by then, but its correlation by value is 0.67. The correlations by value lean on 711 early on: without it, the window over epochs 24 to 40 correlates 0.30 with the end.</p>
+<p>So a screen at epoch 64 would catch the early kind of spill and miss the late kind. On these seeds it would catch three of the four runs over the criterion, though two of those three end near it.</p>
+<h2 id="the-late-kind-and-learning-value-hsv-e3">The late kind and learning <code>value-hsv</code> (E3)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/#the-late-kind-and-learning-value-hsv-e3" title="Link to this heading">&para;</a></h2>
+<p>Is the late kind tied to when the run learns <code>value-hsv</code>? Each op is learned in a jump, at a different time on each seed. The figure shows the <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The side effect of an edit on the other ops<span class="lead-colon">:</span></span><span class="more"> the largest drop in the score of any op other than the one removed, net of what the same edit does to a control trained without the anchor. The selectivity criterion of D2.2 allows at most 0.02 at any dose.</span></span> on <code>value-hsv</code> beside its task score.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/spill-timing-value-light.png" alt="Top: the smoothed spill on value-hsv per seed. Most seeds go below zero, to about −0.02 to −0.05, once value-hsv is learned; 705, 710 and, less, 708 go above zero instead, to about 0.02, 0.02 and 0.01. Middle: the task score on value-hsv jumps from about 0.15 to about 0.4 on every seed, at epochs from about 60 (711, 706) to about 130 (710), then creeps up to about 0.49. The seeds that learn it last are the ones whose spill on it goes above zero, apart from 709. Bottom: the anti weight at slice 3 annealing from about 0.24." width="626" height="434" style="max-width: 100%; height: auto;" data-asset-name="spill-timing-value" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/spill-timing-value-dark.png" alt="Top: the smoothed spill on value-hsv per seed. Most seeds go below zero, to about −0.02 to −0.05, once value-hsv is learned; 705, 710 and, less, 708 go above zero instead, to about 0.02, 0.02 and 0.01. Middle: the task score on value-hsv jumps from about 0.15 to about 0.4 on every seed, at epochs from about 60 (711, 706) to about 130 (710), then creeps up to about 0.49. The seeds that learn it last are the ones whose spill on it goes above zero, apart from 709. Bottom: the anti weight at slice 3 annealing from about 0.24." width="626" height="434" style="max-width: 100%; height: auto;" data-asset-name="spill-timing-value" />
+<figcaption><p><strong>Spill on <code>value-hsv</code> beside when it is learned.</strong> Top: the drop on <code>value-hsv</code> under the full edit,
+less the median drop under the reference edits, smoothed as in the figure above, one line per seed.
+Middle: the task score on <code>value-hsv</code> (expected exact match without any edit), with a mark where it
+first reaches half its final value. Bottom: the anti weight at slice 3, <span class="arithmatex">\(\lambda_{\bar s}\)</span>.</p></figcaption></figure>
+
+<p>The seeds learn <code>value-hsv</code> between about epoch 60 and 128. The two seeds with the late kind are among the last to learn it (705 at epoch 108, 710 at 128, the latest), and their spill on it grows while they learn it and then stays. 708, which learns it at 100, ends with a little spill on it too (0.008). On the seeds that learn it early, the edit costs <code>value-hsv</code> less than a reference edit does, by 0.015 to 0.05 at the end, so there <code>value-hsv</code> keeps further off e₁ than off a typical axis. Over the eight seeds, the later a seed learns <code>value-hsv</code>, the more the edit costs it at the end (rank correlation 0.71). 709 is the exception: it learns <code>value-hsv</code> late (epoch 116) and still keeps it off e₁.</p>
+<p>When an op is learned isn't fixed by the seed, though (table). The control also learns <code>value-hsv</code> at different times on different seeds, between epochs 48 and 144, but which seeds are late changes with the condition, and in this condition the order is unrelated to the control's. So the anchor and anti terms shift when the op is learned. The two quiet conditions learn it as late or later on some seeds, <code>step, soft τ</code> at 180 on 709 and <code>falloff</code> at 164 on 706, and spill little on it. Learning late doesn't put an op on e₁ by itself; in those conditions something keeps e₁ closed to it.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>condition</th><th class=num>704</th><th class=num>705</th><th class=num>706</th><th class=num>707</th><th class=num>708</th><th class=num>709</th><th class=num>710</th><th class=num>711</th><th class=num>rank corr. with the control</th><th class=num>spill on <code>value-hsv</code></th></tr></thead><tbody><tr><td>control</td><td class=num>96</td><td class=num>72</td><td class=num>136</td><td class=num>52</td><td class=num>48</td><td class=num>72</td><td class=num>144</td><td class=num>80</td><td class=num></td><td class=num></td></tr><tr><td><code>falloff</code></td><td class=num>100</td><td class=num>136</td><td class=num>164</td><td class=num>48</td><td class=num>84</td><td class=num>100</td><td class=num>112</td><td class=num>72</td><td class=num>0.58</td><td class=num>none</td></tr><tr><td><code>step, soft τ</code></td><td class=num>100</td><td class=num>160</td><td class=num>64</td><td class=num>92</td><td class=num>92</td><td class=num>180</td><td class=num>168</td><td class=num>88</td><td class=num>0.01</td><td class=num>704</td></tr><tr><td><code>pool 1–3, soft τ</code></td><td class=num>80</td><td class=num>108</td><td class=num>64</td><td class=num>76</td><td class=num>100</td><td class=num>116</td><td class=num>128</td><td class=num>60</td><td class=num>0.04</td><td class=num>708, 710</td></tr></tbody></table><figcaption><p><strong>When <code>value-hsv</code> is learned, by condition and seed.</strong> The first epoch at which the task score on
+<code>value-hsv</code> reaches half its final value. The control and the two quiet conditions are read from their
+stored trajectories, which score each op on a subset of the held-out contexts; <code>pool 1–3, soft τ</code> is
+read from the reruns. Rank corr. with the control: the rank correlation of the row with the control row
+over the eight seeds. Spill on <code>value-hsv</code>: the seeds whose largest drop on <code>value-hsv</code> at the end, net
+of the control at the same seed, is over 0.01. Net of the control, 705 drops out: the edit
+costs its control <code>value-hsv</code> too (E1).</p></figcaption></figure>
+
+<p>The early kind fits the same pattern loosely. Every seed learns <code>darken</code> by epoch 28, during the warm-up, and the early spill of 708 and 711 falls on it. On 707 the early spill falls on <code>hue-hsv</code>, which 707 learns at epoch 48, earlier than any other seed.</p>
+<p>So, as a lead: in this condition the spill lands on an op that is being learned at a time when e₁ is open to it, during the rise or later, and the quiet conditions keep e₁ closed to an op they learn as late. Within this condition, it doesn't say which way it runs. Learning <code>value-hsv</code> late may leave it free to land on e₁, or whatever draws it to e₁ may also slow its learning.</p>
+<h2 id="color-on-e₁-at-the-other-ops-e4">Color on e₁ at the other ops (E4)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/#color-on-e₁-at-the-other-ops-e4" title="Link to this heading">&para;</a></h2>
+<p>Does e₁ hold color information at the example answers of the other ops, which the edit would take away, and does that track the <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The side effect of an edit on the other ops<span class="lead-colon">:</span></span><span class="more"> the largest drop in the score of any op other than the one removed, net of what the same edit does to a control trained without the anchor. The selectivity criterion of D2.2 allows at most 0.02 at any dose.</span></span>? This is a geometric measurement that doesn't apply the edit. The figure shows the probe at the example answers, at slice 3.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/spill-timing-probe-light.png" alt="Left: from e₁ alone, R² on the other ops drops from near 0.1 to about 0.01 by epoch 30, red and blue seeds intermixed, while on difference (ghosted) it stays a little higher, about 0.02 to 0.05. Right: from the whole state, R² falls slowly from about 0.94 to 0.85 on most seeds, and further, to about 0.75 and 0.77, on 706 (blue, after about epoch 60) and 711 (red, from the start)." width="644" height="280" style="max-width: 100%; height: auto;" data-asset-name="spill-timing-probe" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/spill-timing-probe-dark.png" alt="Left: from e₁ alone, R² on the other ops drops from near 0.1 to about 0.01 by epoch 30, red and blue seeds intermixed, while on difference (ghosted) it stays a little higher, about 0.02 to 0.05. Right: from the whole state, R² falls slowly from about 0.94 to 0.85 on most seeds, and further, to about 0.75 and 0.77, on 706 (blue, after about epoch 60) and 711 (red, from the start)." width="644" height="280" style="max-width: 100%; height: auto;" data-asset-name="spill-timing-probe" />
+<figcaption><p><strong>The color probe at the example answers</strong>, slice 3: held-out <span class="arithmatex">\(R^2\)</span> of a ridge fit from the state to
+the RGB of the answer color, averaged over the three example answers. One line per seed, red for the
+seeds whose run ends over the criterion and blue for those within it. Left: from the e₁ coordinate
+alone, on the contexts of the other ops (solid) and on <code>difference</code> contexts (ghosted). Right: from
+the whole state, on the contexts of the other ops. The dotted line marks where the loss-rate screen
+stopped.</p></figcaption></figure>
+
+<p>Removing e₁ barely changes how well the color can be read from the state: the largest difference between the whole state and the state without e₁ is 0.016 in <span class="arithmatex">\(R^2\)</span>, at any position, slice or record, on the other ops and on <code>difference</code> alike. The color is spread over many coordinates, so one coordinate more or less makes little difference to a linear readout.</p>
+<p>On its own, e₁ holds little color at the example answers of the other ops. After the first few epochs its <span class="arithmatex">\(R^2\)</span> is about 0.01, with the seeds that spill and those that don't intermixed (rank correlation with the end spill −0.43 at epoch 64). On <code>difference</code> contexts it holds more, about 0.02, which is still little. What the anchor puts on e₁ there is the op, <code>difference</code>, rather than a color, so there is no reason for e₁ to carry much of the RGB.</p>
+<p>The whole-state fit on the other ops falls slowly over training, and on two seeds it falls further: from the start on 711, which spills most, and after about epoch 60 on 706, which doesn't spill. So the fit doesn't follow the spill (rank correlation −0.43 at epoch 64, −0.07 at the end).</p>
+<p>So the probe doesn't see the spill. The edit takes away e₁, but what the other ops lose may be how later blocks read e₁, rather than color information stored there.</p>
+<h2 id="discussion">Discussion<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/#discussion" title="Link to this heading">&para;</a></h2>
+<p>The edit <dfn class="term" tabindex="0">spills</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The side effect of an edit on the other ops<span class="lead-colon">:</span></span><span class="more"> the largest drop in the score of any op other than the one removed, net of what the same edit does to a control trained without the anchor. The selectivity criterion of D2.2 allows at most 0.02 at any dose.</span></span> in two ways in this condition. The early kind appears during the rise, when the pool is still sharpening and the anchor weight reaches its plateau. That fits the reading of soft-pool that the soft pool lifts the other ops toward e₁ at that time. The late kind appears on <code>value-hsv</code> on two of the seeds that learn it last, while they learn it, as the anti term is partway through its slow anneal (E3). On 705 it starts while the anti weight is still near 0.2, so the anneal may matter less than when the op is learned. Both kinds land on an op that is being learned at the time. Neither reading is tested here; each would need an arm that changes the schedule at that time.</p>
+<p>A screen that edits a checkpoint around epoch 64 would see only the early kind (E2). On these seeds the late kind was the smaller, but it put one run over the criterion and another just under it, so such a screen would undercount. A screen late enough to see both, around epoch 200, would cost half a full run.</p>
+<p>Pooled over seeds, epoch 64 does tell the three conditions apart (table). <code>pool 1–3, soft τ</code> averages 0.014 at epoch 64, and half its runs end over the criterion. <code>falloff</code> and <code>step, soft τ</code> average about −0.005, and few of their runs end over it. So a condition whose runs often spill early shows it in the mean at epoch 64, even when a single run is noisy. But the mean can't see the late kind, and the two quiet conditions look alike at epoch 64 though they differ a little at the end. With three conditions this is a hint only: a pooled early score could rank arms by their early kind of spill, with a later check still needed for the late kind. The swings during the rise could serve the same way, since they mark the same runs.</p>
+<p>Is that enough to stop a condition early? As a rule for dropping a condition whose runs spill early, it may be. Scoring a record costs about 1% of training, and the runs of a condition that passes simply carry on, so the screen costs almost nothing, and each condition it stops saves the remaining five-sixths of its runs. It can't stop a condition for the late kind, so a condition that passes still needs its full runs before it is adopted. It pays when many arms are screened and a fair share of them spill early. With few arms, or arms that spill late, it saves little.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>condition</th><th class=num>runs at 64</th><th class=num>mean spill at 64</th><th class=num>over at 64</th><th class=num>runs at 400</th><th class=num>over at 400</th></tr></thead><tbody><tr><td><code>pool 1–3, soft τ</code></td><td class=num>8</td><td class=num>0.014</td><td class=num>3</td><td class=num>8</td><td class=num>4</td></tr><tr><td><code>falloff</code></td><td class=num>34</td><td class=num>−0.005</td><td class=num>0</td><td class=num>12</td><td class=num>1</td></tr><tr><td><code>step, soft τ</code></td><td class=num>34</td><td class=num>−0.005</td><td class=num>1</td><td class=num>11</td><td class=num>2</td></tr></tbody></table><figcaption><p><strong>The three conditions at epoch 64 and at the end.</strong> Runs at 64: the reruns of this
+report, and the loss-rate screen's checkpoints. Mean spill at 64: the reference-netted spill at
+epoch 64 (a single record), averaged over the runs, and how many of them are over the criterion
+there. Runs at 400: those trained to the end, with their spill netted against the control as earlier
+reports score it, and how many end over the criterion (0.02).</p></figcaption></figure>
+
+<p>Netting against a reference edit works about as well as netting against a control at the end of training, and it needs no control run. The controls showed that e₁ isn't a neutral direction on an unanchored model either, so some of the noise in the earlier spill scores may come from the control rather than from the anchored run.</p>
+<div class="footnote all-sidenoted">
+<hr />
+<ol>
+<li class="sidenoted" id="fn:record" value="1">
+<p>Record: a point along training where the measurements are taken, every four epochs.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-318/m2/spill-timing/#fnref:record" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>
