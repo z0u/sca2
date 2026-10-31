@@ -154,7 +154,7 @@ def forward(model, idx, edit_slices: tuple[int, ...], pos_mask):
         out = op(x)
         return out if pos_mask is None else jnp.where(pos_mask[None, :, None] > 0, out, x)
 
-    x = model.embed(idx)
+    x = normalize(model.transformer.wte[idx])
     states = {"emb": x}
     if 0 in edit_slices:
         x = edit(x)
