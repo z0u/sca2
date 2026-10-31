@@ -301,6 +301,16 @@ class ModalMemoStore(MemoStore):
                 continue
         return "(no logs)"
 
+    def sysmetrics(self, key: str) -> list[dict[str, Any]]:
+        from mini._sysmetrics import read_rows
+
+        try:
+            return read_rows(
+                self._read_volume_bytes(f"_memo/{key}/{self.sysmetrics_path(key, self._gen(key)).name}").decode()
+            )
+        except FileNotFoundError, modal.exception.NotFoundError:
+            return []
+
     def result_artifacts(self, key: str) -> list[str] | None:
         gen = self._gen(key)
         name = f"result-{gen}.artifacts.json" if gen else "result.artifacts.json"

@@ -35,6 +35,7 @@ from typing import Any, Callable, Iterator, cast
 
 import cloudpickle
 
+from mini._sysmetrics import read_rows
 from mini.runs import SETTLED, RunState, _atomic_write, _merge_json
 
 __all__ = [
@@ -1024,6 +1025,15 @@ class MemoStore:
         The worker stamps this sidecar next to the result (see :func:`mini._taskworker.execute_task`), so the artifact GC can mark a result's references without unpickling it — no project imports, no arbitrary code, one small read per record however large the result.
         """
         return self.result_dir(key) / (f"result-{gen}.artifacts.json" if gen else "result.artifacts.json")
+
+    def sysmetrics_path(self, key: str, gen: str | None) -> Path:
+        """Where attempt *gen* of *key* appends its system-metric rows (GPU/CPU/RAM; see :mod:`mini._sysmetrics`)."""
+        return self.result_dir(key) / (f"sysmetrics-{gen}.jsonl" if gen else "sysmetrics.jsonl")
+
+    def sysmetrics(self, key: str) -> list[dict[str, Any]]:
+        """The current attempt's system-metric rows, oldest first; ``[]`` for an attempt that recorded none."""
+        p = self.sysmetrics_path(key, self._gen(key))
+        return read_rows(p.read_text()) if p.exists() else []
 
     def result_artifacts(self, key: str) -> list[str] | None:
         """Blob shas the current result references, or ``None`` for a record from before the sidecar existed (unpickle the result to find out)."""

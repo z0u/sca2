@@ -22,6 +22,7 @@ from itertools import count
 from math import isfinite
 
 from mini._queues import EndOfQueue
+from mini._sysmetrics import SystemSampler, interval_from_env
 from mini._watchdog import Watchdog, WatchdogStall
 from mini.memo import MemoStore
 from mini.progress import progress_context
@@ -154,6 +155,10 @@ class _MemoSink:
             "metrics_wrong_way": dict(self._wrong_way),
             "metric_goals": {k: g for k, g in resolved.items() if g},
         }
+
+    def step(self) -> int | None:
+        """The latest step emitted, for the system sampler to tag its rows with."""
+        return self._last[0] if self._last else None
 
     def get(self, /, block: bool = True, timeout: float | None = None) -> Any:
         del block, timeout
@@ -416,8 +421,17 @@ def execute_task(
         return  # superseded before we even started — nothing here is wanted anymore
     producer = _producer_stamp(experiment, store, key)
     resolved: dict[str, dict[str, Any] | None] = {}
+    # GPU/CPU/RAM samples for this attempt, beside its result (see mini._sysmetrics). Closed with
+    # the call, so the last row and summary land before the result is committed.
+    sys_s = interval_from_env()
+    sampler = (
+        SystemSampler(store.sysmetrics_path(key, gen), record, sys_s, step=sink.step)
+        if sys_s is not None
+        else nullcontext()
+    )
     try:
         with (
+            sampler,
             data_dir_context(store.data_dir),
             store_context(artifacts) if artifacts is not None else nullcontext(),
             producer_context(producer) if producer is not None else nullcontext(),
