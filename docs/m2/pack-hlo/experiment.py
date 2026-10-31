@@ -20,8 +20,11 @@ Everything is put to the store as one tree per task; the comparison happens on t
 Corpus preparation is the pack-timing probe's (a memo hit); the tasks run under the dev profile, and nothing here is
 read by a report.
 
-    MINI_PROFILE=dev bin/mini run docs/m2/pack-hlo/experiment.py --app modal --max-containers 4 --budget 1h
+    MINI_PROFILE=dev bin/mini run docs/m2/pack-hlo/experiment.py --app modal --max-containers 4 --budget 1h --keep-stale-done
     MINI_PROFILE=dev bin/mini results --full pack-hlo --app modal
+
+The second round (`L40S-off-small`) generalized `inspect_packs` to a list of programs, which changed the first
+round's memo evidence; those were kept with `--keep-stale-done`.
 """
 
 from __future__ import annotations
@@ -65,13 +68,15 @@ TIMED = 8
 PROFILED = 3
 """Dispatches inside the profiler trace."""
 WARMUP = 3
-VARIANTS: dict[str, tuple[str, dict[str, str]]] = {
-    "L40S-off": ("L40S", {"XLA_FLAGS": pt.NONDET_XLA_FLAGS}),
-    "L40S-on": ("L40S", {}),
+VARIANTS: dict[str, tuple[str, dict[str, str], tuple[int | str, ...]]] = {
+    "L40S-off": ("L40S", {"XLA_FLAGS": pt.NONDET_XLA_FLAGS}, ("plain", PACK)),
+    "L40S-on": ("L40S", {}, ("plain", PACK)),
+    "L40S-off-small": ("L40S", {"XLA_FLAGS": pt.NONDET_XLA_FLAGS}, ("plain", 2, 3, 4)),
 }
-"""Role name → (card, environment over the project baseline). `off` is the pack-timing fifth round's setting
-(determinism flags off, where the byte inflation was measured); `on` is the project's baseline, which training runs
-use today."""
+"""Role name → (card, environment over the project baseline, programs). `off` is the pack-timing fifth round's
+setting (determinism flags off, where the byte inflation was measured); `on` is the project's baseline, which
+training runs use today. The first round found that one seed's working set fits the L40S's 96 MB L2 cache and a
+pack of 8 does not; `small` asks whether packs of 2 to 4 still fit and pay."""
 
 
 def _trace_kernels(trace_dir) -> dict | None:
@@ -108,8 +113,8 @@ def _trace_kernels(trace_dir) -> dict | None:
     }
 
 
-def inspect_packs(corpus, labels, rows: list[dict], variant: str) -> dict:  # noqa: C901 — one setup, then one pass per program
-    """Compile, dump, time and profile the plain dispatch and a pack of `PACK`, in this container."""
+def inspect_packs(corpus, labels, rows: list[dict], variant: str, packs: tuple = ("plain", PACK)) -> dict:  # noqa: C901 — one setup, then one pass per program
+    """Compile, dump, time and profile each program in *packs* (`plain`, or a pack size), in this container."""
     import json
     import time
 
@@ -178,7 +183,7 @@ def inspect_packs(corpus, labels, rows: list[dict], variant: str) -> dict:  # no
         chunk = [next(gen) for _ in range(SCAN_STEPS)]
         return tuple(np.stack([b[f] for b in chunk]) for f in range(len(chunk[0])))
 
-    total = 2 * (WARMUP + TIMED + PROFILED)
+    total = len(packs) * (WARMUP + TIMED + PROFILED)
     done = 0
 
     def tick() -> None:
@@ -187,9 +192,9 @@ def inspect_packs(corpus, labels, rows: list[dict], variant: str) -> dict:  # no
         emit_progress(done, total)
 
     results = {}
-    for pack in ("plain", PACK):
+    for pack in packs:
         name = str(pack)
-        seeds = list(SEEDS[:1] if pack == "plain" else SEEDS)
+        seeds = list(SEEDS[: 1 if pack == "plain" else int(pack)])
         if pack == "plain":
             model = build_model(config.model, key=jr.key(seeds[0]))
             opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
@@ -296,9 +301,11 @@ def main(ctx: Ctx) -> dict:
     )
     rows = fc.rows_of(prep["meta"], SEEDS, None)
     done, waiting = {}, []
-    for variant in VARIANTS:
+    for variant, (_, _, packs) in VARIANTS.items():
+        # The first round's two variants ran before *packs* was an argument; their keys stay as they were.
+        extra = () if packs == ("plain", PACK) else (packs,)
         try:
-            done[variant] = ctx.run(inspect_packs, prep["corpus"], prep["labels"], rows, variant, role=variant)
+            done[variant] = ctx.run(inspect_packs, prep["corpus"], prep["labels"], rows, variant, *extra, role=variant)
         except Pending as p:
             waiting.append(p)
     if waiting:
@@ -309,7 +316,7 @@ def main(ctx: Ctx) -> dict:
 COMPUTE: dict[str, Any] = {"prep": pt.COMPUTE["prep"]} | {
     # Two compiles of 10 to 60 seconds, then a few dozen dispatches.
     variant: dict(gpu=card, env=env, timeout=1800, watchdog=600, watchdog_grace=900)
-    for variant, (card, env) in VARIANTS.items()
+    for variant, (card, env, _) in VARIANTS.items()
 }
 
 experiment = Experiment(name="pack-hlo", main=main, roles=COMPUTE)
