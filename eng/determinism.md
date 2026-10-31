@@ -43,20 +43,41 @@ Determinism makes a run repeatable. It does not make a seed mean the same thing 
 
 So we keep the flags for what they buy on their own (a stable memo, exact reproductions of a run, and stopped-and-resumed runs that match runs trained straight through), and compare conditions as two samples rather than seed by seed. Pairing by seed is worth it only where runs branch from one stored state and are measured soon after. The rules for reports are in the design checks of the `sci-report` skill, and for the choice of card in the `mi-ni` authoring reference. Decided 2026-10-29, from a paper review of the sans-diff report; the comparison of costs and seed counts is in the project files under `determinism/`.
 
-That view also settles the choice of card. Since about 2026-10-27, L4s on Modal have been scarce: a training task waited a median of 12 to 28 minutes for one, with a tail past an hour, while A10Gs and L40Ss scheduled in seconds. If a card change counts as seed noise, a condition can run on a mix of cards, so training roles list `["L4", "L40S", "A10G"]` and Modal picks the first one free. The mix then depends on when a condition launched, so each report shows the cards per condition, and a close comparison is checked again on the L4 runs alone. Arms that branch from one stored state and are compared in pairs stay on one card. Decided 2026-10-30; the L40S went ahead of the A10G the same day, when the seed-pack probe found it the cheaper of the two per step.
+That view also settles the choice of card. Since about 2026-10-27, L4s on Modal have been scarce: a training task waited a median of 12 to 28 minutes for one, with a tail past an hour, while A10Gs and L40Ss scheduled in seconds. If a card change counts as seed noise, a condition can run on a mix of cards, so training roles list `["L40S", "L4", "A10G"]` and Modal picks the first one free. The mix then depends on when a condition launched, so each report shows the cards per condition, and a close comparison is checked again on the runs of one card alone. Arms that branch from one stored state and are compared in pairs stay on one card. Decided 2026-10-30 with the L4 first; the L40S went ahead of the A10G the same day, when the seed-pack probe found it the cheaper of the two per step, and ahead of the L4 on 2026-10-31, when the scatter-free step and the batch draw on its own thread made it the cheapest per step of the three (`todo/eng/scatter-free-training-step.md`).
 
 ## What we set, and why only that
 
 `[tool.mini] env` in `pyproject.toml` carries the CPU scheduler flag plus:
 
-- **`--xla_gpu_deterministic_ops=true`** — the one that does the work. It makes scatter deterministic through XLA's scatter-determinism expander (an optimized rewrite, so it's much cheaper than the fallback). Our model has one big scatter: the token-embedding gradient. Without the flag those accumulate in whatever order the atomics land, which is a different order every run.
+- **`--xla_gpu_deterministic_ops=true`** — the one that does the work. It makes scatter deterministic through XLA's scatter-determinism expander (an optimized rewrite, so it's much cheaper than the fallback). Our model had one big scatter: the token-embedding gradient. Without the flag those accumulate in whatever order the atomics land, which is a different order every run. Since 2026-10-31 the training step has no scatter at all (`todo/eng/scatter-free-training-step.md`), and the flags are still needed (below).
 - **`--xla_gpu_exclude_nondeterministic_ops=true`** — the broader guard, for ops the scatter expander doesn't cover. It measured free at our sizes, and it's what keeps a future model that reaches for some other atomically-reducing op from quietly reintroducing drift.
 
 The pair was measured on its own (last row) rather than inferred from the three-flag run, so what's configured is what was tested.
 
-**Autotuning stays on.** It's the other classic source of GPU nondeterminism — the algorithm pick comes from measured timings, so a noisy host can pick differently — but turning it off changed neither the digest nor the time here. It has a plausible cost on larger models (a worse GEMM), so we're not paying it for a benefit this project hasn't observed. If a future run drifts *with* the flags above, `--xla_gpu_autotune_level=0` is the next thing to reach for.
+**Autotuning is in effect off.** It's the other classic source of GPU nondeterminism — the algorithm pick comes from measured timings, so a noisy host can pick differently. We left `--xla_gpu_autotune_level` alone, since setting it to 0 changed neither the digest nor the time here. But with either flag above set, XLA's GPU backend skips the timing and takes the first candidate it has for each GEMM and fusion (`RequireDeterminism` and `PickBestResult` in its source; the [XLA determinism guide](https://openxla.org/xla/determinism) says so too), which is why the level made no difference. The seed-pack probe found the untimed picks cost about a fifth of a step on an L40S (`/mnt/project-files/pack-timing/why-packing-doesnt-pay.md`).
 
-The digest does not hold across GPU *models* (measured in the full-length probe above): determinism is a per-device-class property. Training roles list `["L4", "L40S", "A10G"]`, so a re-run can land on another card and give another digest; the card is recorded on every attempt and returned in training results (see [Seeds are draws](#seeds-are-draws)).
+### With no scatter left (2026-10-31)
+
+The flags were there for the scatters, so once the step had none, we checked whether it was deterministic without them. The step-speed probe (`docs/m2/step-speed`, dev profile) trained the recipe of record for 40 epochs (about 2,100 steps, on a fifth of its corpus) in separate containers, with the flags and without:
+
+| card | flags | containers | distinct digests | ms per step |
+| --- | --- | --- | --- | --- |
+| L40S | on | 4 | 1 | 3.0 to 3.4 |
+| L40S | off | 6 | 6 | 2.7 to 3.1 |
+| L4 | off | 4 | 4 | 6.2 to 7.2 |
+
+Without the flags, every container ended on weights of its own, on both cards. So the scatters were not the only source of drift. The likely remaining one is the autotuner's timed pick, and a fourth round tested it by pinning the picks: JAX's compilation cache in a directory on the Volume, filled by one task and then loaded by three more, each in a container of its own, on the recipe's full corpus and with the batch draw on its own thread:
+
+| card | flags | containers | distinct digests | ms per step |
+| --- | --- | --- | --- | --- |
+| L40S | on, no cache | 1 | | 2.42 |
+| L40S | off, shared cache | 4 | 1 | 2.0 to 2.1 |
+| L4 | on, no cache | 1 | | 6.74 |
+| L4 | off, shared cache | 3 | 1 | 5.6 to 5.7 |
+
+With the compiled programs shared, the flags-off runs agree bit for bit on both cards, and a step is about a sixth faster than with the flags on. So the flags are not the only way to a reproducible run any more. They stay on for now, because the cache brings questions of its own: a run reproduces only while its compiled program is in the cache, so deleting the cache, or two first compiles racing in one fan-out, would let one memo key map to two numerically different results (the quiet failure the JAX version has, below). The open item is `todo/eng/flags-off-with-a-compilation-cache.md`.
+
+The digest does not hold across GPU *models* (measured in the full-length probe above): determinism is a per-device-class property. Training roles list `["L40S", "L4", "A10G"]`, so a re-run can land on another card and give another digest; the card is recorded on every attempt and returned in training results (see [Seeds are draws](#seeds-are-draws)).
 
 ## Why the environment, and not a line of Python
 

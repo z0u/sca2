@@ -244,7 +244,7 @@ def _forward(
         out = operator(x)
         return out if positions is None else jnp.where(positions[None, :, None] > 0, out, x)
 
-    x = normalize(model.transformer.wte[idx])
+    x = model.embed(idx)
     pre, post = [x], [edit(x) if 0 in slices else x]
     x = post[-1]
     allowed = model.attention_mask(idx)

@@ -199,6 +199,59 @@ def _scanned(step, n_steps: int, scheduled_tau: bool = False):
     return run
 
 
+def _dispatch_sizes(step: int, epoch_length: int, traj_stride: int) -> list[int]:
+    """The steps in each dispatch of an epoch that starts at *step*: at most `SCAN_STEPS`, stopping at each trajectory record and at the epoch's end, which need the model there."""
+    sizes, done = [], 0
+    while done < epoch_length:
+        n = min(SCAN_STEPS, epoch_length - done, traj_stride - (step + done) % traj_stride)
+        sizes.append(n)
+        done += n
+    return sizes
+
+
+def _draw_stacked(batches, n: int) -> tuple[np.ndarray, ...]:
+    """The next *n* batches, stacked along a leading step axis and padded to `SCAN_STEPS` with copies of the last."""
+    chunk = [next(batches) for _ in range(n)]
+    pad = SCAN_STEPS - n
+    return tuple(np.stack([b[f] for b in chunk] + [chunk[-1][f]] * pad) for f in range(len(chunk[0])))
+
+
+class _Prefetch:
+    """Draws an epoch's dispatches of batches (`_draw_stacked`, one per entry of *sizes*) on a thread of its own, at
+    most `depth` ahead of the training loop.
+
+    The call that dispatches a scan returns only near the end of the card's work (profiled on an L40S, most of each
+    dispatch's time was spent inside the call), so batches drawn on the training thread between dispatches leave the
+    card idle: about a millisecond a step, a third of the step on an L40S. On a thread of their own they are drawn
+    while the dispatch runs (`docs/m2/step-speed`). The sampler is the only user of the epoch's generator and of the
+    run's random stream until `join`, so the draws, and the batches, are those of a loop that draws in line.
+    """
+
+    def __init__(self, batches, sizes: list[int], depth: int = 2):
+        import queue
+        import threading
+
+        self._queue: queue.Queue = queue.Queue(maxsize=depth)
+        self._thread = threading.Thread(target=self._run, args=(batches, sizes), daemon=True, name="batch-prefetch")
+        self._thread.start()
+
+    def _run(self, batches, sizes: list[int]) -> None:
+        try:
+            for n in sizes:
+                self._queue.put((True, _draw_stacked(batches, n)))
+        except BaseException as e:  # handed to the loop, which raises it in its own thread
+            self._queue.put((False, e))
+
+    def get(self) -> tuple[np.ndarray, ...]:
+        ok, value = self._queue.get()
+        if not ok:
+            raise value
+        return value
+
+    def join(self) -> None:
+        self._thread.join()
+
+
 class _Window:
     """Running means of the fallback step's extra outputs between trajectory records."""
 
@@ -495,16 +548,15 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
             min_line_tokens=min_line_tokens,
             loss_mask=loss_mask,
         )
-        while len(train_losses) < epoch_length:
-            # A dispatch stops at the next trajectory record and at the epoch's end, which need the model there.
-            n = min(SCAN_STEPS, epoch_length - len(train_losses), traj_stride - step % traj_stride)
-            chunk = [next(batches) for _ in range(n)]
+        sizes = _dispatch_sizes(step, epoch_length, traj_stride)
+        drawn = _Prefetch(batches, sizes)
+        for n in sizes:
+            stacked = drawn.get()
             ats = [epoch + (len(train_losses) + i) / epoch_length for i in range(n)]
             weights = [float(anchor(at)) for at in ats]
             anti_weights = [_anti_at(anti, at) for at in ats]
             taus = [anchor.taus(at) for at in ats]
             pad = SCAN_STEPS - n
-            stacked = tuple(np.stack([b[f] for b in chunk] + [chunk[-1][f]] * pad) for f in range(len(chunk[0])))
             model, opt_state, outs = train_steps(
                 model,
                 opt_state,
@@ -527,6 +579,7 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
             emit_progress(step, total_steps)
             if step % traj_stride == 0:
                 record(step, weights[-1], anti_weights[-1], anchor_loss[-1], anti_loss[-1])
+        drawn.join()
         # Run the sampler to its end, as a for loop would, so any draws after its last batch still happen.
         assert next(batches, None) is None
 

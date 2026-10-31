@@ -101,7 +101,11 @@ def test_sampler_writes_rows_and_summary(tmp_path: Path):
     assert any("gpu_util" in r for r in rows)
     final = published[-1]["sys"]
     assert final["rows"] == len(rows) and final["interval_s"] == 0.1
-    assert final["gpu_util_mean"] == pytest.approx(60)
+    # Each row folds the reports since the last one, and a row can fall between the two cards' lines (80 and 40), so
+    # a row reads 60 only on average. The summary is the mean of the rows.
+    gpu_rows = [r["gpu_util"] for r in rows if "gpu_util" in r]
+    assert final["gpu_util_mean"] == pytest.approx(sum(gpu_rows) / len(gpu_rows))
+    assert 40 <= final["gpu_util_mean"] <= 80
 
 
 def test_sampler_never_raises_into_the_task(tmp_path: Path):
