@@ -84,18 +84,19 @@ cuda = [
 # parses XLA_FLAGS once when its backend comes up, so an in-process setting takes
 # effect for whichever task happened to run first and is ignored thereafter.
 #
-#   deterministic_ops       makes scatter deterministic, via the fast expander.
-#                           Without it, embedding-gradient scatter-adds accumulate
-#                           in whatever order the atomics land, so the same seed
-#                           and code give a different model every run. Measured on
-#                           an L4: three containers, three digests; with it, one.
-#                           Costs about 1.7x on a d64-L4 cell (eng/determinism.md).
-#   exclude_nondeterministic_ops  the broader guard, for ops the scatter expander
-#                           doesn't cover. Free at our sizes.
+#   MINI_COMPILE_CACHE      the namespace of the compilation cache every worker
+#                           shares (mini.compile_cache). Each program compiles once
+#                           per card model and every run loads it, so the
+#                           autotuner's picks are the same in every container and
+#                           runs reproduce without XLA's determinism flags, about
+#                           a sixth faster per step (eng/determinism.md).
+#   XLA_FLAGS               the CPU scheduler flag alone. For an exact reproduction
+#                           of a run trained before 2026-10-31, a role sets
+#                           env={"XLA_FLAGS": mini.compile_cache.DETERMINISTIC_XLA_FLAGS}.
 #
 # A role can override per-experiment with env= (merged key by key). Not a secret
 # channel: these values are recorded on every task record. Tokens go in secrets=.
-env = { XLA_FLAGS = "--xla_cpu_enable_concurrency_optimized_scheduler=false --xla_gpu_deterministic_ops=true --xla_gpu_exclude_nondeterministic_ops=true" }
+env = { XLA_FLAGS = "--xla_cpu_enable_concurrency_optimized_scheduler=false", MINI_COMPILE_CACHE = "shared" }
 
 # See .agents/skills/mi-ni/references/storage.md
 store-bucket = "z0u/sca2-store"

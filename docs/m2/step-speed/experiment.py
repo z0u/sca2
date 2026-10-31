@@ -62,13 +62,12 @@ STOP = 40
 """Epochs trained in each task: ten records at the recipe's stride of four epochs."""
 NONDET_XLA_FLAGS = "--xla_cpu_enable_concurrency_optimized_scheduler=false"
 """The project's `XLA_FLAGS` with the two GPU determinism flags left out."""
+SHARED = {"XLA_FLAGS": NONDET_XLA_FLAGS, "MINI_COMPILE_CACHE": "step-speed-r8"}
+"""Flags off, with mini's shared compilation cache in a namespace of its own, so the round starts cold."""
 VARIANTS: dict[str, dict[str, Any]] = {
-    "L40S-cache-seed": dict(card="L40S", env={"XLA_FLAGS": NONDET_XLA_FLAGS}, n=1, full=True, cache=True),
-    "L40S-cache": dict(
-        card="L40S", env={"XLA_FLAGS": NONDET_XLA_FLAGS}, n=3, full=True, cache=True, after="L40S-cache-seed"
-    ),
-    "L4-cache-seed": dict(card="L4", env={"XLA_FLAGS": NONDET_XLA_FLAGS}, n=1, full=True, cache=True),
-    "L4-cache": dict(card="L4", env={"XLA_FLAGS": NONDET_XLA_FLAGS}, n=2, full=True, cache=True, after="L4-cache-seed"),
+    "L40S-r8-cold": dict(card="L40S", env=SHARED, n=6, full=True),
+    "L40S-r8-warm": dict(card="L40S", env=SHARED, n=4, full=True, after="L40S-r8-cold"),
+    "L40S-r8-lazy": dict(card="L40S", env=SHARED, n=2, full=True, after="L40S-r8-warm"),
 }
 """Variant → card, environment over the project baseline, replicas, and the options: `full` trains on the recipe's
 corpus, `gather` puts back the indexed embedding and cross-entropy the step had before, `profile` runs the training
@@ -85,7 +84,18 @@ The earlier rounds' variants (results on the dev store, under their own roles), 
   `L4-full-gather`.
 - round 3, the recipe's corpus, flags on, the batch draw on a thread of its own: `L40S-r3`, `L40S-r3-select`,
   `L4-r3`, `L4-r3-select`.
-- round 4, the recipe's corpus, flags off, a compilation cache shared within each card: the variants above.
+- round 4, the recipe's corpus, flags off, a compilation cache shared within each card: `L40S-cache-seed`,
+  `L40S-cache` (three replicas, after the seed), `L4-cache-seed`, `L4-cache` (two).
+- round 5, the recipe's corpus, flags off, mini's shared compilation cache (`mini.compile_cache`, namespace
+  `step-speed-r5`): `L40S-shared-cold` (four replicas), `L40S-shared-warm` (two, after them), `L4-shared-cold`
+  (two). Some L40S hosts got keys of their own.
+- round 6, `key_parts` (`KEY_PARTS`): which part of the key moves between L40S hosts.
+- round 7, as round 5 on the L40S alone, with the parts of the training program's key in each result, and six
+  replicas with the flags on and no shared cache, to see whether those agree across the hosts the keys tell apart:
+  `L40S-r7-cold` (six), `L40S-r7-warm` (three), `L40S-r7-flags` (six).
+- round 8, as round 7 with the key holding one program per card model rather than per host pool: the variants
+  above. `L40S-r8-lazy` ran after the device came to be named on first use rather than at install, and should load
+  every entry.
 """
 
 
@@ -168,6 +178,7 @@ def train_timed(  # noqa: C901 — one setup, one run, and the probe's options
     from sca.compute.training import train_anchored
     from sca.data.incontext import context_length
     from sca.data.named_colors import WordTokenizer
+    from mini.compile_cache import installed
     from mini.runs import gpu_name
     from mini.store import get
 
@@ -238,6 +249,7 @@ def train_timed(  # noqa: C901 — one setup, one run, and the probe's options
     # The last record is the one at the stop, made after the loop; the ones before it are a stride apart.
     steady = stamps[:-1]
     ms_per_step = 1000 * (steady[-1] - steady[0]) / ((len(steady) - 1) * stride)
+    key_parts_seen = shared.parts if (shared := installed()) else {}
     leaves = jax.tree.leaves(eqx.filter(model, eqx.is_inexact_array))
     digest = hashlib.sha256(b"".join(np.asarray(leaf).tobytes() for leaf in leaves)).hexdigest()
     print(f"{variant} r{replica}: {ms_per_step:.3f} ms/step, digest {digest[:12]}", flush=True)
@@ -254,7 +266,83 @@ def train_timed(  # noqa: C901 — one setup, one run, and the probe's options
         "digest": digest,
         "val_loss": metrics[-1].val_loss,
         "profile": profile_text,
+        # The parts of the training program's cache key, when mini's shared cache is on (round 7).
+        "run_key_parts": {k: v for k, v in key_parts_seen.items() if k.startswith("jit_run")},
     }
+
+
+def key_parts(variant: str, replica: int) -> dict:
+    """The parts of JAX's compilation-cache key for a small program, hashed one by one, with what the card and host
+    report: which part moves between containers on one card model. *variant* and *replica* give each task its own key.
+    """
+    import logging
+    import subprocess
+    from pathlib import Path
+
+    import jax
+    import jax.numpy as jnp
+    from jax._src import compilation_cache as cc
+
+    jax.config.update("jax_compilation_cache_dir", "/tmp/key-parts")
+    jax.config.update("jax_persistent_cache_min_compile_time_secs", 0.0)
+    parts: dict[str, str] = {}
+
+    class Grab(logging.Handler):
+        def emit(self, record):
+            msg = record.getMessage()
+            if msg.startswith("get_cache_key hash of serialized "):
+                name, _, digest = msg.removeprefix("get_cache_key hash of serialized ").rpartition(": ")
+                parts.setdefault(name, digest[:16])
+
+    logger = logging.getLogger("jax._src.cache_key")
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(Grab())
+    cc.reset_cache()
+    jax.jit(lambda x: (x @ x.T).sum())(jnp.ones((256, 256)))
+    from jax._src.lib import xla_client
+    from jax.extend.backend import get_backend
+
+    backend = get_backend()
+    dev = jax.devices()[0]
+    try:
+        topo = f"{xla_client.get_topology_for_devices([dev]).fingerprint():016x}"
+    except Exception as e:  # noqa: BLE001 — a probe: say what went wrong
+        topo = repr(e)
+    smi = subprocess.run(
+        [
+            "nvidia-smi",
+            "--query-gpu=driver_version,vbios_version,clocks.max.sm,clocks.max.mem,memory.total,pci.device_id",
+            "--format=csv,noheader",
+        ],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    version = Path("/proc/driver/nvidia/version")
+    return {
+        "variant": variant,
+        "replica": replica,
+        "parts": parts,
+        "platform_version": backend.platform_version,
+        "device": {k: str(getattr(dev, k, None)) for k in ("device_kind", "compute_capability", "core_count")},
+        "topology": topo,
+        "nvidia_smi": smi,
+        "driver": version.read_text().splitlines()[0] if version.exists() else None,
+    }
+
+
+KEY_PARTS = {"any": dict(n=8)}
+"""Round 6: `key_parts` in eight L40S containers, wherever Modal places them (it does not pin a task to OCI)."""
+
+
+def _run_key_parts(ctx: Ctx, waiting: list) -> dict:
+    keys = {}
+    for variant, v in KEY_PARTS.items():
+        for r in range(v["n"]):
+            try:
+                keys[f"keys-{variant}-r{r}"] = ctx.run(key_parts, variant, r, role=f"keys-{variant}-r{r}")
+            except Pending as e:
+                waiting.append(e)
+    return keys
 
 
 def main(ctx: Ctx) -> dict:
@@ -296,9 +384,10 @@ def main(ctx: Ctx) -> dict:
                 )  # fmt: skip
             except Pending as e:
                 waiting.append(e)
+    keys = _run_key_parts(ctx, waiting)
     if waiting:
         raise waiting[0]
-    return {"timed": timed}
+    return {"timed": timed, "keys": keys}
 
 
 COMPUTE: dict[str, Any] = {
@@ -308,6 +397,12 @@ COMPUTE: dict[str, Any] = {
     # Forty epochs: about 2,000 steps on the small corpus and 10,000 on the recipe's, a few minutes at most.
     f"{variant}-r{r}": dict(gpu=v["card"], env=v["env"], timeout=3600, watchdog=600, watchdog_grace=900)
     for variant, v in VARIANTS.items()
+    for r in range(v["n"])
+}
+
+COMPUTE |= {
+    f"keys-{variant}-r{r}": dict(gpu="L40S", timeout=900) | ({"cloud": v["cloud"]} if "cloud" in v else {})
+    for variant, v in KEY_PARTS.items()
     for r in range(v["n"])
 }
 

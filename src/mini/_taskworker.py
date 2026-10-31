@@ -21,6 +21,7 @@ from contextlib import AbstractContextManager, contextmanager, nullcontext
 from itertools import count
 from math import isfinite
 
+from mini import compile_cache
 from mini._queues import EndOfQueue
 from mini._sysmetrics import SystemSampler, interval_from_env
 from mini._watchdog import Watchdog, WatchdogStall
@@ -367,6 +368,11 @@ def _stall_handler(
     return abort_stalled
 
 
+def _cache_fields(cache: compile_cache.SharedCache | None) -> dict[str, Any]:
+    """What the attempt took from the shared compilation cache, as settled-record fields."""
+    return {"compile_cache": summary} if cache is not None and (summary := cache.summary()) else {}
+
+
 def execute_task(
     store: MemoStore,
     key: str,
@@ -379,6 +385,7 @@ def execute_task(
     experiment: str | None = None,
     watchdog_s: float | None = None,
     watchdog_grace_s: float | None = None,
+    compile_backend: Callable[[], compile_cache.Backend] | None = None,
 ) -> None:
     """Run one memoized call and persist its result/state — backend-agnostic.
 
@@ -393,6 +400,8 @@ def execute_task(
     *experiment* is the experiment this task belongs to. It powers ref provenance both ways: refs the step writes are stamped with it (:func:`_producer_stamp`), and refs the step *resolves* land on the settled record as ``upstream_refs`` — the evidence the driver aggregates into ``lineage.upstreams``, without the experiment declaring its deps by hand.
 
     *watchdog_s* arms the progress watchdog: if the task's ``(step, total)`` hasn't advanced in that many seconds, the worker settles its own record FAILED (with an all-thread stack dump as the traceback) and hard-exits — a silent wedge becomes a fast, retryable failure instead of burning the whole role ``timeout`` (see :mod:`mini._watchdog`). It covers the task call only — result upload rides on the role timeout as before. *watchdog_grace_s* is the looser threshold that applies until the first progress emission, so one-off setup (tokenization, compilation) doesn't force the watchdog loose. Spans *inside* the call that legitimately make no step progress get the same treatment on demand, via :func:`~mini.progress.blocking_phase` — which ``mini.store``'s transfers already declare for themselves.
+
+    *compile_backend* builds the backend of the shared JAX compilation cache (:mod:`mini.compile_cache`), used when ``MINI_COMPILE_CACHE`` turns it on. What the attempt took from the cache lands on its settled record as ``compile_cache``.
     """
 
     def record(**fields: Any) -> bool:
@@ -429,8 +438,10 @@ def execute_task(
         if sys_s is not None
         else nullcontext()
     )
+    shared_cache = None
     try:
         with (
+            compile_cache.attempt(compile_backend) as shared_cache,
             sampler,
             data_dir_context(store.data_dir),
             store_context(artifacts) if artifacts is not None else nullcontext(),
@@ -461,7 +472,7 @@ def execute_task(
         # Which shared refs this step resolved (and whose experiment wrote each) —
         # the per-task evidence the driver rolls up into ``lineage.upstreams``.
         extra = {"upstream_refs": _upstream_refs(resolved)} if resolved else {}
-        record(state=RunState.DONE, heartbeat_at=now, finished_at=now, **extra)
+        record(state=RunState.DONE, heartbeat_at=now, finished_at=now, **extra, **_cache_fields(shared_cache))
     except Exception as exc:
         tb = traceback.format_exc()
         store.error_path(key, gen).write_text(tb)
@@ -476,6 +487,7 @@ def execute_task(
             heartbeat_at=now,
             finished_at=now,
             **extra,
+            **_cache_fields(shared_cache),
         )
 
 
@@ -500,6 +512,8 @@ def run_task(data_dir: Path, key: str) -> None:
         experiment=data_dir.name,
         watchdog_s=watchdog_s,
         watchdog_grace_s=watchdog_grace_s,
+        # One cache per checkout, beside the experiments (it has no memo state, so `mini` never lists it as one).
+        compile_backend=lambda: compile_cache.LocalBackend(data_dir.parent / "compile-cache"),
     )
     # This record has settled, so its slot is free: hand it to the next queued task,
     # which keeps a capped local run draining with no driver attached.

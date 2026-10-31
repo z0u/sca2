@@ -1,7 +1,8 @@
 ---
-status: open
+status: done
 tags: [performance, modal, determinism]
 opened: 2026-10-31
+closed: 2026-10-31
 ---
 # Determinism flags off, with a shared compilation cache
 
@@ -15,3 +16,7 @@ Adopting it would mean a run reproduces only while its compiled program is in th
 - XLA's own per-fusion autotune cache (`--xla_gpu_per_fusion_autotune_cache_dir`) is a narrower alternative: it pins the picks and leaves the rest of compilation alone. Untested here.
 
 The flags stay on until this is settled. The numbers are from the fourth round of the probe.
+
+## Notes
+
+2026-10-31 — Done, and the flags are off. `mini.compile_cache` settles each point above: first compiles are claimed through the Modal Dict with a lease (locally a `flock`), entries are write-once, and each attempt records `compile_cache` (counts, a digest over the entries it used, and the machine parts of the key). The cold fan-out turned up one more thing: JAX's key splits a card model by host pool (AWS and OCI L40S hosts each got their own programs and their own weights), so the key names the card model instead. Ten flags-off L40S runs over both pools, six launched cold together, compiled once and agreed bit for bit at 1.94 to 2.03 ms a step; six flags-on runs gave 2.36 to 2.46. The per-fusion autotune cache was not needed. Details and the deterministic mode for exact reproductions of older runs are in [eng/determinism.md](/eng/determinism.md#a-shared-compilation-cache-2026-10-31).

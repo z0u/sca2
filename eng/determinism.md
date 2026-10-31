@@ -47,7 +47,7 @@ That view also settles the choice of card. Since about 2026-10-27, L4s on Modal 
 
 ## What we set, and why only that
 
-`[tool.mini] env` in `pyproject.toml` carries the CPU scheduler flag plus:
+Until 2026-10-31, `[tool.mini] env` in `pyproject.toml` carried the CPU scheduler flag plus the two flags below. Since then it carries the CPU flag and `MINI_COMPILE_CACHE`, and the two flags are the deterministic mode a role asks for when it must reproduce an older run (`mini.compile_cache.DETERMINISTIC_XLA_FLAGS`; [A shared compilation cache](#a-shared-compilation-cache-2026-10-31) says why).
 
 - **`--xla_gpu_deterministic_ops=true`** — the one that does the work. It makes scatter deterministic through XLA's scatter-determinism expander (an optimized rewrite, so it's much cheaper than the fallback). Our model had one big scatter: the token-embedding gradient. Without the flag those accumulate in whatever order the atomics land, which is a different order every run. Since 2026-10-31 the training step has no scatter at all (`todo/eng/scatter-free-training-step.md`), and the flags are still needed (below).
 - **`--xla_gpu_exclude_nondeterministic_ops=true`** — the broader guard, for ops the scatter expander doesn't cover. It measured free at our sizes, and it's what keeps a future model that reaches for some other atomically-reducing op from quietly reintroducing drift.
@@ -75,7 +75,32 @@ Without the flags, every container ended on weights of its own, on both cards. S
 | L4 | on, no cache | 1 | | 6.74 |
 | L4 | off, shared cache | 3 | 1 | 5.6 to 5.7 |
 
-With the compiled programs shared, the flags-off runs agree bit for bit on both cards, and a step is about a sixth faster than with the flags on. So the flags are not the only way to a reproducible run any more. They stay on for now, because the cache brings questions of its own: a run reproduces only while its compiled program is in the cache, so deleting the cache, or two first compiles racing in one fan-out, would let one memo key map to two numerically different results (the quiet failure the JAX version has, below). The open item is `todo/eng/flags-off-with-a-compilation-cache.md`.
+With the compiled programs shared, the flags-off runs agree bit for bit on both cards, and a step is about a sixth faster than with the flags on. So the flags are not the only way to a reproducible run any more. The cache brought questions of its own: a run reproduces only while its compiled program is in the cache, so deleting the cache, or two first compiles racing in one fan-out, would let one memo key map to two numerically different results (the quiet failure the JAX version has, below). The next section settles them.
+
+### A shared compilation cache (2026-10-31)
+
+`mini.compile_cache` is JAX's compilation cache, shared by every worker of a Modal Environment (a Volume, `mini-compile-cache`) or of a checkout (`.mini/compile-cache/`). A worker turns it on when `MINI_COMPILE_CACHE` names a namespace, and the project sets `shared`. Three rules make it safe to depend on:
+
+- One compile per program and card model. Before a program compiles, the worker claims it in a `modal.Dict` with `put(skip_if_exists=True)`, which only one worker can win. The winner compiles, autotunes and stores the entry; the others wait for the entry and load it. The claim is a lease that its holder renews while it compiles, so a worker that dies holds the rest up by about a minute and a half, after which the next worker claims the program's next generation. Locally a `flock` does the same job.
+- Write once. Modal refuses an upload over an existing file, and the local backend links the file into place, so an entry never changes. A worker that compiled anyway (it gave up waiting, after twenty minutes) keeps its own program for that attempt, and the record says so.
+- Provenance. Each attempt records `compile_cache` on its settled record: how many programs it loaded, waited for or compiled, a digest over the entries it used, and the parts of the cache key that describe the machine (`key_env`). Two attempts with one digest ran the same compiled programs. A lost cache refills on the next run with fresh picks, and the new digest shows it.
+
+The first fan-out exposed one more source of drift. JAX's cache key folds in a fingerprint of the card as XLA describes it, and that fingerprint differs between Modal's L40S host pools: the AWS hosts in `us-east` give one value and the OCI hosts another, with the same driver (610.57.04), CUDA, clocks and memory. So each pool compiled and timed its own programs, and the runs of one seed split into two sets of weights. The key in `mini.compile_cache` drops that part and names the device as JAX does (kind, compute capability, core count, device count) in its place, which keeps one program per card model. The step-speed probe trained the recipe of record for 40 epochs with the flags off, in separate containers, several rounds in fresh namespaces:
+
+| round | key | containers (pools) | compiled | distinct digests | ms per step |
+| --- | --- | --- | --- | --- | --- |
+| 7 | JAX's | 9 L40S (6 AWS, 3 OCI) | once per pool | 2, one per pool | 1.95 to 2.11 |
+| 7 | flags on, no cache | 6 L40S (3 AWS, 3 OCI) | in every container | 1 | 2.36 to 2.46 |
+| 8 | per card model | 10 L40S (8 AWS, 2 OCI) | once | 1 | 1.94 to 2.03 |
+
+In round 8, six tasks launched together and one compiled while the other five waited for it, then four more loaded the entries; the OCI hosts ran the programs compiled on an AWS host at the same speed. Round 5 found the L4 behaves the same way (two containers on GCP hosts in two regions, one compile, one digest). Waiting for a compile adds nothing to a task, since a worker that compiled for itself would take as long; a task that loads everything reaches its first record in 15 to 20 seconds rather than about 80.
+
+So with the cache the reproducibility unit is the same as with the flags: a card model, on any host. The flags came off on 2026-10-31. What a run now depends on, beyond its code and inputs, is the cache entry it loaded, and two things can change that:
+
+- A new Modal Environment, a new namespace, or a deleted Volume starts from nothing, and the first run there compiles fresh picks. Production and `dev` are separate Environments, so a prototype on `dev` and its re-run on production can differ in the last bits; the rule to re-run on production before a report is frozen already covers this.
+- A JAX or driver upgrade changes the key, which compiles fresh picks too, on top of the numerics change the upgrade brings anyway (below).
+
+Both show up as a new digest on the attempt record. An exact reproduction of a run trained before the switch sets `env={"XLA_FLAGS": DETERMINISTIC_XLA_FLAGS}` on its role, and it can keep the cache on: the flags are part of the key, so the deterministic programs are stored apart from the others.
 
 The digest does not hold across GPU *models* (measured in the full-length probe above): determinism is a per-device-class property. Training roles list `["L40S", "L4", "A10G"]`, so a re-run can land on another card and give another digest; the card is recorded on every attempt and returned in training results (see [Seeds are draws](#seeds-are-draws)).
 
