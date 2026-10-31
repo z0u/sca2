@@ -216,6 +216,42 @@ def _draw_stacked(batches, n: int) -> tuple[np.ndarray, ...]:
     return tuple(np.stack([b[f] for b in chunk] + [chunk[-1][f]] * pad) for f in range(len(chunk[0])))
 
 
+class _Prefetch:
+    """Draws an epoch's dispatches of batches (`_draw_stacked`, one per entry of *sizes*) on a thread of its own, at
+    most `depth` ahead of the training loop.
+
+    A dispatch keeps the host thread that called it busy for most of the time the card takes (the scan's
+    conditional reads its flag back from the card every step), so batches drawn on that thread between dispatches
+    are time the card sits idle: about a millisecond a step, a third of the step on an L40S. On a thread of their own
+    they are drawn while the dispatch runs. The sampler is the only user of the epoch's generator and of the run's
+    random stream until `join`, so the draws, and the batches, are those of a loop that draws in line.
+    """
+
+    def __init__(self, batches, sizes: list[int], depth: int = 2):
+        import queue
+        import threading
+
+        self._queue: queue.Queue = queue.Queue(maxsize=depth)
+        self._thread = threading.Thread(target=self._run, args=(batches, sizes), daemon=True, name="batch-prefetch")
+        self._thread.start()
+
+    def _run(self, batches, sizes: list[int]) -> None:
+        try:
+            for n in sizes:
+                self._queue.put((True, _draw_stacked(batches, n)))
+        except BaseException as e:  # handed to the loop, which raises it in its own thread
+            self._queue.put((False, e))
+
+    def get(self) -> tuple[np.ndarray, ...]:
+        ok, value = self._queue.get()
+        if not ok:
+            raise value
+        return value
+
+    def join(self) -> None:
+        self._thread.join()
+
+
 class _Window:
     """Running means of the fallback step's extra outputs between trajectory records."""
 
@@ -513,8 +549,9 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
             loss_mask=loss_mask,
         )
         sizes = _dispatch_sizes(step, epoch_length, traj_stride)
-        stacked = _draw_stacked(batches, sizes[0])
-        for k, n in enumerate(sizes):
+        drawn = _Prefetch(batches, sizes)
+        for n in sizes:
+            stacked = drawn.get()
             ats = [epoch + (len(train_losses) + i) / epoch_length for i in range(n)]
             weights = [float(anchor(at)) for at in ats]
             anti_weights = [_anti_at(anti, at) for at in ats]
@@ -529,9 +566,6 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
                 np.nan_to_num(np.asarray(taus + [taus[-1]] * pad, np.float32), nan=1.0, posinf=1.0),
                 np.arange(SCAN_STEPS) < n,
             )
-            # The dispatch runs on the card while the host draws the next one's batches; reading the losses waits for it.
-            if k + 1 < len(sizes):
-                stacked = _draw_stacked(batches, sizes[k + 1])
             loss, anchor_loss, anti_loss, fb_loss, aa_loss, fb_lines = np.asarray(outs[:n]).T.tolist()
             train_losses += loss
             anchor_losses += anchor_loss
@@ -545,6 +579,7 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
             emit_progress(step, total_steps)
             if step % traj_stride == 0:
                 record(step, weights[-1], anti_weights[-1], anchor_loss[-1], anti_loss[-1])
+        drawn.join()
         # Run the sampler to its end, as a for loop would, so any draws after its last batch still happen.
         assert next(batches, None) is None
 

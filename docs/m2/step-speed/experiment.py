@@ -9,7 +9,8 @@ names is the autotuner's pick, which with the flags off is timed afresh in every
 
 Each task trains the recipe of record (`τ_ℓ fixed`, as `fixed-confirm` trains it) through `train_anchored` for
 `STOP` epochs of the unchanged 400-epoch schedule. The time between the first trajectory record and the last, over
-the steps between them, is the steady cost of a step with the records included and the compile left out. The
+the steps between them, is the steady cost of a step with the records included and the compile left out.
+(`train_anchored` builds its step with `_scanned` from its module, which is what lets `_without_cond` swap it.) The
 weights at the stop are hashed; replicas of one variant run in separate containers (each its own role), so equal
 digests mean the same weights from separate processes, each with its own compile and autotune.
 
@@ -62,20 +63,55 @@ STOP = 40
 NONDET_XLA_FLAGS = "--xla_cpu_enable_concurrency_optimized_scheduler=false"
 """The project's `XLA_FLAGS` with the two GPU determinism flags left out."""
 VARIANTS: dict[str, dict[str, Any]] = {
-    "L40S-off": dict(card="L40S", env={"XLA_FLAGS": NONDET_XLA_FLAGS}, n=3),
-    "L4-off": dict(card="L4", env={"XLA_FLAGS": NONDET_XLA_FLAGS}, n=3),
-    "L40S-on": dict(card="L40S", env={}, n=2),
-    "L4-on": dict(card="L4", env={}, n=1),
-    # The second round, on the recipe's corpus, with the flags on.
-    "L40S-full": dict(card="L40S", env={}, n=1, full=True),
-    "L40S-full-gather": dict(card="L40S", env={}, n=1, full=True, gather=True),
-    "L40S-full-profile": dict(card="L40S", env={}, n=1, full=True, profile=True),
-    "L4-full": dict(card="L4", env={}, n=1, full=True),
-    "L4-full-gather": dict(card="L4", env={}, n=1, full=True, gather=True),
+    "L40S-r3": dict(card="L40S", env={}, n=1, full=True),
+    "L40S-r3-select": dict(card="L40S", env={}, n=1, full=True, select=True),
+    "L4-r3": dict(card="L4", env={}, n=1, full=True),
+    "L4-r3-select": dict(card="L4", env={}, n=1, full=True, select=True),
 }
 """Variant → card, environment over the project baseline, replicas, and the options: `full` trains on the recipe's
-corpus, `gather` puts back the indexed embedding and cross-entropy the step had before (the step as trained until
-now, but for the prefetched draw, which changes no draw), and `profile` runs the training under `cProfile`."""
+corpus, `gather` puts back the indexed embedding and cross-entropy the step had before, `profile` runs the training
+under `cProfile`, and `select` swaps the scan's conditional for a select (`_without_cond`).
+
+The earlier rounds' variants (results on the dev store, under their own roles), each one container a replica:
+
+- round 1, the small corpus, the batch draw between dispatches on the training thread: `L40S-off` and `L4-off`
+  (flags off, three replicas each), `L40S-on` (two), `L4-on` (one).
+- round 2, the recipe's corpus, flags on: `L40S-full`, `L40S-full-gather`, `L40S-full-profile`, `L4-full`,
+  `L4-full-gather`.
+- round 3, the recipe's corpus, flags on, the batch draw on a thread of its own: the variants above.
+"""
+
+
+def _without_cond() -> None:
+    """Swap the scan's conditional on the live flag for a select, in this process: a padded step is computed and its
+    result dropped, where the conditional skips it. Every live step computes what it did.
+    """
+    import equinox as eqx
+    import jax
+    import jax.numpy as jnp
+
+    import sca.compute.training as training
+
+    def scanned(step, n_steps: int, scheduled_tau: bool = False):
+        @eqx.filter_jit
+        def run(model, opt_state, batches, weights, anti_weights, taus, live):
+            carry, static = eqx.partition((model, opt_state), eqx.is_array)
+
+            def body(carry, xs):
+                batch, weight, anti_weight, tau, on = xs
+                kw = {"taus": tau} if scheduled_tau else {}
+                m, s = eqx.combine(carry, static)
+                m, s, *outs = step(m, s, *batch[:4], weight, anti_weight, *batch[4:], **kw)
+                new = eqx.filter((m, s), eqx.is_array)
+                kept = jax.tree.map(lambda a, b: jnp.where(on, a, b), new, carry)
+                return kept, jnp.where(on, jnp.stack([jnp.asarray(o, jnp.float32) for o in outs]), 0.0)
+
+            carry, outs = jax.lax.scan(body, carry, (batches, weights, anti_weights, taus, live), length=n_steps)
+            return (*eqx.combine(carry, static), outs)
+
+        return run
+
+    training._scanned = scanned
 
 
 def _with_gathers() -> None:
@@ -96,11 +132,19 @@ def _with_gathers() -> None:
 
 
 def train_timed(  # noqa: C901 — one setup, one run, and the probe's options
-    corpus, labels, probes, row: dict, variant: str, replica: int, gather: bool = False, profile: bool = False
+    corpus,
+    labels,
+    probes,
+    row: dict,
+    variant: str,
+    replica: int,
+    gather: bool = False,
+    profile: bool = False,
+    select: bool = False,
 ) -> dict:
     """Train *row* for `STOP` epochs in this container; return the steady ms per step, the digest of the weights at
-    the stop, and the card. *variant* and *replica* give each task its own memo key; *gather* and *profile* are the
-    `VARIANTS` options.
+    the stop, and the card. *variant* and *replica* give each task its own memo key; *gather*, *profile* and *select*
+    are the `VARIANTS` options.
     """
     import cProfile
     import hashlib
@@ -121,6 +165,8 @@ def train_timed(  # noqa: C901 — one setup, one run, and the probe's options
 
     if gather:
         _with_gathers()
+    if select:
+        _without_cond()
     workdir = get_data_dir() / "step-speed" / f"{variant}-r{replica}"
     corpus_dir = get(corpus, workdir / "corpus")
     config = row["config"]
@@ -223,8 +269,7 @@ def main(ctx: Ctx) -> dict:
     timed, waiting = {}, []
     for variant, v in VARIANTS.items():
         full = v.get("full", False)
-        # The first round's tasks pass no options, which keeps their memo keys.
-        opts = (v.get("gather", False), v.get("profile", False)) if full else ()
+        opts = (v.get("gather", False), v.get("profile", False), v.get("select", False))
         p = preps[full]
         for r in range(v["n"]):
             try:
