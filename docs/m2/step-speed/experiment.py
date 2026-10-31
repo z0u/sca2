@@ -63,14 +63,19 @@ STOP = 40
 NONDET_XLA_FLAGS = "--xla_cpu_enable_concurrency_optimized_scheduler=false"
 """The project's `XLA_FLAGS` with the two GPU determinism flags left out."""
 VARIANTS: dict[str, dict[str, Any]] = {
-    "L40S-r3": dict(card="L40S", env={}, n=1, full=True),
-    "L40S-r3-select": dict(card="L40S", env={}, n=1, full=True, select=True),
-    "L4-r3": dict(card="L4", env={}, n=1, full=True),
-    "L4-r3-select": dict(card="L4", env={}, n=1, full=True, select=True),
+    "L40S-cache-seed": dict(card="L40S", env={"XLA_FLAGS": NONDET_XLA_FLAGS}, n=1, full=True, cache=True),
+    "L40S-cache": dict(
+        card="L40S", env={"XLA_FLAGS": NONDET_XLA_FLAGS}, n=3, full=True, cache=True, after="L40S-cache-seed"
+    ),
+    "L4-cache-seed": dict(card="L4", env={"XLA_FLAGS": NONDET_XLA_FLAGS}, n=1, full=True, cache=True),
+    "L4-cache": dict(card="L4", env={"XLA_FLAGS": NONDET_XLA_FLAGS}, n=2, full=True, cache=True, after="L4-cache-seed"),
 }
 """Variant → card, environment over the project baseline, replicas, and the options: `full` trains on the recipe's
 corpus, `gather` puts back the indexed embedding and cross-entropy the step had before, `profile` runs the training
-under `cProfile`, and `select` swaps the scan's conditional for a select (`_without_cond`).
+under `cProfile`, `select` swaps the scan's conditional for a select (`_without_cond`), and `cache` keeps JAX's
+compilation cache in a directory on the Volume, one per card, so that a task after the first loads the compiled
+programs, with the first one's autotuned picks, rather than compiling and timing them again. A variant with `after`
+launches once that variant's tasks are done.
 
 The earlier rounds' variants (results on the dev store, under their own roles), each one container a replica:
 
@@ -78,7 +83,9 @@ The earlier rounds' variants (results on the dev store, under their own roles), 
   (flags off, three replicas each), `L40S-on` (two), `L4-on` (one).
 - round 2, the recipe's corpus, flags on: `L40S-full`, `L40S-full-gather`, `L40S-full-profile`, `L4-full`,
   `L4-full-gather`.
-- round 3, the recipe's corpus, flags on, the batch draw on a thread of its own: the variants above.
+- round 3, the recipe's corpus, flags on, the batch draw on a thread of its own: `L40S-r3`, `L40S-r3-select`,
+  `L4-r3`, `L4-r3-select`.
+- round 4, the recipe's corpus, flags off, a compilation cache shared within each card: the variants above.
 """
 
 
@@ -141,10 +148,11 @@ def train_timed(  # noqa: C901 — one setup, one run, and the probe's options
     gather: bool = False,
     profile: bool = False,
     select: bool = False,
+    cache: bool = False,
 ) -> dict:
     """Train *row* for `STOP` epochs in this container; return the steady ms per step, the digest of the weights at
-    the stop, and the card. *variant* and *replica* give each task its own memo key; *gather*, *profile* and *select*
-    are the `VARIANTS` options.
+    the stop, and the card. *variant* and *replica* give each task its own memo key; *gather*, *profile*, *select*
+    and *cache* are the `VARIANTS` options.
     """
     import cProfile
     import hashlib
@@ -167,6 +175,12 @@ def train_timed(  # noqa: C901 — one setup, one run, and the probe's options
         _with_gathers()
     if select:
         _without_cond()
+    if cache:
+        card = (gpu_name() or "cpu").replace(" ", "-")
+        jax.config.update("jax_compilation_cache_dir", str(get_data_dir() / "step-speed" / f"jax-cache-{card}"))
+        jax.config.update("jax_persistent_cache_min_compile_time_secs", 0.0)
+        jax.config.update("jax_persistent_cache_min_entry_size_bytes", 0)
+    started = time.perf_counter()
     workdir = get_data_dir() / "step-speed" / f"{variant}-r{replica}"
     corpus_dir = get(corpus, workdir / "corpus")
     config = row["config"]
@@ -235,6 +249,7 @@ def train_timed(  # noqa: C901 — one setup, one run, and the probe's options
         "epoch_length": epoch_length,
         "stride": stride,
         "records": len(stamps),
+        "to_first_record_s": stamps[0] - started,
         "ms_per_step": ms_per_step,
         "digest": digest,
         "val_loss": metrics[-1].val_loss,
@@ -269,8 +284,10 @@ def main(ctx: Ctx) -> dict:
     timed, waiting = {}, []
     for variant, v in VARIANTS.items():
         full = v.get("full", False)
-        opts = (v.get("gather", False), v.get("profile", False), v.get("select", False))
+        opts = (v.get("gather", False), v.get("profile", False), v.get("select", False), v.get("cache", False))
         p = preps[full]
+        if "after" in v and sum(k.startswith(f"{v['after']}-r") for k in timed) < VARIANTS[v["after"]]["n"]:
+            continue  # the variant it follows is still running
         for r in range(v["n"]):
             try:
                 timed[f"{variant}-r{r}"] = ctx.run(

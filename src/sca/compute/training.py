@@ -220,11 +220,11 @@ class _Prefetch:
     """Draws an epoch's dispatches of batches (`_draw_stacked`, one per entry of *sizes*) on a thread of its own, at
     most `depth` ahead of the training loop.
 
-    A dispatch keeps the host thread that called it busy for most of the time the card takes (the scan's
-    conditional reads its flag back from the card every step), so batches drawn on that thread between dispatches
-    are time the card sits idle: about a millisecond a step, a third of the step on an L40S. On a thread of their own
-    they are drawn while the dispatch runs. The sampler is the only user of the epoch's generator and of the run's
-    random stream until `join`, so the draws, and the batches, are those of a loop that draws in line.
+    The call that dispatches a scan returns only near the end of the card's work (profiled on an L40S, most of each
+    dispatch's time was spent inside the call), so batches drawn on the training thread between dispatches leave the
+    card idle: about a millisecond a step, a third of the step on an L40S. On a thread of their own they are drawn
+    while the dispatch runs (`docs/m2/step-speed`). The sampler is the only user of the epoch's generator and of the
+    run's random stream until `join`, so the draws, and the batches, are those of a loop that draws in line.
     """
 
     def __init__(self, batches, sizes: list[int], depth: int = 2):

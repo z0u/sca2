@@ -49,12 +49,24 @@ That view also settles the choice of card. Since about 2026-10-27, L4s on Modal 
 
 `[tool.mini] env` in `pyproject.toml` carries the CPU scheduler flag plus:
 
-- **`--xla_gpu_deterministic_ops=true`** — the one that does the work. It makes scatter deterministic through XLA's scatter-determinism expander (an optimized rewrite, so it's much cheaper than the fallback). Our model has one big scatter: the token-embedding gradient. Without the flag those accumulate in whatever order the atomics land, which is a different order every run.
+- **`--xla_gpu_deterministic_ops=true`** — the one that does the work. It makes scatter deterministic through XLA's scatter-determinism expander (an optimized rewrite, so it's much cheaper than the fallback). Our model had one big scatter: the token-embedding gradient. Without the flag those accumulate in whatever order the atomics land, which is a different order every run. Since 2026-10-31 the training step has no scatter at all (`todo/eng/scatter-free-training-step.md`), and the flags are still needed (below).
 - **`--xla_gpu_exclude_nondeterministic_ops=true`** — the broader guard, for ops the scatter expander doesn't cover. It measured free at our sizes, and it's what keeps a future model that reaches for some other atomically-reducing op from quietly reintroducing drift.
 
 The pair was measured on its own (last row) rather than inferred from the three-flag run, so what's configured is what was tested.
 
-**Autotuning stays on.** It's the other classic source of GPU nondeterminism — the algorithm pick comes from measured timings, so a noisy host can pick differently — but turning it off changed neither the digest nor the time here. It has a plausible cost on larger models (a worse GEMM), so we're not paying it for a benefit this project hasn't observed. If a future run drifts *with* the flags above, `--xla_gpu_autotune_level=0` is the next thing to reach for.
+**Autotuning is in effect off.** It's the other classic source of GPU nondeterminism — the algorithm pick comes from measured timings, so a noisy host can pick differently. We left `--xla_gpu_autotune_level` alone, since setting it to 0 changed neither the digest nor the time here. But with either flag above set, XLA's GPU backend skips the timing and takes the first candidate it has for each GEMM and fusion (`RequireDeterminism` and `PickBestResult` in its source; the [XLA determinism guide](https://openxla.org/xla/determinism) says so too), which is why the level made no difference. The seed-pack probe found the untimed picks cost about a fifth of a step on an L40S (`/mnt/project-files/pack-timing/why-packing-doesnt-pay.md`).
+
+### With no scatter left (2026-10-31)
+
+The flags were there for the scatters, so once the step had none, we checked whether it was deterministic without them. The step-speed probe (`docs/m2/step-speed`, dev profile) trained the recipe of record for 40 epochs (about 2,100 steps, on a fifth of its corpus) in separate containers, with the flags and without:
+
+| card | flags | containers | distinct digests | ms per step |
+| --- | --- | --- | --- | --- |
+| L40S | on | 4 | 1 | 3.0 to 3.4 |
+| L40S | off | 6 | 6 | 2.7 to 3.1 |
+| L4 | off | 4 | 4 | 6.2 to 7.2 |
+
+Without the flags, every container ended on weights of its own, on both cards. So the scatters were not the only source of drift. The likely remaining one is the autotuner's timed pick, which we didn't test by pinning it (XLA can persist its autotune results to a directory), because the flags cost little in the training loop: about a twelfth of a step on the L40S (measured with the batch draw still on the training thread, so the share is likely a little larger now). On the L4 they may cost more (the one flags-on run took 8.3 ms a step), but that is a single container and L4 timings vary by a sixth between containers. So the flags stay, and a run stays reproducible on its card.
 
 The digest does not hold across GPU *models* (measured in the full-length probe above): determinism is a per-device-class property. Training roles list `["L4", "L40S", "A10G"]`, so a re-run can land on another card and give another digest; the card is recorded on every attempt and returned in training results (see [Seeds are draws](#seeds-are-draws)).
 
