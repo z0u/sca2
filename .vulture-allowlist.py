@@ -55,6 +55,9 @@ DETERMINISTIC_XLA_FLAGS  # unused variable (src/mini/compile_cache.py:34)
 # Experiments define `smoke(ctx)` beside `main(ctx)`: a small run of the same DAG,
 # started by hand in place of `main` while the experiment is being built.
 smoke  # unused function (docs/m2/*/experiment.py)
+# The pack-timing probe has no report; its memo in the project files gives costs per
+# seed-step at these prices.
+PRICE_PER_HOUR  # unused variable (docs/m2/pack-timing/experiment.py:81)
 
 # Published reports. Their code is part of the record and pinned in docs/publish.lock,
 # so leftovers stay rather than change a frozen source. Prose reads names through
