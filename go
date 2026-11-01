@@ -27,7 +27,7 @@ if [[ "${CLAUDE_CODE_PROJECTS_SESSION:-}" == 1 && -d /mnt/project-files/ && -z "
 fi
 
 show_usage() {
-    echo "usage: $SELF [-h] {install,auth,check,deps,render,serve,preview,publish,site,todo,worktrees} ..."
+    echo "usage: $SELF [-h] {install,auth,check,deps,find,render,serve,preview,publish,site,todo,worktrees} ..."
 }
 
 show_help() {
@@ -53,6 +53,10 @@ show_help() {
 		                       upstream tag, dev container features against the registry,
 		                       and upgrades available to packages we declare.
 		                       Read-only; the upgrade check is a --dry-run
+		  find    <words...> [-n N] [--kind K] [--in PATH] [--full] [--json]:
+		                       ranked keyword search (BM25) over report prose, design
+		                       docs, backlogs, eng/ and the index, one passage per
+		                       section; "where did we find out X?"
 		  render  <report> -o FILE [-o FILE ...] [--since REF|FILE]:
 		                       weave a report (mini.lit: a .py with string prose between
 		                       cells, or a Markdown page under docs/) to each FILE, in
@@ -203,6 +207,10 @@ case "${1:-}" in
     site)
         shift
         uv run "$SCRIPT_DIR/build_site.py" --externalize "$@"
+        ;;
+    find)
+        shift
+        uv run "$SCRIPT_DIR/find.py" "$@"
         ;;
     todo)
         shift
