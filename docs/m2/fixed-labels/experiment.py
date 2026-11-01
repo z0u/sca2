@@ -72,6 +72,17 @@ BUDGET_USD = 15
 (\\$2), their end measurements and the axis scoring of their kept checkpoints (\\$1); and room for a retry."""
 
 
+CROSS_SEEDS: tuple[int, ...] = (712, 715, 718, 719)
+"""The crossed runs: the 1/50 draw of each of these seeds, trained at each of them. Two seeds whose 1/50 run ended
+low (715 slid, 719 never reached the level of the rest) and two whose run ended high. The diagonal repeats the
+1/50 runs, retrained with the faster step and the determinism flags off (a shared compilation cache instead), so
+all sixteen runs come from one regime."""
+
+
+def cross_label_of(draw_seed: int, model_seed: int) -> str:
+    return f"{NAME}-cross-d{draw_seed}-s{model_seed}"
+
+
 def label_of(model_seed: int, stop: int | None = None, rate: str = DEFAULT_RATE) -> str:
     tag = "" if rate == DEFAULT_RATE else f"-{rate}"
     return f"{NAME}{tag}-s{model_seed}" + (f"-e{stop}" if stop is not None else "")
@@ -95,12 +106,19 @@ WRITE_ARRAYS_REF = PREFIX + "/write-arrays/{label}"
 RESTRICTED_REF = PREFIX + "/restricted-axes"
 ALONG_REF = PREFIX + "/along"
 BIAS_REF = PREFIX + "/label-bias"
+CROSS_PREFIX = PREFIX + "/cross"
+CROSS_CHECKPOINT_REF = CROSS_PREFIX + "/checkpoints/{label}"
+CROSS_RESULTS_REF = CROSS_PREFIX + "/results"
+CROSS_AXES_REF = CROSS_PREFIX + "/axes"
+CROSS_ALONG_REF = CROSS_PREFIX + "/along"
+CROSS_TRAJ_REF = CROSS_PREFIX + "/trajectories"
 
 
-def draw_labels(labels, model_seed: int, rate: float, tag: str = "") -> dict:
+def draw_labels(labels, model_seed: int, rate: float, tag: str = "", draw_seed: int | None = None) -> dict:
     """The corpus labels of ex-2.2.21 with a `fixed_draw` beside them: one draw per context at *rate*, from a stream
     of the model seed's own (the same stream at every rate, so a context labelled at one rate is labelled at every
-    higher one). *tag* names the rate in the artifact. Returns the new labels and the count of `difference` contexts
+    higher one). *draw_seed* takes the draw from another seed's stream instead (the crossed runs). *tag* names the
+    rate in the artifact. Returns the new labels and the count of `difference` contexts
     the draw labels.
     """
     import numpy as np
@@ -110,13 +128,14 @@ def draw_labels(labels, model_seed: int, rate: float, tag: str = "") -> dict:
     workdir = ex2221.get_data_dir() / NAME / "draws" / f"{model_seed}{tag}"
     with np.load(get(labels, workdir / "labels.npz")) as z:
         arrays = {k: z[k] for k in z.files}
-    rng = np.random.default_rng([model_seed, DRAW_SALT])
+    rng = np.random.default_rng([model_seed if draw_seed is None else draw_seed, DRAW_SALT])
     drawn = rng.random(len(arrays["op_ids"])) < rate
     out = workdir / "fixed-labels.npz"
     np.savez_compressed(out, **arrays, fixed_draw=drawn)
     is_anchored = arrays["op_ids"] == OP_NAMES.index(ANCHORED_OP)
     return {
         "model_seed": model_seed,
+        "draw_seed": model_seed if draw_seed is None else draw_seed,
         "labels": put(out, name=f"{NAME}{tag}-labels-s{model_seed}.npz"),
         "n_labelled": int((drawn & is_anchored).sum()),
         "n_anchored": int(is_anchored.sum()),
@@ -390,6 +409,68 @@ def scout(ctx: Ctx) -> dict:
     return {"calls": calls_of(rows, draws, stopped)}
 
 
+def cross(ctx: Ctx) -> dict:
+    """Each 1/50 draw of `CROSS_SEEDS` trained at each of those model seeds, straight to the end, then measured:
+    whether a low run follows its label set or its seed.
+    """
+    runs = [(d, s) for d in CROSS_SEEDS for s in CROSS_SEEDS]
+    n = len(runs)
+    resolved = ctx.run(ex2222.resolve_reused, [], role="prep")
+    draws = ctx.map(
+        draw_labels,
+        [resolved["labels"]] * n,
+        [s for _, s in runs],
+        [RATES[DEFAULT_RATE]] * n,
+        [f"-cross-d{d}" for d, _ in runs],
+        [d for d, _ in runs],
+        role="prep",
+    )
+    base = {r["model_seed"]: r for r in fc.rows_of(resolved["meta"], CROSS_SEEDS, None, EPOCHS)}
+    rows = [base[s] | {"kind": f"{NAME}-cross", "rate": DEFAULT_RATE, "draw_seed": d, "label": cross_label_of(d, s)} for d, s in runs]  # fmt: skip
+    done = train(ctx, resolved, rows, [x["labels"] for x in draws], KEEP, [None] * n)
+    labels = [r["label"] for r in rows]
+    holdout = [resolved["holdout"]] * n
+    checkpoints = [t["checkpoint"] for t in done]
+    measured = ctx.map(lean.measure_one, checkpoints, holdout, labels, [True] * n, role="measure")
+    axes = ctx.map(rb.axes_one, checkpoints, holdout, labels, [None] * n, role="measure")
+    along = ctx.map(
+        ac.kept_axes_one,
+        [t["kept_checkpoints"] for t in done],
+        checkpoints,
+        holdout,
+        labels,
+        [tuple(t["kept_epochs"]) for t in done],
+        [EPOCHS] * n,
+        role="measure",
+    )
+    return ctx.run(publish_cross, rows, draws, done, measured, axes, along, role="prep")
+
+
+def publish_cross(rows: list[dict], draws: list[dict], trained: list[dict], measured: list[dict], axes: list[dict],
+                  along: list[list[dict]]) -> dict:  # fmt: skip
+    """The crossed runs, under refs of their own beside the main runs."""
+    import json
+
+    from mini.store import put, set_ref
+
+    meta = {
+        r["label"]: {"kind": r["kind"], "draw_seed": r["draw_seed"], "model_seed": r["model_seed"], "n_labelled": d["n_labelled"]}
+        for r, d in zip(rows, draws, strict=True)
+    }  # fmt: skip
+    for t in trained:
+        set_ref(CROSS_CHECKPOINT_REF.format(label=t["label"]), t["checkpoint"])
+    traj = {t["label"]: meta[t["label"]] | {k: t[k] for k in ("traj", "val_loss", "train_loss")} | {"gpu": t.get("gpu")} for t in trained}  # fmt: skip
+    set_ref(CROSS_TRAJ_REF, put(json.dumps(traj).encode(), name=f"{NAME}-cross-trajectories.json"))
+
+    def body(runs: list[dict]) -> bytes:
+        return json.dumps({"cross_seeds": list(CROSS_SEEDS), "runs": [meta[r["label"]] | r for r in runs]}).encode()
+
+    set_ref(CROSS_RESULTS_REF, put(body(measured), name=f"{NAME}-cross-results.json"))
+    set_ref(CROSS_AXES_REF, put(body(axes), name=f"{NAME}-cross-axes.json"))
+    set_ref(CROSS_ALONG_REF, put(body([r for a in along for r in a]), name=f"{NAME}-cross-along.json"))
+    return {"n_cross": len(trained)}
+
+
 def smoke(ctx: Ctx) -> dict:
     """One seed for eight epochs, stopped at six, carried on and measured."""
     return run(
@@ -410,12 +491,12 @@ def half(ctx: Ctx) -> dict:
     return run(ctx, seeds=SEEDS[:4])
 
 
-STAGE = "full"
-"""Which entry `main` runs: `smoke`, `scout`, `half`, or `full`. Each stage's runs are memo hits for the next."""
+STAGE = "cross"
+"""Which entry `main` runs: `smoke`, `scout`, `half`, `full`, or `cross`. Each stage's runs are memo hits for the next."""
 
 
 def main(ctx: Ctx) -> dict:
-    return {"smoke": smoke, "scout": scout, "half": half, "full": run}[STAGE](ctx)
+    return {"smoke": smoke, "scout": scout, "half": half, "full": run, "cross": cross}[STAGE](ctx)
 
 
 COMPUTE = ac.COMPUTE
