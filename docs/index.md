@@ -664,4 +664,12 @@ With `τ_ℓ fixed` adopted, we gave it the full set of measurements and a refer
 
     <!-- mini:figures ./m2/filtered-corpus/report.py -->
 
+- [What the edit misses in the low runs](./m2/low-runs/report.py)
+
+    A few runs trained with one label draw held for the run end with the edit removing much less of `difference`, and a twin trained again from the same labels, seed, and batches matches each in loss and alignment and still removes the op well. A re-analysis of 48 stored checkpoints: every run also writes, off the anchored axis, whether each example fits the op, and in a low run the reader blocks take part of that judgement from copies the edit never touches, at the answers or at the other example positions. The low runs peak lower and give back more while the anti weight anneals.
+
+    <span class="tags">`reanalysis` `in-context` `intervention` `seed-sensitivity`</span>
+
+    <!-- mini:figures ./m2/low-runs/report.py -->
+
 </details>
