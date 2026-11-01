@@ -9,6 +9,7 @@ Scheduled jobs that run in the project's **Maintenance routines** thread. Each s
 | `tech-debt.md` | Sun & Tue 16:00 | general-purpose, opus |
 | `housekeeping.md` | Sun & Tue 21:00 | general-purpose, opus |
 | `dead-code.md` | 1st of month 15:51 | the `deadcode-routine` agent spec |
+| `find-tuning.md` | 1st & 15th 16:30 | general-purpose, opus |
 
 The science desk has its own thread and prompt, and its brief is `.claude/agents/science-desk.md`.
 

@@ -8,12 +8,15 @@ The corpus is a few megabytes, so the index is built on every call (well under a
 Two cheap aids cover most of the gap between how a question is worded and how a report worded the answer. Words are folded (Unicode NFKC, so `e₁` matches `e1`; case; a light suffix strip, so `spills` matches `spill`). And the glossary lists other wordings for each term (`docs/glossary.md`), so a query that names one wording also matches the others, at half weight.
 
 Like `todo.py`, this uses the standard library only, so it runs before `uv sync` does.
+
+Usage is logged so the ranking can be tuned from evidence. When `FIND_LOG_DIR` is set (`./go` sets it to the project's shared folder in a cloud project thread), each search appends one JSON line to `queries/<session>.jsonl` there: the query, the filters, and the top paths. An agent that finds an answer the search missed records it with `--miss`, which appends to `misses/<session>.jsonl` with where the answer was and what rank that place has now. One file per session keeps concurrent threads from writing to the same file. `--log-report` summarizes both for the tuning routine (`.claude/routines/find-tuning.md`), and settled misses become cases in `tests/find_cases.json`, which `tests/test_find_cases.py` checks against the real corpus. The log lives outside the repo, so it is never indexed itself.
 """
 
 import argparse
 import ast
 import json
 import math
+import os
 import re
 import shutil
 import signal
@@ -21,8 +24,10 @@ import sys
 import textwrap
 import unicodedata
 from collections import Counter
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from itertools import pairwise
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent.resolve()
@@ -30,6 +35,8 @@ KINDS = ("report", "doc", "todo", "eng", "index")
 K1, B = 1.2, 0.75  # the usual BM25 constants: term-frequency saturation, length normalization
 ALIAS_WEIGHT = 0.5  # how much a glossary alias counts against a word the query used
 SNIPPET = 320  # characters of excerpt per hit
+LOGGED_HITS = 5  # top paths kept per logged query
+REWORD_SECONDS = 180  # a second query from the same session this soon after a first is counted as a rewording
 STOP = frozenset(
     "a an and are as at be by for from has have how in into is it its of on or that the this to was we were what when where which with".split()
 )
@@ -285,14 +292,81 @@ def snippet(text: str, query: dict[str, float], width: int = SNIPPET) -> str:
     )
 
 
+# --- The usage log ---------------------------------------------------------------------------------------------
+
+
+def session_name() -> str:
+    """A stable name for this session's log files: the Claude Code session id where there is one."""
+    sid = os.environ.get("CLAUDE_CODE_SESSION_ID") or os.environ.get("CLAUDE_CODE_REMOTE_SESSION_ID")
+    return re.sub(r"[^\w-]", "_", sid) if sid else f"pid-{os.getpid()}"
+
+
+def append_log(log_dir: Path | None, kind: str, record: dict) -> None:
+    """Append *record* as one JSON line to `<log_dir>/<kind>/<session>.jsonl`. Logging never fails a search."""
+    if log_dir is None:
+        return
+    try:
+        (folder := log_dir / kind).mkdir(parents=True, exist_ok=True)
+        stamped = {"time": datetime.now(UTC).isoformat(timespec="seconds"), "session": session_name(), **record}
+        with open(folder / f"{session_name()}.jsonl", "a") as f:
+            f.write(json.dumps(stamped, ensure_ascii=False) + "\n")
+    except OSError as e:
+        print(f"find: could not write the usage log ({e})", file=sys.stderr)
+
+
+def read_log(log_dir: Path, kind: str, since: str = "") -> list[dict]:
+    """Every record of *kind* at or after *since* (an ISO date or time), oldest first."""
+    records = []
+    for path in sorted((log_dir / kind).glob("*.jsonl")):
+        for line in path.read_text().splitlines():
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue  # a torn line from an interrupted write
+            if record.get("time", "") >= since:
+                records.append(record)
+    return sorted(records, key=lambda r: r.get("time", ""))
+
+
+def rank_of(hits: list[tuple[float, Passage]], target: str) -> int | None:
+    """Where *target* (`path` or `path:line`) first appears in *hits*, counting from 1."""
+    path, _, line = target.partition(":")
+    for i, (_, p) in enumerate(hits, 1):
+        if p.path == path and (not line or p.line <= int(line) < p.line + p.text.count("\n") + 3):
+            return i
+    return None
+
+
+def log_report(log_dir: Path, since: str, rank: Callable[[str, str], int | None]) -> str:
+    """A plain-text summary of the log: volume, empty results, quick rewordings, and each recorded miss with its rank today."""
+    queries, misses = read_log(log_dir, "queries", since), read_log(log_dir, "misses", since)
+    out = [f"{len(queries)} searches from {len({q['session'] for q in queries})} sessions since {since or 'the start'}"]
+    if empty := [q for q in queries if not q.get("top")]:
+        out += ["", "No results:", *(f"  {q['query']!r}" for q in empty)]
+    rewordings = []
+    for a, b in pairwise(sorted(queries, key=lambda q: (q["session"], q["time"]))):
+        gap = datetime.fromisoformat(b["time"]) - datetime.fromisoformat(a["time"])
+        if a["session"] == b["session"] and gap.total_seconds() <= REWORD_SECONDS and a["query"] != b["query"]:
+            rewordings.append(f"  {a['query']!r} → {b['query']!r}")
+    if rewordings:
+        out += ["", "Reworded within a few minutes (the first may have missed):", *rewordings]
+    if misses:
+        out += ["", "Recorded misses (rank of the answer in today's ranking, top 20):"]
+        for m in misses:
+            now = rank(m["query"], m["found"])
+            note = f" · {m['note']}" if m.get("note") else ""
+            out.append(f"  {m['query']!r} → {m['found']}: was {m.get('rank') or '>20'}, now {now or '>20'}{note}")
+    return "\n".join(out)
+
+
 # --- CLI ------------------------------------------------------------------------------------------------------
 
 
-def main(argv: list[str] | None = None, root: Path = ROOT) -> int:
+def main(argv: list[str] | None = None, root: Path = ROOT, log_dir: Path | None = None) -> int:
     ap = argparse.ArgumentParser(
         description="Ranked keyword search (BM25) over report prose, design docs, backlogs, the decision register and the index."
     )
-    ap.add_argument("query", nargs="+", help="words to look for; order does not matter")
+    ap.add_argument("query", nargs="*", help="words to look for; order does not matter")
     ap.add_argument("-n", type=int, default=10, help="hits to show (default 10)")
     ap.add_argument(
         "--kind", action="append", choices=KINDS, help="only these kinds of document (repeatable; default all)"
@@ -308,22 +382,66 @@ def main(argv: list[str] | None = None, root: Path = ROOT) -> int:
     ap.add_argument("--full", action="store_true", help="print each passage whole, wrapped to the terminal width")
     ap.add_argument("--no-glossary", action="store_true", help="match only the words given, without glossary wordings")
     ap.add_argument("--json", action="store_true", help="emit the hits as JSON")
+    ap.add_argument(
+        "--miss",
+        metavar="PATH[:LINE]",
+        help="record that the query missed: the answer was at PATH (the query words are the search that missed)",
+    )
+    ap.add_argument(
+        "--note", default="", help="with --miss: what the answer was worded as, or why the search missed it"
+    )
+    ap.add_argument("--log-report", action="store_true", help="summarize the usage log and the recorded misses")
+    ap.add_argument("--since", default="", metavar="DATE", help="with --log-report: only records from this date on")
     args = ap.parse_args(argv)
 
+    glossary = root / "docs" / "glossary.md"
+    groups = [] if args.no_glossary or not glossary.exists() else glossary_forms(glossary.read_text())
     passages = [
         p
         for p in corpus(root)
         if (not args.kind or p.kind in args.kind)
         and (not args.under or any(p.path.startswith(u.rstrip("/")) for u in args.under))
     ]
-    glossary = root / "docs" / "glossary.md"
-    groups = [] if args.no_glossary or not glossary.exists() else glossary_forms(glossary.read_text())
+    index = Index(passages)
+
+    def rank(words: str, target: str) -> int | None:
+        return rank_of(index.search(expand(words, groups), 20, 20), target)
+
+    if args.log_report:
+        if log_dir is None:
+            print("find: no usage log here (FIND_LOG_DIR is not set)", file=sys.stderr)
+            return 2
+        print(log_report(log_dir, args.since, rank))
+        return 0
+    if not args.query:
+        ap.error("a query is needed")
     query = expand(" ".join(args.query), groups)
     if not query:
         print("find: the query has only stop words", file=sys.stderr)
         return 2
-    hits = Index(passages).search(query, args.n, args.per_file)
+    if args.miss:
+        found = rank(" ".join(args.query), args.miss)
+        append_log(
+            log_dir, "misses", {"query": " ".join(args.query), "found": args.miss, "rank": found, "note": args.note}
+        )
+        where = "not in the top 20" if found is None else f"at rank {found}"
+        print(
+            f"recorded: {args.miss} is {where} for {' '.join(args.query)!r}"
+            + ("" if log_dir else " (no log here, so not saved)")
+        )
+        return 0
 
+    hits = index.search(query, args.n, args.per_file)
+    append_log(
+        log_dir,
+        "queries",
+        {
+            "query": " ".join(args.query),
+            "kind": args.kind or [],
+            "in": args.under or [],
+            "top": [f"{p.path}:{p.line}" for _, p in hits[:LOGGED_HITS]],
+        },
+    )
     if args.json:
         print(
             json.dumps(
@@ -360,4 +478,5 @@ def main(argv: list[str] | None = None, root: Path = ROOT) -> int:
 
 if __name__ == "__main__":
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)  # `| head` ends the listing quietly
-    sys.exit(main())
+    logs = os.environ.get("FIND_LOG_DIR")
+    sys.exit(main(log_dir=Path(logs) if logs and not os.environ.get("FIND_NO_LOG") else None))

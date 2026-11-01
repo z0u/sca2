@@ -1,5 +1,6 @@
 """Tests for `./go find`: the static prose extraction, the section cut, glossary expansion, and the ranking."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -124,3 +125,26 @@ def test_cli_filters_and_json(tree: Path, capsys: pytest.CaptureFixture[str]):
     assert '"kind": "report"' in out and '"kind": "todo"' not in out
     assert find.main(["zebra"], root=tree) == 1
     assert find.main(["the", "of"], root=tree) == 2
+
+
+def test_searches_and_misses_are_logged_per_session(tree: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    logs = tmp_path / "logs"
+    assert find.main(["separator", "latch"], root=tree, log_dir=logs) == 0
+    assert find.main(["zebra"], root=tree, log_dir=logs) == 1
+    assert find.main(["lighten", "--miss", "docs/m2/scout/report.py", "--note", "a"], root=tree, log_dir=logs) == 0
+    (queries,) = (logs / "queries").glob("*.jsonl")
+    first, second = (json.loads(line) for line in queries.read_text().splitlines())
+    assert first["top"][0].startswith("todo/science/latch.md") and second["top"] == []
+    (miss,) = find.read_log(logs, "misses")
+    assert (miss["found"], miss["rank"], miss["note"]) == ("docs/m2/scout/report.py", 1, "a")
+    capsys.readouterr()
+    assert find.main(["--log-report"], root=tree, log_dir=logs) == 0
+    report = capsys.readouterr().out
+    assert "2 searches from 1 sessions" in report
+    assert "'zebra'" in report and "'separator latch' → 'zebra'" in report
+    assert "'lighten' → docs/m2/scout/report.py: was 1, now 1 · a" in report
+
+
+def test_without_a_log_dir_nothing_is_written(tree: Path, tmp_path: Path):
+    assert find.main(["spill"], root=tree) == 0
+    assert not (tmp_path / "logs").exists()

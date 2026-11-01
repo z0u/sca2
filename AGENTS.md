@@ -60,7 +60,7 @@ rg -no '.{0,55}anneal.{0,55}' docs/  # a {0,N} window around each match
 
 For the backlogs, prefer `./go todo --grep anneal`, which skips settled items.
 
-To find where something was found or decided, start with `./go find late spill anneal`. It ranks passages by keyword relevance (BM25) across report prose, design docs, both settled and live backlog items, `eng/`, and the index entries, and prints one excerpt per section with its `path:line`. A query that names a glossary term also matches the glossary's other wordings for it. Narrow with `--kind report|doc|todo|eng|index` or `--in docs/m2`, and use `rg` once you know the word the report used.
+To find where something was found or decided, start with `./go find late spill anneal`. It ranks passages by keyword relevance (BM25) across report prose, design docs, both settled and live backlog items, `eng/`, and the index entries, and prints one excerpt per section with its `path:line`. A query that names a glossary term also matches the glossary's other wordings for it. Narrow with `--kind report|doc|todo|eng|index` or `--in docs/m2`, and use `rg` once you know the word the report used. When a search misses something you then find another way, record it with `./go find <the words you searched> --miss <path>[:line] --note "<the word the report used>"`. Searches and misses are logged to the project's shared folder, and a routine tunes the ranking from them.
 
 For recon on an earlier report (what it found, how it reads), read its Markdown render instead of the `.py`: `./go render docs/<key>/report.py -o .mini/lit/<key>/index.md`, with figures beside it. The render caches are shared between the project's cloud threads, so it's quick. Open the `.py` only to see how something was computed.
 
