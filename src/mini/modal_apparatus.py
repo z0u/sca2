@@ -39,7 +39,7 @@ from mini.modal_volume import ModalVolume
 from mini.progress import ProgressMessage, progress_context
 from mini.progress_display import RichProgressDisplay
 from mini.requirements import project_packages, uv_freeze
-from mini.runs import data_root
+from mini.runs import experiments_root
 from mini.store import (
     PROFILE_ENV,
     PUBLISH_REPO_ENV,
@@ -604,9 +604,9 @@ class ModalApparatus(Apparatus[ModalVolume]):
         With a bucket configured *and* a token available, that's the shared HF bucket the worker wrote to — so artifacts read back the same everywhere, no Volume needed. Otherwise it's a read-through over this experiment's Modal Volume, warm-caching into a local checkout (``.mini/store-cache/<app>``). The token gate mirrors ``_hf_store_secret``: with no token the worker writes to the Volume, so the client must read from there too (not an empty bucket).
         """
         if store_bucket() and _hf_token():
-            return store_for(data_root() / "store")
+            return store_for(experiments_root() / "store")
         assert self.app.name  # guaranteed by __init__ (a named App is required)
-        cache = LocalStore(data_root() / "store-cache" / self.app.name)
+        cache = LocalStore(experiments_root() / "store-cache" / self.app.name)
         return ModalVolumeStore(self.volume, cache)
 
     def _memo_worker(self, fn: Callable) -> modal.Function:

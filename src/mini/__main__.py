@@ -32,8 +32,8 @@ from mini.runs import (
     SETTLED,
     STALE_HEARTBEAT_S,
     RunState,
-    data_root,
     describe_numerics_drift,
+    experiments_root,
     in_declared_phase,
     is_queued,
     merged_numerics_drift,
@@ -74,7 +74,7 @@ def _resolve_app(name: str, args: argparse.Namespace) -> str:
     """
     if app := getattr(args, "app", None):
         return app
-    marker = data_root() / name / ".app"
+    marker = experiments_root() / name / ".app"
     if marker.is_file() and (app := marker.read_text().strip()):
         return app
     return os.environ.get(_APP_ENV) or _project_config().get("app") or "local"
@@ -82,7 +82,7 @@ def _resolve_app(name: str, args: argparse.Namespace) -> str:
 
 def _remember_app(name: str, args: argparse.Namespace) -> None:
     """Stamp the launch backend into ``.mini/<name>/.app`` so later reads follow it."""
-    d = data_root() / name
+    d = experiments_root() / name
     d.mkdir(parents=True, exist_ok=True)
     (d / ".app").write_text(f"{_resolve_app(name, args)}\n")
 
@@ -91,7 +91,7 @@ def _peek(name: str, backend: str) -> int:
     """Best-effort task count on *backend*, for the empty-read hint. Never raises and never creates state — Modal may not even be configured here."""
     try:
         if backend == "local":
-            return len(MemoStore(data_root() / name).records())
+            return len(MemoStore(experiments_root() / name).records())
         import modal
 
         from mini.modal_apparatus import control_dict_name
@@ -106,7 +106,7 @@ def _peek(name: str, backend: str) -> int:
 
 def _known_names() -> list[str]:
     """Experiment names with a memo store under the data root (as ``ls`` lists)."""
-    root = data_root()
+    root = experiments_root()
     if not root.exists():
         return []
     return sorted(p.name for p in root.glob("*") if (p / ".control" / "memo").is_dir())
@@ -190,7 +190,7 @@ def _store_for(name: str, args: argparse.Namespace) -> MemoStore:
     Local reads straight off disk (no apparatus needed); ``--app modal`` builds the apparatus so reads hit the Modal control plane (a named ``modal.Dict``).
     """
     if _resolve_app(name, args) == "local":
-        return MemoStore(data_root() / name)
+        return MemoStore(experiments_root() / name)
     return _build_apparatus(name, args).memo_store()
 
 
@@ -501,7 +501,7 @@ def cmd_ls(args: argparse.Namespace) -> None:
         print("  (ls reads local launch state only — a run made elsewhere is reachable by name:")
         print(f"   {PROG} status <name> --app modal)")
         return
-    root = data_root()
+    root = experiments_root()
     for name in names:
         store = MemoStore(root / name)
         current, stale = store.split_current(store.records())
@@ -1329,12 +1329,12 @@ def _gc_store(args: argparse.Namespace) -> None:
             "sweeping the local fallback store instead of the real CAS would be misleading. "
             "Run ./go auth (or set HF_TOKEN) first."
         )
-    store = store_for(data_root() / "store")
+    store = store_for(experiments_root() / "store")
     # Settle vanished local workers first, so a crashed run's RUNNING record
     # doesn't block the sweep forever. Modal records are reaped by their own
     # verbs (status/watch); a stale one here aborts with a pointer to those.
-    for name in sorted(p.name for p in data_root().glob("*") if (p / ".control" / "memo").is_dir()):
-        memo = MemoStore(data_root() / name)
+    for name in sorted(p.name for p in experiments_root().glob("*") if (p / ".control" / "memo").is_dir()):
+        memo = MemoStore(experiments_root() / name)
         LocalApparatus(name).reap_dead(memo)
     try:
         roots, notes = collect_store_roots()

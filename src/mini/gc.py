@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from mini.memo import MemoStore
-from mini.runs import SETTLED, RunState, data_root
+from mini.runs import SETTLED, RunState, experiments_root
 from mini.store import BlobStat, Store, artifact_shas
 
 __all__ = [
@@ -379,7 +379,7 @@ def collect_store_roots(
 
     Pass *stores* to mark an explicit ``(name, memo_store)`` set (tests); otherwise experiments are enumerated under *root* and each is read on the backend stamped at launch.
     """
-    root = data_root() if root is None else root
+    root = experiments_root() if root is None else root
     if stores is None:
         stores = ((name, _memo_store_for(name, root)) for name in _experiment_names(root))
     shas: set[str] = set()
