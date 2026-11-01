@@ -13,6 +13,7 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy import stats
 
 import experiment as ex
 from mini.lit import memo
@@ -101,6 +102,15 @@ _DRAWS = {(r["rate"], r["model_seed"]): r for r in fetch_json(ex.DRAWS_REF)["run
 N_LABELLED = {t: np.array([_DRAWS[(t, s)]["n_labelled"] for s in SEEDS]) for t in RATES}
 N_ANCHORED = int(_DRAWS[(RATES[0], SEEDS[0])]["n_anchored"])
 REDRAW_DISTINCT = 34_000
+
+# --- The label-bias check ---------------------------------------------------------------------------------------
+
+_BIAS = fetch_json(ex.BIAS_REF)
+BIAS_FEATURES: list[str] = _BIAS["features"]
+_BIAS_BY = {(r["rate"], r["model_seed"]): r for r in _BIAS["runs"]}
+BIAS_P = {t: np.array([_BIAS_BY[(t, s)]["t2_p"] for s in SEEDS]) for t in RATES}
+BIAS_Z = {t: np.array([_BIAS_BY[(t, s)]["z"] for s in SEEDS]) for t in RATES}  # (seeds, features)
+BIAS_OCC = {t: np.array([[_BIAS_BY[(t, s)]["occupancy_p"][k] for k in ("operand pairs", "answer region")] for s in SEEDS]) for t in RATES}  # fmt: skip
 
 # --- Along training -------------------------------------------------------------------------------------------
 
@@ -395,6 +405,26 @@ def end_table() -> str:
     )
 
 
+def bias_table() -> str:
+    rows = []
+    for t in ("r50", "r25", "r10"):
+        cells = []
+        for i, sd in enumerate(SEEDS):
+            c = f"{BIAS_P[t][i]:.2f}<br>{REMOVAL[t][i]:.2f}"
+            cells.append(f"<strong>{c}</strong>" if sd in LOW_RUNS[t] else c)
+        rows.append([f"`{SHOWN[t]}`", *cells])
+    return table_html(
+        ["labels", *(str(sd) for sd in SEEDS)],
+        rows,
+        f"""
+        **How typical each label set is, by seed.** In each cell, above: the χ² tail of a Hotelling T² that compares
+        the mean of the labelled `difference` contexts with that of all of them, over {len(BIAS_FEATURES)} features of
+        what a context shows; a set drawn at random has a tail spread evenly between 0 and 1, and a small one is
+        unusual. Below: removal at epoch 400. The low runs are in bold.
+        """,
+    )
+
+
 def removal_along_figure() -> str:
     data = {
         "names": COLUMNS,
@@ -476,6 +506,38 @@ I32 = ALONG_EPOCHS.index(32)
 LOW_RANGE = {n: (float(REMOVAL[n][[SEEDS.index(s) for s in LOW_RUNS[n]]].min()), float(REMOVAL[n][[SEEDS.index(s) for s in LOW_RUNS[n]]].max())) for n in RATES if LOW_RUNS[n]}  # fmt: skip
 R_WINDOW = float(np.corrcoef(np.concatenate([WINDOW[n] for n in RATES]), np.concatenate([REMOVAL[n] for n in RATES]))[0, 1])  # fmt: skip
 
+# E3: how far each run gets, and how much it gives back
+PEAK = {n: REMOVAL_ALONG[n].max(axis=1) for n in COLUMNS}
+SLIDE = {n: PEAK[n] - REMOVAL_ALONG[n][:, -1] for n in COLUMNS}
+_IS_LOW = {n: np.array([s in LOW_RUNS.get(n, []) for s in SEEDS]) for n in COLUMNS}
+LOW_PEAK = np.concatenate([PEAK[n][_IS_LOW[n]] for n in RATES])
+REST_PEAK_MIN = float(min(PEAK[n][~_IS_LOW[n]].min() for n in COLUMNS))
+assert LOW_PEAK.max() < REST_PEAK_MIN  # the prose says every low run peaks below every other run
+SLIDER = max(((n, s) for n in RATES for s in LOW_RUNS[n]), key=lambda k: SLIDE[k[0]][SEEDS.index(k[1])])
+SLIDER_PEAK, SLIDER_END = (
+    float(PEAK[SLIDER[0]][SEEDS.index(SLIDER[1])]),
+    float(REMOVAL[SLIDER[0]][SEEDS.index(SLIDER[1])]),
+)
+assert SLIDER == ("r50", 715), SLIDER  # the prose names it
+REST_SLIDE = {k: float(np.concatenate([SLIDE[n][~_IS_LOW[n]] for n in ns]).max()) for k, ns in (("fixed", RATES), ("redraw", [REDRAW]))}  # fmt: skip
+SLOW_AT_32 = 0.25  # a slow starter: removal under this at epoch 32
+SLOW = {n: [s for s, v in zip(SEEDS, REMOVAL_ALONG[n][:, ALONG_EPOCHS.index(32)], strict=True) if v < SLOW_AT_32] for n in COLUMNS}  # fmt: skip
+
+# E4: does a low run's label set differ from the rest?
+_LOW_KEYS = [(t, s) for t in RATES for s in LOW_RUNS[t]]
+LOW_BIAS_P = sorted(float(BIAS_P[t][SEEDS.index(s)]) for t, s in _LOW_KEYS)
+_ALL_Z = np.concatenate([BIAS_Z[t] for t in RATES])
+_ALL_REMOVAL = np.concatenate([REMOVAL[t] for t in RATES])
+_RHO = [stats.spearmanr(_ALL_Z[:, i], _ALL_REMOVAL) for i in range(len(BIAS_FEATURES))]
+TOP_FEATURE = int(np.argmax([abs(r.statistic) for r in _RHO]))
+TOP_RHO, TOP_RHO_P = float(_RHO[TOP_FEATURE].statistic), float(_RHO[TOP_FEATURE].pvalue)
+BIAS_MIN_P = float(min(BIAS_P[t].min() for t in RATES))
+OCC_MIN_P = float(min(BIAS_OCC[t].min() for t in RATES))
+NEST = {s: [float(REMOVAL[t][SEEDS.index(s)]) for t in ("r50", "r25", "r10")] for s in (715, 717, 718, 719)}
+LOW_BIAS_TYPICAL = sum(p > 0.5 for p in LOW_BIAS_P)
+_OCC_MIN_AT = min(((t, s) for t in RATES for s in SEEDS), key=lambda k: BIAS_OCC[k[0]][SEEDS.index(k[1])].min())
+assert _OCC_MIN_AT[1] not in LOW_RUNS[_OCC_MIN_AT[0]]  # the prose says it is not on a low run
+
 rf"""
 # Fixed labels
 
@@ -498,7 +560,8 @@ rf"""
 
 - [The anchor settles at every rate (E1)](#the-anchor-settles-at-every-rate-e1): all 24 runs are called kept at epoch 64, and α at the example answers settles about as fast as under the per-visit draw.
 - [Removal and spill at the end (E2)](#removal-and-spill-at-the-end-e2): every run keeps the anchor, and runs pass the task gate as often as the per-visit runs do. At 1/50 and at 1/10, a few runs end well below the lowest per-visit run, so the seed mean falls. At 1/25 removal matches the per-visit draw, but one run spills late, over the criterion.
-- [When the low runs fall behind (E3)](#when-the-low-runs-fall-behind-e3): some low runs are behind from early in training, and others slide down after the anchor has settled. Neither kind tracks the label count.
+- [When the low runs fall behind (E3)](#when-the-low-runs-fall-behind-e3): the low runs mostly never reach the level of the rest. One run at 1/50 slides after reaching it, and the others give back only a little after their peak.
+- [The low runs' label sets (E4)](#the-low-runs-label-sets-e4): nothing in what the labelled contexts show sets the low runs' sets apart, and labelling more contexts around a low run's set does not lift removal in step.
 
 ## Scope and method
 
@@ -506,7 +569,7 @@ This is an exploratory study, with no preregistration and no gate of its own. It
 
 Every run is `τ_ℓ fixed` as the fixed confirmation trained it, with one change to the labels. In place of the per-visit draw, a single draw made before training picks the labelled contexts. A picked context carries the label on every visit, and any other context never does.
 
-Each seed has its own random stream for this draw, and the draws are nested, so every context labelled at 1/50 is also labelled at 1/25 and at 1/10. The per-visit draw is still taken and set aside, so each run trains on the same batches from the same initialization as the per-visit run at its seed. Only which contexts carry the pull differs.
+Each seed has its own random stream for this draw, so the seed sets the labelled contexts as well as the initialization and the batches. The draws are nested, so every context labelled at 1/50 is also labelled at 1/25 and at 1/10. The per-visit draw is still taken and set aside, so each run trains on the same batches from the same initialization as the per-visit run at its seed. Only which contexts carry the pull differs.
 
 The pull is a mean over the labelled contexts in each batch, so the label rate does not change how hard the anchor pulls. At 1/50 it also leaves the number of labelled contexts per batch unchanged on average. What the rate changes is how many distinct contexts the pull ever falls on, and how much the pull in a batch varies from one batch to the next.
 
@@ -530,7 +593,7 @@ Task change
 :   The clean score per op, less that of the control at the seed. The gate of the D2.2 design asks for a mean change over ops of at least −0.02, and at least −0.05 on any one op.
 
 Call
-:   The early verdict on whether a run kept the anchor, from mean α at the example answers at slice 3 over epochs 44 to 64. A run below 0.15 is called lost, and one at 0.28 or above is called kept.
+:   The early verdict on whether a run kept the anchor, from mean α at the example answers of the `difference` probe contexts at slice 3, over epochs 44 to 64. The probe contexts are a held-out set, the same for every run, and none carries a label. A run below 0.15 is called lost, and one at 0.28 or above is called kept.
 """
 
 # %%
@@ -582,17 +645,37 @@ The intervals on the removal difference from the per-visit draw are wide. At 1/1
 rf"""
 ## When the low runs fall behind (E3)
 
-Do the low runs fail to settle, or settle and then lose ground? The answer says whether the shortfall is about the anchor finding e₁ or about holding it there.
+Do the low runs fail to reach the level of the rest, or reach it and lose ground? The answer says whether the shortfall is about the anchor finding e₁ or about holding it there.
 
 {removal_along_figure()}
 
-Both happen. Some low runs are already behind at epoch 32 and never catch up, staying near 0.6 for the rest of training. Others come close to the per-visit level by epoch 100 or so and then slide down over the rest of the run, while the anti weight anneals. Under the per-visit draw, slow starters (such as seed 717, still near zero at epoch 32) catch up by the end.
+Mostly the first. Every low run peaks below every other run in any condition: {LOW_PEAK.min():.2f} to {LOW_PEAK.max():.2f}, against {REST_PEAK_MIN:.2f} and up. The gap is there from early in training and does not close.
 
-Neither kind lines up with the rate. Both appear at 1/50 and at 1/10, and the 1/25 runs show neither. The 1/25 runs also reach their final level sooner than any other condition, by about epoch 64. With eight runs a condition, that may be the same luck of the seeds as in E2.
+One run also slides. Seed {SLIDER[1]} at 1/50 is near the top of its condition at epoch 64 and peaks at {SLIDER_PEAK:.2f}, then slides to {SLIDER_END:.2f} over the rest of the run, while the anti weight anneals. Other runs give back a little after their peak too: up to {REST_SLIDE["fixed"]:.2f} with a fixed set, and up to {REST_SLIDE["redraw"]:.2f} under the per-visit draw.
 
-One account fits, though we have not tested it. With a fixed set, the pull keeps returning to the same few hundred or thousand contexts, so what the anchor learns depends on which contexts the draw happened to pick. A draw whose contexts cover the examples or the replacement noise unevenly could anchor the op only partly, and keep it that way.
+A slow start doesn't make a low run. Seed {SLOW[REDRAW][0]} under the per-visit draw and seeds {SLOW["r50"][0]} and {SLOW["r50"][1]} at 1/50 are under {SLOW_AT_32} at epoch 32 and end with the rest.
 
-The per-visit draw averages over almost every context, which would explain why its runs spread less. Telling this apart from plain run-to-run sensitivity would take several draws at the same seed.
+Neither pattern lines up with the rate. The 1/25 runs show neither, and they reach their final level sooner than any other condition, by about epoch 64. With eight runs a condition, that may be the same luck of the seeds as in E2.
+"""
+
+# %%
+
+rf"""
+## The low runs' label sets (E4)
+
+With a fixed set, the pull keeps returning to the same few hundred or thousand contexts, so what the anchor learns could depend on which contexts the draw happened to pick. A set whose contexts lean toward one part of the colour cube, one ordering of the operands, or more noisy examples might anchor the op only partly. Is there anything unusual about the label sets of the low runs?
+
+To check, each `difference` context gets one value per feature, averaged over its examples and its query: the mean of each channel for each operand and the answer, the signed difference of the operands per channel, the lightness of the operands and the answer, the distance between the operands, and the counts of noise and cube examples. Each label set is then compared with all `difference` contexts on all {len(BIAS_FEATURES)} features at once (a Hotelling T² test[^hotelling]), and on how it fills the cube (by pairs of operand octants, and by answer region, χ² tests).
+
+[^hotelling]: Hotelling T² test: the many-feature version of a t test, asking whether a sample mean differs from a reference mean, with the features' correlations taken into account.
+
+{bias_table()}
+
+The low runs' sets look like any other. Their tails run from {LOW_BIAS_P[0]:.2f} to {LOW_BIAS_P[-1]:.2f}, and {WORD[LOW_BIAS_TYPICAL]} of the {WORD[len(LOW_BIAS_P)]} are above 0.5. The smallest tail of any of the 24 sets is {BIAS_MIN_P:.2f}, about what 24 random draws give. On the cube, the smallest of the 48 occupancy tails is {OCC_MIN_P:.2f}, about what 48 tests give, and it is not on a low run. No single feature tracks removal over the 24 runs either: the strongest is `{BIAS_FEATURES[TOP_FEATURE]}`, at Spearman ρ = {f"{TOP_RHO:.2f}".replace("-", "−")} (p = {TOP_RHO_P:.2f}).
+
+The nesting gives a second view. Every context labelled at 1/50 is also labelled at 1/25 and 1/10, so the three sets of a seed grow around one another. If a run ended low because of some contexts in its set, those contexts stay in every larger set, diluted by the new ones, so removal should climb as the set grows and not fall again. At seed 715 the low run at 1/50 recovers once more contexts join its set ({NEST[715][0]:.2f}, then {NEST[715][1]:.2f} and {NEST[715][2]:.2f}), which fits. But at seed 719 removal goes {NEST[719][0]:.2f}, {NEST[719][1]:.2f}, {NEST[719][2]:.2f} as the set grows. At seeds 717 and 718 the 1/25 runs end at {NEST[717][1]:.2f} and {NEST[718][1]:.2f}, while the 1/10 runs, whose sets contain theirs, end at {NEST[717][2]:.2f} and {NEST[718][2]:.2f}. Low runs come and go as the set grows.
+
+So the label sets don't account for the low runs, as far as these features can see. That leaves run-to-run sensitivity, where a small change in which contexts carry the pull sends a run to a different end. These tests can't rule out a feature they don't measure. Training one draw at several seeds, and several draws at one seed, would tell set and seed apart.
 """
 
 # %%
@@ -602,7 +685,7 @@ r"""
 
 A fixed labelled set at one context in fifty is enough for the anchor to settle on e₁ and keep it (E1, E2). That was the main worry, since the per-visit draw had shown the anchor most of the `difference` contexts over a run. On that count, the scarce-label claim of the D2.2 design holds with labels as a real pipeline would have them.
 
-But removal is less reliable with a fixed set: a few runs in eight end well short of the rest (E2), either from early in training or after a late slide (E3). Since a fixed set five times larger did no better, more labels of the same kind do not seem to be the fix, at least between about 900 and 4,300 contexts. The per-visit draw spreads less, and that may come from the variety of contexts it sees rather than their number.
+But removal is less reliable with a fixed set: a few runs in eight end well short of the rest (E2), mostly because they never reach the level of the others (E3). Since a fixed set five times larger did no better, more labels of the same kind do not seem to be the fix, at least between about 900 and 4,300 contexts. Nor do the low runs' sets differ from the others in what their contexts show (E4). The per-visit draw spreads less, and that may come from averaging over almost every context, which would smooth out a run's sensitivity to which contexts carry the pull.
 
 If this holds, a comparison against post-hoc methods with fixed labels should expect a wider spread on the anchored side than the fixed confirmation showed. With that spread, eight runs give a noisy seed mean.
 """
