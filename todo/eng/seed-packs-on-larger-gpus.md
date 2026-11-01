@@ -1,7 +1,8 @@
 ---
-status: open
+status: done
 tags: [performance, modal, experiments]
 opened: 2026-10-29
+closed: 2026-10-30
 ---
 # Seed packs on larger GPUs
 
@@ -12,3 +13,32 @@ Nobody has measured it. On paper an L40S has about 2.9× the memory bandwidth of
 The probe: time the scanned step for packs of 1, 8 and 16 seeds on an L4, an L40S and an A100, with the probe recipe of `pack-runs-per-gpu` (a throwaway mini experiment under `MINI_PROFILE=dev`, several single-use containers per cell), and compare the cost per seed-step at list prices.
 
 Two things changed since packing was closed, both in its favor. Conditions are now compared as two samples ([eng/determinism.md](/eng/determinism.md#seeds-are-draws)), so the new numerics of a pack and a move off the L4 matter less: a whole experiment on one card is fine, as long as no run in it pairs with or resumes from a run on the L4. The cost that stays is that the pack is the memo unit, so one failure retrains every seed in it. Training is a few dollars per experiment, so the main gain would be wall time.
+
+L4 supply on Modal is a second reason. Since about 2026-10-27 a training task has waited a median of 12 to 28 minutes for an L4, with a tail past an hour, counting only the wait that our own container cap does not explain. A pack needs one card where eight runs need eight, so a confirmation run would wait for one machine rather than for the slowest of eight. If a pack runs well on an L40S or an A100, that card also gives a second capacity pool to draw on, with each experiment still on one card.
+
+## What the probe found (2026-10-30)
+
+Packing does not pay on any card we tried, as long as the GPU determinism flags are on. The probe is `docs/m2/pack-timing`, run under the dev profile: the step of the recipe of record (`τ_ℓ fixed`, as the fixed-confirm experiment trains it), at epoch 100 of its schedules, vmapped over packs of seeds and timed per seed-step, three containers a card unless noted. The "loop" figure adds what `train_anchored` does around each dispatch (drawing the batches on the host, about 0.8–1.5 ms a seed-step, and reading the losses back). Milliseconds per seed-step, loop, the median over containers (one seed is the plain, unvmapped dispatch):
+
+| card | one seed | pack of 8 | pack of 32 | pack of 64 |
+| --- | --- | --- | --- | --- |
+| L4 (one container) | 11.2 | 28.6 | 35.7 | |
+| A10G | 13.6 | 18.2 | 20.3 | |
+| L40S | 4.5 | 8.4 | 12.7 | |
+| A100 | 6.8 | 7.1 | 7.5 | 7.6 |
+| A100, determinism flags off | 7.8 | 4.6 | 4.3 | 4.3 |
+| L40S, no scatter-add in the step | 3.3 | 4.7 | 5.7 | |
+
+On every card with the flags on, a pack costs at least as much per seed as one seed alone, and on the L4, A10G and L40S it costs two to three times as much. With the flags off, the A100 halves its cost per seed from a pack of 8 on, but that only brings it level with the L4 per dollar.
+
+The step had five scatter-adds, which are the gradients of indexing: two residual-slice selections (`states[sel]` with an index array), the embedding lookup, and two in the cross-entropy. The determinism flags make a scatter-add run serially, and a vmapped scatter-add grows with the pack. Removing all five (static slices, and one-hot products for the other three) makes one seed about a third faster on the L40S and a pack much cheaper, but a pack still costs more per seed than one seed does. Something else in the batched step also grows with the pack. I did not chase it, since even the best pack on the best card would save little beside the single-seed gain.
+
+Peak memory was about 125 MB per seed, so memory was never the limit: a pack of 64 used 8 GB of the A100.
+
+Two results bear on other work, and they are taken up in [`scatter-free-training-step`](./scatter-free-training-step.md): the scatter-free step is faster for every run, packed or not, and the fallback cards differ a lot per dollar. The probe cost about $6.60 in all.
+
+## Notes
+
+**2026-10-31, follow-up thread** — A fifth round of the probe (`-nondet-onehot`: flags off, no scatter-add, `nvidia-smi` sampled) explains the rest. One seed keeps a card's memory bus about a third busy (the step is a few thousand elementwise passes over 6–19 MB activation tensors, so it is bytes, not arithmetic); a pack pins the bus at 96–99% and moves two to five times the bytes per seed that one seed does, so it comes out level or behind: L40S plain 1.95 ms a seed-step, pack of 8 3.38; A100 plain 3.33, pack of 32 2.46. The flags off save a fifth on a single scatter-free L40S seed (2.37 → 1.95), and the A100 single seed goes 5.7 → 3.33. The single-run path (scatter-free step, flags off if the digest test still passes, a prefetch thread for the host draw) reaches about 1.95 ms a step on an L40S against 8.7 on today's L4; the pack would need a GPU-side HLO comparison to find what inflates its traffic. Memo: project files `pack-timing/why-packing-doesnt-pay.md`.
+
+**2026-10-31, pack HLO scout** — The GPU-side look (`docs/m2/pack-hlo`, about twenty cents) revises the fifth round's reading. A pack moves the same bytes per seed as one seed (about 3 GB a step), but one seed's 92 MB working set fits the L40S's 96 MB L2 cache and a pack's does not, so the pack's kernels run at the main-memory rate (0.67 TB/s) where one seed's run at about 3.2 TB/s. Packs of 2, 3 and 4 are also slower per seed (1.96, 2.21, 2.56 ms against 1.79–1.90), so there is no pack size that pays on the L40S, and the "threefold room" was the cache hiding two thirds of one seed's traffic from the bus counter. The pack path is closed; what is left for one seed is in [`cut-the-training-step-bytes`](./cut-the-training-step-bytes.md).

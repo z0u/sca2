@@ -131,3 +131,22 @@ def test_merged_numerics_drift_keeps_every_baseline():
     merged = runs.merged_numerics_drift(drifts)
     assert merged == {"jax": (("0.9.0", "0.10.1"), "0.11.0"), "numpy": (("2.2.3",), "2.3.0")}
     assert runs.describe_numerics_drift(merged) == "jax 0.9.0/0.10.1 → 0.11.0, numpy 2.2.3 → 2.3.0"
+
+
+def test_gpus_fall_back_to_nvidia_smi_when_proc_is_empty(monkeypatch, tmp_path):
+    """Modal's gVisor sandbox has ``/proc/driver/nvidia`` with an empty ``gpus/``, so the card has to come from ``nvidia-smi`` there."""
+    import subprocess
+
+    monkeypatch.setattr(runs, "Path", lambda _: tmp_path)
+    monkeypatch.setattr(
+        runs.subprocess,
+        "run",
+        lambda *a, **kw: subprocess.CompletedProcess(a, 0, stdout="NVIDIA L4\nNVIDIA L4\n"),
+    )
+    assert runs._gpus() == ("NVIDIA L4", 2)
+
+    def missing(*a, **kw):
+        raise FileNotFoundError("nvidia-smi")
+
+    monkeypatch.setattr(runs.subprocess, "run", missing)
+    assert runs._gpus() == (None, 0)

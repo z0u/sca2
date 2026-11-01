@@ -339,6 +339,8 @@ def _memo_line(rec: dict, rates: dict[str, float] | None = None) -> str:
     if state == RunState.RUNNING and rec.get("heartbeat_at"):
         line += f"  ⧖ queued {_age(rec['heartbeat_at'])}" if queued else f"  ♥ {_age(rec['heartbeat_at'])}"
         line += _worry(rec, rates or {})
+    if (util := (rec.get("sys") or {}).get("gpu_util_mean")) is not None:
+        line += f"  gpu {util:.0f}%"  # mean utilization so far (mini._sysmetrics); `mini sysmetrics` for the rest
     if gpu := rec.get("env", {}).get("gpu"):
         line += f"  on {gpu}"  # what it actually ran on, when not the local CPU
     if rec.get("fc_id"):
@@ -372,13 +374,13 @@ def cmd_retry(args: argparse.Namespace) -> None:
     _run(exp, apparatus, args)
 
 
-def _detected_upstreams(exp: Experiment, store: MemoStore) -> dict[str, list[str]]:
+def _detected_upstreams(exp: Experiment, records: list[dict[str, Any]]) -> dict[str, list[str]]:
     """Upstream experiments detected from the refs this run's tasks resolved.
 
     Each settled task records the shared refs it read and the experiment stamped on each at ``set_ref`` time (``upstream_refs`` — see ``mini._taskworker``). Rolled up here to producer → the resolved ref names (the evidence), with self-reads dropped (an experiment reading its own refs is not a dependency).
     """
     found: dict[str, set[str]] = {}
-    for rec in store.records():
+    for rec in records:
         for item in rec.get("upstream_refs") or []:
             if (producer := item.get("experiment")) and producer != exp.name:
                 found.setdefault(producer, set()).add(item["ref"])
@@ -396,7 +398,10 @@ def _stamp_lineage(exp: Experiment, store: MemoStore, args: argparse.Namespace) 
         fresh = run_lineage()
     except Exception:  # lineage is diagnostic — never let it take a run down
         return
-    detected = _detected_upstreams(exp, store)
+    records = store.records()
+    detected = _detected_upstreams(exp, records)
+    if gpus := _exec_env_summary(records).get("gpus"):
+        fresh["gpus"] = gpus
     upstreams = []
     for dep in dict.fromkeys([*(exp.deps or []), *sorted(detected)]):
         try:
@@ -698,7 +703,7 @@ def _grouped_attention_line(g: dict[str, Any]) -> str:
 def _attention_json(rec: dict) -> dict[str, Any]:
     """A task entry for the ``attention`` list: the full record trimmed to what acting on it needs — key/state/error/liveness (and ``fc_id`` for Modal log lookup), without the env/metrics/timestamps bulk of the full ``--json``."""
     out = _task_json(rec)
-    for f in ("env", "started_at", "finished_at", "watchdog_s", "watchdog_grace_s"):
+    for f in ("env", "sys", "compile_cache", "started_at", "finished_at", "watchdog_s", "watchdog_grace_s"):
         out.pop(f, None)  # metrics and throughput stay: they're what the deviation flags are about
     if out.pop("queued", None):
         out.pop("heartbeat_age_s", None)  # a queued record's heartbeat is just its launch stamp
@@ -822,6 +827,8 @@ def _task_json(rec: dict) -> dict[str, Any]:
         "phase",
         "phase_until",
         "phase_at",
+        "sys",
+        "compile_cache",
     ):
         if (v := rec.get(f)) is not None:
             out[f] = v
@@ -1051,7 +1058,7 @@ def _attempt_delta(prev: dict, cur: dict) -> str:
     return ", ".join(bits) or "retried (evidence unchanged)"
 
 
-def _exec_env_summary(store: MemoStore) -> dict[str, Any]:
+def _exec_env_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     """Aggregate the per-task execution environments a run actually ran on.
 
     Each settled task carries an ``env`` (see :func:`mini.runs.compute_env`); this rolls the fan-out up into the distinct GPUs / regions / clouds / hosts and the number of Modal containers, plus the summed execution wall time — the "what did this run *on*" companion to the driver-side lineage.
@@ -1059,7 +1066,7 @@ def _exec_env_summary(store: MemoStore) -> dict[str, Any]:
     # env field -> the distinct values seen across tasks (each rolled up below).
     seen: dict[str, set[str]] = {k: set() for k in ("gpu", "region", "cloud", "host", "modal_task_id")}
     wall = 0.0
-    for rec in store.records():
+    for rec in records:
         env = rec.get("env") or {}
         if gpu := env.get("gpu"):
             env = {**env, "gpu": f"{gpu}×{env['gpu_count']}" if env.get("gpu_count") else gpu}
@@ -1148,7 +1155,7 @@ def _print_upstreams(lin: dict[str, Any]) -> None:
 
 def _ran_on_line(store: MemoStore) -> str:
     """One-line rollup of what a run's tasks actually executed on (or empty)."""
-    s = _exec_env_summary(store)
+    s = _exec_env_summary(store.records())
     bits = []
     if s.get("gpus"):
         bits.append("gpu " + ", ".join(s["gpus"]))
@@ -1230,6 +1237,25 @@ def cmd_explain(args: argparse.Namespace) -> None:
         if i > 1:
             line += f"  ⇐ {_attempt_delta(attempts[i - 2], att)}"
         print(line)
+
+
+def cmd_sysmetrics(args: argparse.Namespace) -> None:
+    """Print the system metrics recorded with each attempt (GPU/CPU/RAM; see ``mini._sysmetrics``).
+
+    Without a key, one summary line per task from the records; with one, that task's rows as JSONL, oldest first, for a script or a plot. Rows live beside the result, so they outlast the record's summary.
+    """
+    store = _store_for(args.name, args)
+    if args.key:
+        for row in store.sysmetrics(args.key):
+            print(json.dumps(row))
+        return
+    for rec in sorted(store.records(), key=lambda r: r["key"]):
+        summary = rec.get("sys")
+        if not summary:
+            continue
+        gpu = (rec.get("env") or {}).get("gpu") or "cpu"
+        parts = [f"{k}={v:g}" for k, v in summary.items() if isinstance(v, (int, float))]
+        print(f"{rec['key']}  {_rec_state(rec)}  {gpu}  {' '.join(parts)}")
 
 
 def _human_size(n: float) -> str:
@@ -1499,6 +1525,15 @@ def main() -> None:
     _add_key_arg(p)
     _add_app_flag(p)
     p.set_defaults(func=cmd_logs)
+
+    p = sub.add_parser(
+        "sysmetrics",
+        help="show recorded GPU/CPU/RAM use: a summary per task, or one task's rows as JSONL",
+    )
+    _add_name_arg(p)
+    p.add_argument("key", nargs="?", default=None, help="print this task's sampled rows (default: summary per task)")
+    _add_app_flag(p)
+    p.set_defaults(func=cmd_sysmetrics)
 
     p = sub.add_parser("explain", help="show a task's identity evidence and attempt timeline (why did this re-run)")
     _add_name_arg(p)
