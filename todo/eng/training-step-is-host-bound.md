@@ -1,7 +1,8 @@
 ---
-status: partial
+status: done
 tags: [performance, modal, experiments]
 opened: 2026-09-28
+closed: 2026-11-01
 ---
 # The anchored training step is host-bound on an L4
 
@@ -61,3 +62,7 @@ The padding form was the one real choice. On the CPU, only the `cond` form match
 
 - Inside a dispatch, a step costs 5–7 ms, against 3.1–3.4 ms for the bare scan in probe 4. I haven't found where the difference goes. Probe 4 called the step with the anti weight at zero and no fallback term, which may account for some of it.
 - `train_model`, the unanchored loop, has the same shape and could share `_scanned`.
+
+## Notes
+
+**2026-11-01, housekeeping** — Closing, since the step-speed work of late October took this further than "What's left" asks. The scatter-adds that the anchored step still ran ([`scatter-free-training-step`](./scatter-free-training-step.md)) are gone, the batch draw has its own thread, and the determinism flags are off with a shared compilation cache ([`flags-off-with-a-compilation-cache`](./flags-off-with-a-compilation-cache.md)). The L40S now comes first in the training fallback list, and the pack HLO scout found that one seed there runs close to the rate of the card's L2 cache, so the next lever is fewer bytes rather than less host work ([`cut-the-training-step-bytes`](./cut-the-training-step-bytes.md)). Scanning `train_model`, the unanchored loop, is still undone; I didn't open an item for it, since only ex-2.1.1 to ex-2.1.5 call it.
