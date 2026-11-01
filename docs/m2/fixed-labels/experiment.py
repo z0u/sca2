@@ -94,6 +94,7 @@ WRITE_REF = PREFIX + "/write"
 WRITE_ARRAYS_REF = PREFIX + "/write-arrays/{label}"
 RESTRICTED_REF = PREFIX + "/restricted-axes"
 ALONG_REF = PREFIX + "/along"
+BIAS_REF = PREFIX + "/label-bias"
 
 
 def draw_labels(labels, model_seed: int, rate: float, tag: str = "") -> dict:
@@ -120,6 +121,89 @@ def draw_labels(labels, model_seed: int, rate: float, tag: str = "") -> dict:
         "n_labelled": int((drawn & is_anchored).sum()),
         "n_anchored": int(is_anchored.sum()),
     }
+
+
+def label_bias(draws: list[dict], runs: list[tuple[str, int]]) -> dict:
+    """How far each fixed draw's labelled `difference` contexts sit from all of them, on what the contexts show.
+
+    The corpus is sampled again from ex-2.2.21's seed and sizes (its op per context is checked against the labels,
+    so it is the corpus the runs trained on). Each `difference` context gets one value per feature, averaged over
+    its examples and query: the mean channel of each operand and of the answer, the signed lhs − rhs per channel,
+    the answer's and the operands' lightness, the operand distance, and the counts of noise and cube examples.
+    Per draw: a z score per feature for the labelled set's mean against all `difference` contexts (sampled
+    without replacement); a Hotelling T² over all features with its χ² tail; and χ² tails for occupancy of the cube,
+    by operand-pair octants (64 cells) and by answer region (a 3×3×3 grid).
+    """
+    import numpy as np
+    from scipy import stats
+
+    from mini.store import get
+    from sca.data.incontext import op_ids as op_ids_of
+    from sca.data.incontext import sample_corpus
+
+    table = ex2221.ex2218.table_of(OP_NAMES)
+    corpus = sample_corpus(
+        ex2221.N_LINES, ex2221.CORPUS_SEED, K, ex2221.RHO, op_table=table, cube_rate=ex2221.CUBE_RATE,
+        rounding=ex2221.ex2216.ROUNDING,
+    )  # fmt: skip
+    ops = op_ids_of(corpus, table)
+    idx = np.flatnonzero(ops == OP_NAMES.index(ANCHORED_OP))
+    top = 15.0  # the colour grid runs 0 to 15 per channel
+
+    def pairs(i: int) -> tuple[list, list, list]:
+        c = corpus[i]
+        return (
+            [e.lhs for e in c.examples] + [c.query_lhs],
+            [e.rhs for e in c.examples] + [c.query_rhs],
+            [e.answer for e in c.examples] + [c.query_answer],
+        )
+
+    lhs, rhs, ans = (np.array(x, float) / top for x in zip(*(pairs(i) for i in idx), strict=True))
+    src = np.array([[e.source for e in corpus[i].examples] for i in idx])
+
+    def lightness(x):
+        return (x.max(-1) + x.min(-1)) / 2
+
+    features: dict[str, np.ndarray] = {}
+    for c, ch in enumerate("RGB"):
+        features[f"lhs {ch}"] = lhs[..., c].mean(1)
+        features[f"rhs {ch}"] = rhs[..., c].mean(1)
+        features[f"answer {ch}"] = ans[..., c].mean(1)
+        features[f"lhs − rhs {ch}"] = (lhs[..., c] - rhs[..., c]).mean(1)
+    features["answer lightness"] = lightness(ans).mean(1)
+    features["operand lightness"] = (lightness(lhs) + lightness(rhs)).mean(1) / 2
+    features["operand distance"] = np.abs(lhs - rhs).sum(-1).mean(1)
+    features["noise examples"] = (src == "noise").sum(1).astype(float)
+    features["cube examples"] = (src == "cube").sum(1).astype(float)
+    names = list(features)
+    x = np.stack([features[k] for k in names], 1)
+    mu, cov = x.mean(0), np.cov(x.T)
+
+    def cells(v, b):
+        return (np.minimum((v * b).astype(int), b - 1) * np.array([b * b, b, 1])).sum(-1)
+
+    occupancy = {"operand pairs": (cells(lhs, 2) * 8 + cells(rhs, 2), 64), "answer region": (cells(ans, 3), 27)}
+
+    out = []
+    for (rate, seed), d in zip(runs, draws, strict=True):
+        with np.load(get(d["labels"], ex2221.get_data_dir() / NAME / "bias" / f"{rate}-{seed}.npz")) as z:
+            assert (z["op_ids"] == ops).all(), "the resampled corpus is not the one the runs trained on"
+            m = z["fixed_draw"][idx]
+        n = int(m.sum())
+        fpc = 1 - n / len(idx)
+        diff = x[m].mean(0) - mu
+        t2 = float(n / fpc * diff @ np.linalg.solve(cov, diff))
+        occ = {}
+        for key, (cell, k) in occupancy.items():
+            expected = np.bincount(cell.ravel(), minlength=k) / cell.size * cell[m].size
+            seen = np.bincount(cell[m].ravel(), minlength=k)
+            occ[key] = float(stats.chisquare(seen[expected > 0], expected[expected > 0]).pvalue)
+        out.append({
+            "rate": rate, "model_seed": seed, "n": n,
+            "z": (diff / np.sqrt(np.diag(cov) * fpc / n)).tolist(),
+            "t2": t2, "t2_p": float(stats.chi2.sf(t2, len(names))), "occupancy_p": occ,
+        })  # fmt: skip
+    return {"features": names, "n_anchored": len(idx), "runs": out}
 
 
 def rows_of(meta, runs: list[tuple[str, int]], stop: int | None, epochs: int = EPOCHS) -> list[dict]:
@@ -213,6 +297,16 @@ def publish(rows: list[dict], draws: list[dict], trained: list[dict], measured: 
     return {"n_finished": len(trained), "n_labelled": [d["n_labelled"] for d in draws]}
 
 
+def publish_bias(bias: dict) -> dict:
+    """The label-bias check, under its own ref so the training refs above keep their memo."""
+    import json
+
+    from mini.store import put, set_ref
+
+    set_ref(BIAS_REF, put(json.dumps(bias).encode(), name=f"{NAME}-label-bias.json"))
+    return {"n_bias": len(bias["runs"])}
+
+
 def runs_of(rates: tuple[str, ...], seeds: tuple[int, ...]) -> list[tuple[str, int]]:
     return [(t, s) for t in rates for s in seeds]
 
@@ -281,9 +375,11 @@ def run(ctx: Ctx, epochs: int = EPOCHS, stop: int = STOP_EPOCH, seeds: tuple[int
     axes = ctx.map(rb.axes_one, checkpoints, holdout, labels, [None] * n, role="measure")
     written = ctx.map(ee.measure_one, checkpoints, holdout, labels, role="write")
     restricted = ctx.map(sps.restricted_axes_one, checkpoints, holdout, labels, role="measure")
+    bias = ctx.run(label_bias, draws, runs, role="prep")
     if not publishes:
         return {"finished": labels}
-    return ctx.run(publish, rows, draws, done, measured, dosed, axes, written, restricted, along, role="prep")
+    out = ctx.run(publish, rows, draws, done, measured, dosed, axes, written, restricted, along, role="prep")
+    return out | ctx.run(publish_bias, bias, role="prep")
 
 
 def scout(ctx: Ctx) -> dict:

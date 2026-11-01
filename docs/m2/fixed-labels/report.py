@@ -182,15 +182,34 @@ def table_html(head: list[str], rows: list[list[str]], caption: str) -> str:
 
 # --- Figures ---------------------------------------------------------------------------------------------------
 
-RULE = light_dark("#333", "#ddd")
-ZERO = light_dark("#aaa", "#555")
-GHOST = light_dark("#bbb", "#555")
-INK = {
-    REDRAW: light_dark("#08306b", "#c6dbef"),
-    "r10": light_dark("#1b7837", "#a6dba0"),
-    "r25": light_dark("#a6611a", "#dfc27d"),
-    "r50": light_dark("#b2182b", "#f4a582"),
+# Theme inks are functions: `light_dark` picks by the theme active when it is called, so a module-level value
+# would carry the light ink into the dark render.
+
+
+def rule() -> str:
+    return light_dark("#333", "#ddd")
+
+
+def zero() -> str:
+    return light_dark("#aaa", "#555")
+
+
+def ghost() -> str:
+    return light_dark("#bbb", "#555")
+
+
+INKS = {
+    REDRAW: ("#08306b", "#7fb2f0"),
+    "r10": ("#1b7837", "#6fcf7f"),
+    "r25": ("#a6611a", "#e8b04a"),
+    "r50": ("#b2182b", "#ff7f7f"),
 }
+
+
+def ink(n: str) -> str:
+    return light_dark(*INKS[n])
+
+
 MARKER = {REDRAW: "s", "r10": "^", "r25": "D", "r50": "v"}
 
 
@@ -240,8 +259,8 @@ def alpha_draw(data: dict, alt_text: str) -> str:
         caption="""
             **The anchor settling, by condition.** α at the example answers of the `difference` probe contexts, at
             slice 3, along the first 120 epochs: the seed mean as a line with markers, each run faint behind it. The
-            shaded band is the call window (epochs 44 to 64), and the dashed line is where the call counts a run as
-            kept.
+            shaded band is the call window (epochs 44 to 64), and the dashed line across it is where the call counts a
+            run as kept.
         """,
     )
     def _plot() -> plt.Figure:
@@ -251,12 +270,12 @@ def alpha_draw(data: dict, alt_text: str) -> str:
         for ax, n, label in zip(axes, data["names"], data["shown"], strict=True):
             runs = np.asarray(data["alpha"][n])
             for a in runs:
-                ax.plot(ep[show], a[show], color=INK[n], lw=0.4, alpha=0.35, zorder=1)
+                ax.plot(ep[show], a[show], color=ink(n), lw=0.4, alpha=0.35, zorder=1)
             mark = np.flatnonzero(show)[:: max(1, show.sum() // 8)]
-            ax.plot(ep[show], runs.mean(axis=0)[show], color=INK[n], lw=1.1, zorder=3)
-            ax.plot(ep[mark], runs.mean(axis=0)[mark], MARKER[n], ms=3, color=INK[n], zorder=4, mew=0)
-            ax.axvspan(*data["window"], color=GHOST, alpha=0.25, lw=0, zorder=0)
-            ax.axhline(data["kept_min"], color=RULE, lw=0.7, ls="--", zorder=0)
+            ax.plot(ep[show], runs.mean(axis=0)[show], color=ink(n), lw=1.1, zorder=3)
+            ax.plot(ep[mark], runs.mean(axis=0)[mark], MARKER[n], ms=3, color=ink(n), zorder=4, mew=0)
+            ax.axvspan(*data["window"], color=ghost(), alpha=0.25, lw=0, zorder=0)
+            ax.hlines(data["kept_min"], *data["window"], color=rule(), lw=0.7, ls="--", zorder=2)
             ax.set_title(label, fontsize=6.5)
             ax.set_xlabel("epoch", fontsize=7)
             ax.tick_params(labelsize=6)
@@ -311,9 +330,9 @@ def end_draw(data: dict, alt_text: str) -> str:
         for ax, key in zip(axes, ("removal", "spill", "task"), strict=True):
             v = np.array([data[key][n] for n in names])
             for j in range(v.shape[1]):
-                ax.plot([i + jit[n][j] for i, n in enumerate(names)], v[:, j], color=GHOST, lw=0.3, zorder=1)
+                ax.plot([i + jit[n][j] for i, n in enumerate(names)], v[:, j], color=ghost(), lw=0.3, zorder=1)
             for i, n in enumerate(names):
-                _dots(ax, i, data[key][n], INK[n], MARKER[n], jit[n])
+                _dots(ax, i, data[key][n], ink(n), MARKER[n], jit[n])
             ax.set_xticks(range(len(names)), data["ticks"], rotation=50, ha="right", fontsize=5.5)
             ax.set_xlim(-0.6, len(names) - 0.4)
             ax.tick_params(labelsize=7)
@@ -321,8 +340,8 @@ def end_draw(data: dict, alt_text: str) -> str:
         axes[1].set_title("spill ↓", fontsize=8)
         axes[2].set_title("task change ↑", fontsize=8)
         for ax, y, below in ((axes[1], data["criterion"], False), (axes[2], data["task_gate"], True)):
-            ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
-            ax.axhline(y, color=RULE, lw=0.7, ls="--", zorder=1)
+            ax.axhline(0, color=zero(), lw=0.5, zorder=0)
+            ax.axhline(y, color=rule(), lw=0.7, ls="--", zorder=1)
             lo, hi = ax.get_ylim()
             if below:
                 lo = min(lo, y - 0.005)
@@ -414,7 +433,7 @@ def removal_along_draw(data: dict, alt_text: str) -> str:
         left = fig.add_subplot(gs[0, 0])
         for n, label in zip(names, data["shown"], strict=True):
             v = np.asarray(data["removal"][n])
-            left.plot(ep, v.mean(axis=0), color=INK[n], marker=MARKER[n], ms=2.5, lw=1.0, label=label)
+            left.plot(ep, v.mean(axis=0), color=ink(n), marker=MARKER[n], ms=2.5, lw=1.0, label=label)
         left.set_ylim(-0.05, 1.0)
         left.set_xlabel("epoch", fontsize=7)
         left.set_ylabel("removal ↑", fontsize=7)
@@ -423,9 +442,9 @@ def removal_along_draw(data: dict, alt_text: str) -> str:
         ref = np.asarray(data["removal"][names[0]]).mean(axis=0)
         cells = [fig.add_subplot(gs[0, j]) for j in range(1, len(names) + 1)]
         for k, (ax, n) in enumerate(zip(cells, names, strict=True)):
-            ax.plot(ep, ref, color=GHOST, lw=1.2, zorder=1)
+            ax.plot(ep, ref, color=ghost(), lw=1.2, zorder=1)
             for v in np.asarray(data["removal"][n]):
-                ax.plot(ep, v, color=INK[n], lw=0.7, alpha=0.7, zorder=2)
+                ax.plot(ep, v, color=ink(n), lw=0.7, alpha=0.7, zorder=2)
             ax.set_ylim(-0.05, 1.0)
             ax.set_title(data["shown"][k], fontsize=6)
             ax.set_xlabel("epoch", fontsize=6)
@@ -519,13 +538,13 @@ Call
 rf"""
 ## The anchor settles at every rate (E1)
 
-With the pull confined to under a thousand contexts, does the anchor still settle on e₁ by the time the call is made? If a fixed set were too small, α at the example answers would rise more slowly or level off lower.
+With the pull confined to fewer contexts, does the anchor still settle on e₁ by the time the call is made? If a fixed set were too small, α at the example answers may rise more slowly or level off lower.
 
 {alpha_figure()}
 
 Every run is called kept, at every rate, with a wide margin. The rise over the first 40 epochs looks much the same in all four conditions. Over the call window, the seed mean of the fixed 1/50 runs is a little below that of the per-visit runs. The 1/25 and 1/10 runs are a little above it, and closer together. All of them are near the spread of the per-visit runs.
 
-So a fixed set of under a thousand labelled contexts is enough for the anchor to settle. But across the fixed-label runs, mean α over the call window says little about how much a run removes at the end (Pearson r = {R_WINDOW:.2f} over the 24 runs).
+So a fixed set of fewer than a thousand labelled contexts is enough for the anchor to settle. But across the fixed-label runs, mean α over the call window says little about how much a run removes at the end (Pearson r = {R_WINDOW:.2f} over the 24 runs).
 """
 
 # %%
