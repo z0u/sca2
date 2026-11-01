@@ -499,6 +499,8 @@ def main(ctx: Ctx) -> dict:
     return {"smoke": smoke, "scout": scout, "half": half, "full": run, "cross": cross}[STAGE](ctx)
 
 
-COMPUTE = ac.COMPUTE
+COMPUTE = ac.COMPUTE | {
+    role: ac.COMPUTE[role] | {"gpu": "L40S"} for role in ("train", "measure")
+}  # the crossed runs, all on one card; the main runs above trained and measured on L4s
 
 experiment = Experiment(name=NAME, main=main, roles=COMPUTE)
