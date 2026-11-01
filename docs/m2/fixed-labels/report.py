@@ -103,6 +103,16 @@ N_LABELLED = {t: np.array([_DRAWS[(t, s)]["n_labelled"] for s in SEEDS]) for t i
 N_ANCHORED = int(_DRAWS[(RATES[0], SEEDS[0])]["n_anchored"])
 REDRAW_DISTINCT = 34_000
 
+# --- The crossed runs ------------------------------------------------------------------------------------------
+
+CROSS = list(ex.CROSS_SEEDS)
+_CROSS_AX = {r["label"]: r for r in fetch_json(ex.CROSS_AXES_REF)["runs"]}
+_CROSS_TRAJ = fetch_json(ex.CROSS_TRAJ_REF)
+_CROSS_SCORES = {(d, s): axis_scores(_CROSS_AX[ex.cross_label_of(d, s)], _CONTROL[ac.label_of(s, None, "control")]) for d in CROSS for s in CROSS}  # fmt: skip
+CROSS_REMOVAL = np.array([[_CROSS_SCORES[(d, s)]["removal"] for s in CROSS] for d in CROSS])  # (draw, model seed)
+CROSS_SPILL = np.array([[_CROSS_SCORES[(d, s)]["spill"] for s in CROSS] for d in CROSS])
+CROSS_GPU = sorted({str(t.get("gpu")) for t in _CROSS_TRAJ.values()})
+
 # --- The label-bias check ---------------------------------------------------------------------------------------
 
 _BIAS = fetch_json(ex.BIAS_REF)
@@ -405,6 +415,28 @@ def end_table() -> str:
     )
 
 
+def cross_table() -> str:
+    rows = []
+    for i, d in enumerate(CROSS):
+        cells = []
+        for j, sd in enumerate(CROSS):
+            v = CROSS_REMOVAL[i, j]
+            cell = f"{v:.2f}" + (f"<br>({CROSS_OLD[sd]:.2f})" if d == sd else "")
+            cells.append(f"<strong>{cell}</strong>" if v < LOW_LINE else cell)
+        rows.append([f"draw of {d}", *cells])
+    return table_html(
+        ["labels", *(f"seed {sd}" for sd in CROSS)],
+        rows,
+        f"""
+        **The crossed runs: removal at epoch 400.** Each row is the 1/50 label set drawn for one seed, and each
+        column the model seed it trained at (initialization and batches). On the diagonal, in brackets: the run of
+        E1 to E4 with the same set at the same seed. Runs below {LOW_LINE} are in bold. All sixteen trained with the
+        faster training step and the determinism flags off, on L40S cards; the runs of E1 to E4 trained on L4s with
+        the flags on.
+        """,
+    )
+
+
 def bias_table() -> str:
     rows = []
     for t in ("r50", "r25", "r10"):
@@ -523,6 +555,15 @@ REST_SLIDE = {k: float(np.concatenate([SLIDE[n][~_IS_LOW[n]] for n in ns]).max()
 SLOW_AT_32 = 0.25  # a slow starter: removal under this at epoch 32
 SLOW = {n: [s for s, v in zip(SEEDS, REMOVAL_ALONG[n][:, ALONG_EPOCHS.index(32)], strict=True) if v < SLOW_AT_32] for n in COLUMNS}  # fmt: skip
 
+# E5: the crossed runs
+CROSS_DIAG = {s: float(CROSS_REMOVAL[i, i]) for i, s in enumerate(CROSS)}
+CROSS_OLD = {s: float(REMOVAL["r50"][SEEDS.index(s)]) for s in CROSS}
+CROSS_LOW = [(d, s) for i, d in enumerate(CROSS) for j, s in enumerate(CROSS) if CROSS_REMOVAL[i, j] < LOW_LINE]
+assert all(d != s for d, s in CROSS_LOW), CROSS_LOW  # the prose says no diagonal run is low
+assert all(CROSS_DIAG[s] > LOW_LINE for s in (715, 719)) and all(CROSS_OLD[s] < LOW_LINE for s in (715, 719))
+CROSS_SPILL_MAX = float(CROSS_SPILL.max())
+assert CROSS_SPILL_MAX < CRITERION
+
 # E4: does a low run's label set differ from the rest?
 _LOW_KEYS = [(t, s) for t in RATES for s in LOW_RUNS[t]]
 LOW_BIAS_P = sorted(float(BIAS_P[t][SEEDS.index(s)]) for t, s in _LOW_KEYS)
@@ -543,7 +584,7 @@ rf"""
 
 /// tip |
 <!-- lede -->
-Every anchored run so far drew its labels afresh on each visit to a context, so over a run the anchor saw labels on most `difference` contexts. Holding one draw fixed for the run, as a real labelled set would be, still keeps the anchor at every rate we tried. But the edit removes the op less reliably: a few runs end well below the rest, and more labels in the fixed set did not cure it.
+Every anchored run so far drew its labels afresh on each visit to a context, so over a run the anchor saw labels on most `difference` contexts. Holding one draw fixed for the run, as a real labelled set would be, still keeps the anchor at every rate we tried. But the edit removes the op less reliably: a few runs end well below the rest, and more labels in the fixed set did not cure it. Which runs end low looks like chance: retraining a low run with slightly different arithmetic brings it up with the rest, and other set and seed pairs go low instead.
 ///
 
 The [post-hoc comparison plan](/docs/m2/d2.2/post-hoc-comparison.md) compares the edit along the anchored axis with directions found after training on a control. Writing it up, we noticed that the anchor labeller (inherited from M1) makes a fresh 1/50 draw on every visit to a context.
@@ -562,10 +603,11 @@ rf"""
 - [Removal and spill at the end (E2)](#removal-and-spill-at-the-end-e2): every run keeps the anchor, and runs pass the task gate as often as the per-visit runs do. At 1/50 and at 1/10, a few runs end well below the lowest per-visit run, so the seed mean falls. At 1/25 removal matches the per-visit draw, but one run spills late, over the criterion.
 - [When the low runs fall behind (E3)](#when-the-low-runs-fall-behind-e3): the low runs mostly never reach the level of the rest. One run at 1/50 slides after reaching it, and the others give back only a little after their peak.
 - [The low runs' label sets (E4)](#the-low-runs-label-sets-e4): nothing in what the labelled contexts show sets the low runs' sets apart, and labelling more contexts around a low run's set does not lift removal in step.
+- [Crossing label sets with seeds (E5)](#crossing-label-sets-with-seeds-e5): retrained with slightly different arithmetic, the two low 1/50 runs end with the rest. {WORD[len(CROSS_LOW)].capitalize()} of the twelve new pairings of set and seed end low, with no set or seed low throughout.
 
 ## Scope and method
 
-This is an exploratory study, with no preregistration and no gate of its own. It started as a scout: one seed at 1/50, trained to epoch 64. Then 1/50 and 1/10 ran at four seeds to the end of training. At four seeds 1/50 removed less than 1/10, so they were carried to eight seeds, and 1/25 was added between them. The three rates were each chosen before their runs, and none was chosen by how it scored.
+This is an exploratory study, with no preregistration and no gate of its own. It started as a scout: one seed at 1/50, trained to epoch 64. Then 1/50 and 1/10 ran at four seeds to the end of training. At four seeds 1/50 removed less than 1/10, so they were carried to eight seeds, and 1/25 was added between them. The three rates were each chosen before their runs, and none was chosen by how it scored. After a first reading, E4 and E5 were added to look into the low runs; E5 trains sixteen more runs.
 
 Every run is `τ_ℓ fixed` as the fixed confirmation trained it, with one change to the labels. In place of the per-visit draw, a single draw made before training picks the labelled contexts. A picked context carries the label on every visit, and any other context never does.
 
@@ -675,7 +717,23 @@ The low runs' sets look like any other. Their tails run from {LOW_BIAS_P[0]:.2f}
 
 The nesting gives a second view. Every context labelled at 1/50 is also labelled at 1/25 and 1/10, so the three sets of a seed grow around one another. If a run ended low because of some contexts in its set, those contexts stay in every larger set, diluted by the new ones, so removal should climb as the set grows and not fall again. At seed 715 the low run at 1/50 recovers once more contexts join its set ({NEST[715][0]:.2f}, then {NEST[715][1]:.2f} and {NEST[715][2]:.2f}), which fits. But at seed 719 removal goes {NEST[719][0]:.2f}, {NEST[719][1]:.2f}, {NEST[719][2]:.2f} as the set grows. At seeds 717 and 718 the 1/25 runs end at {NEST[717][1]:.2f} and {NEST[718][1]:.2f}, while the 1/10 runs, whose sets contain theirs, end at {NEST[717][2]:.2f} and {NEST[718][2]:.2f}. Low runs come and go as the set grows.
 
-So the label sets don't account for the low runs, as far as these features can see. That leaves run-to-run sensitivity, where a small change in which contexts carry the pull sends a run to a different end. These tests can't rule out a feature they don't measure. Training one draw at several seeds, and several draws at one seed, would tell set and seed apart.
+So the label sets don't account for the low runs, as far as these features can see. That leaves run-to-run sensitivity, where a small change in which contexts carry the pull sends a run to a different end. These tests can't rule out a feature they don't measure, so E5 trains sets and seeds in new pairings.
+"""
+
+# %%
+
+rf"""
+## Crossing label sets with seeds (E5)
+
+Does a low run follow its label set or its seed? Here the 1/50 sets of four seeds are each trained at all four of those seeds: {CROSS[1]} and {CROSS[3]}, whose 1/50 runs ended low, and {CROSS[0]} and {CROSS[2]}, whose runs ended high. A set that holds a run back would give a low row, and a seed that does would give a low column.
+
+These sixteen runs came after a faster training step was merged, which also turns the GPU determinism flags off (a shared compilation cache keeps runs reproducible instead). They trained on L40S cards rather than L4s. A run sees the same batches from the same initialization as before, so on the diagonal only the arithmetic differs from the 1/50 runs of E1 to E4, in its last bits.
+
+{cross_table()}
+
+Neither the sets nor the seeds account for the low runs. On the diagonal, both low runs now end with the rest: seed 715 at {CROSS_DIAG[715]:.2f} (it was {CROSS_OLD[715]:.2f}) and seed 719 at {CROSS_DIAG[719]:.2f} (it was {CROSS_OLD[719]:.2f}). Meanwhile {WORD[len(CROSS_LOW)]} of the twelve new pairings end low ({", ".join(f"the set of {d} at seed {s_}" for d, s_ in CROSS_LOW)}), against five of sixteen at 1/50 and 1/10 in E2. No row and no column is low throughout. Every crossed run stays under the spill criterion (the largest is {CROSS_SPILL_MAX:.3f}).
+
+So whether a fixed-label run ends low is decided by small differences somewhere along the run, which the same set, seed and batches don't fix. The per-visit runs of the fixed confirmation spread less, though the reason for that is still open. The task change of these runs isn't compared here: their controls trained on L4s with the flags on.
 """
 
 # %%
@@ -685,7 +743,7 @@ r"""
 
 A fixed labelled set at one context in fifty is enough for the anchor to settle on e₁ and keep it (E1, E2). That was the main worry, since the per-visit draw had shown the anchor most of the `difference` contexts over a run. On that count, the scarce-label claim of the D2.2 design holds with labels as a real pipeline would have them.
 
-But removal is less reliable with a fixed set: a few runs in eight end well short of the rest (E2), mostly because they never reach the level of the others (E3). Since a fixed set five times larger did no better, more labels of the same kind do not seem to be the fix, at least between about 900 and 4,300 contexts. Nor do the low runs' sets differ from the others in what their contexts show (E4). The per-visit draw spreads less, and that may come from averaging over almost every context, which would smooth out a run's sensitivity to which contexts carry the pull.
+But removal is less reliable with a fixed set: a few runs in eight end well short of the rest (E2), mostly because they never reach the level of the others (E3). Since a fixed set five times larger did no better, more labels of the same kind do not seem to be the fix, at least between about 900 and 4,300 contexts. Nor do the low runs' sets differ from the others in what their contexts show (E4), and in new pairings of set and seed the low runs move about: the same set at the same seed can end low or high depending on the last bits of the arithmetic (E5). The per-visit draw spreads less, and that may come from averaging over almost every context, which could steady a run against such small differences.
 
 If this holds, a comparison against post-hoc methods with fixed labels should expect a wider spread on the anchored side than the fixed confirmation showed. With that spread, eight runs give a noisy seed mean.
 """
