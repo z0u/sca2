@@ -181,27 +181,26 @@ def table_html(head: list[str], rows: list[list[str]], caption: str) -> str:
     return figure_html(table, caption=caption, class_="report-figure")
 
 
+# Inks are (light, dark) pairs, resolved with `light_dark` where a figure draws: it picks by the theme active when
+# it is called, so a value resolved at import would give the dark render the light ink.
 INK = {
-    "late": light_dark("#8fbbe0", "#4f7fa8"),
-    "late-anti0.2": light_dark("#0b3c73", "#cfe6ff"),
-    "split-anti": light_dark("#c0392b", "#ff8a76"),
-    "pool-slices": light_dark("#2a9d8f", "#7fd8c8"),
+    "late": ("#8fbbe0", "#4f7fa8"),
+    "late-anti0.2": ("#0b3c73", "#cfe6ff"),
+    "split-anti": ("#c0392b", "#ff8a76"),
+    "pool-slices": ("#2a9d8f", "#7fd8c8"),
 }
 MARK = {"late": "o", "late-anti0.2": "s", "split-anti": "^", "pool-slices": "D"}
 SLICE_INK = [
-    light_dark(c, d)
-    for c, d in (
-        ("#999", "#777"),
-        ("#e08e0b", "#f5b950"),
-        ("#1f6fb2", "#7ab8f5"),
-        ("#6c4fa3", "#b9a2e8"),
-        ("#2a9d8f", "#7fd8c8"),
-    )
+    ("#999", "#777"),
+    ("#e08e0b", "#f5b950"),
+    ("#1f6fb2", "#7ab8f5"),
+    ("#6c4fa3", "#b9a2e8"),
+    ("#2a9d8f", "#7fd8c8"),
 ]
 SLICE_MARK = ["o", "D", "^", "s", "v"]
 SLICE_NAME = ["emb", "block 1", "block 2", "block 3", "block 4"]
 SLICE_TICK = ["emb", "1", "2", "3", "4"]
-SCHED_INK = light_dark("#b4531f", "#dd8f5f")
+SCHED_INK = ("#b4531f", "#dd8f5f")
 
 # --- Summaries the prose quotes -------------------------------------------------------------------------------
 
@@ -322,9 +321,18 @@ def dose_draw(data: dict, alt_text: str) -> str:
             for arm in data["arms"]:
                 a = arm["arm"]
                 for r in arm["runs"]:
-                    ax.plot(data["doses"], r[key], color=INK[a], lw=0.5, alpha=0.6, zorder=2)
+                    ax.plot(data["doses"], r[key], color=light_dark(*INK[a]), lw=0.5, alpha=0.6, zorder=2)
                 mean = np.mean([r[key] for r in arm["runs"]], axis=0)
-                ax.plot(data["doses"], mean, color=INK[a], lw=1.6, marker=MARK[a], ms=4.5, label=arm["name"], zorder=3)
+                ax.plot(
+                    data["doses"],
+                    mean,
+                    color=light_dark(*INK[a]),
+                    lw=1.6,
+                    marker=MARK[a],
+                    ms=4.5,
+                    label=arm["name"],
+                    zorder=3,
+                )
             ax.set_xlabel("dose", fontsize=9)
             ax.set_ylabel(ylabel, fontsize=9)
             ax.set_xticks(data["doses"])
@@ -437,14 +445,31 @@ def alpha_draw(data: dict, alt_text: str) -> str:
             for arm in data["arms"]:
                 a = arm["arm"]
                 for r in arm["runs"]:
-                    ax.plot(r["epoch"], r[key], color=INK[a], lw=0.4, alpha=0.5, zorder=2)
+                    ax.plot(r["epoch"], r[key], color=light_dark(*INK[a]), lw=0.4, alpha=0.5, zorder=2)
                 ep = arm["runs"][0]["epoch"]
                 mean = np.mean([r[key] for r in arm["runs"]], axis=0)
-                ax.plot(ep, mean, color=INK[a], lw=1.5, marker=MARK[a], markevery=12, ms=4, label=arm["name"], zorder=3)
+                ax.plot(
+                    ep,
+                    mean,
+                    color=light_dark(*INK[a]),
+                    lw=1.5,
+                    marker=MARK[a],
+                    markevery=12,
+                    ms=4,
+                    label=arm["name"],
+                    zorder=3,
+                )
             ax.set_ylim(-0.05, 0.75)
             sax = axes[1, col]
             for (name, sched), ls in zip(data["anti"].items(), ("-", "--"), strict=True):
-                sax.plot(sched["epoch"], sched["w"], color=SCHED_INK, lw=1.1, ls=ls, label=f"anti weight, {name}")
+                sax.plot(
+                    sched["epoch"],
+                    sched["w"],
+                    color=light_dark(*SCHED_INK),
+                    lw=1.1,
+                    ls=ls,
+                    label=f"anti weight, {name}",
+                )
             sax.set_ylim(0, 0.27)
             sax.set_yticks([0, 0.1, 0.2])
             sax.tick_params(labelsize=7)
@@ -551,10 +576,18 @@ def pool_draw(data: dict, alt_text: str) -> str:
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(1, len(data["seeds"]), figsize=(7.2, 2.4), layout="constrained", sharey=True)
         x = np.arange(len(SLICE_NAME))
-        ink = INK["pool-slices"]
+        ink = light_dark(*INK["pool-slices"])
         for ax, d in zip(axes, data["seeds"], strict=True):
             ax.axhline(0, color=light_dark("#aaa", "#555"), lw=0.5, zorder=0)
-            ax.plot(x, d["split"], color=INK["split-anti"], lw=0.6, alpha=0.8, zorder=1, label="split-anti, answers")
+            ax.plot(
+                x,
+                d["split"],
+                color=light_dark(*INK["split-anti"]),
+                lw=0.6,
+                alpha=0.8,
+                zorder=1,
+                label="split-anti, answers",
+            )
             ax.plot(x, d["answers"], color=ink, lw=1.4, marker="D", ms=4.5, zorder=3, label="example answers")
             ax.plot(
                 x, d["query"], color=ink, lw=0.9, ls="--", marker="o", mfc="none", ms=4.5, zorder=3,
@@ -676,7 +709,7 @@ def depth_draw(data: dict, alt_text: str) -> str:
             for ref in data["refs"]:
                 dotted = ref["arm"] == "split-anti"
                 ax.plot(
-                    x, ref[key], color=INK[ref["arm"]], lw=1.0 if dotted else 0.7, ls=":" if dotted else "-",
+                    x, ref[key], color=light_dark(*INK[ref["arm"]]), lw=1.0 if dotted else 0.7, ls=":" if dotted else "-",
                     zorder=4 if dotted else 1, label=ref["name"],
                 )  # fmt: skip
             for r, ink, m in zip(data["rungs"], shades, marks, strict=True):

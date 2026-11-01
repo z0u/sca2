@@ -85,13 +85,15 @@ def table_html(head: list[str], rows: list[list[str]], caption: str) -> str:
     return figure_html(table, caption=caption, class_="report-figure")
 
 
-OVER_INK = light_dark("#c0392b", "#ff8a76")
-WITHIN_INK = light_dark("#0b3c73", "#9fcbff")
-CTL_INK = light_dark("#777", "#aaa")
-ARM_INK = {"falloff": light_dark("#2a9d8f", "#7fd8c8"), "step-soft": light_dark("#e08e0b", "#f5b950")}
-GHOST = light_dark("#bbb", "#555")
-RULE = light_dark("#333", "#ddd")
-ZERO = light_dark("#aaa", "#555")
+# Inks are (light, dark) pairs, resolved with `light_dark` where a figure draws: it picks by the theme active when
+# it is called, so a value resolved at import would give the dark render the light ink.
+OVER_INK = ("#c0392b", "#ff8a76")
+WITHIN_INK = ("#0b3c73", "#9fcbff")
+CTL_INK = ("#777", "#aaa")
+ARM_INK = {"falloff": ("#2a9d8f", "#7fd8c8"), "step-soft": ("#e08e0b", "#f5b950")}
+GHOST = ("#bbb", "#555")
+RULE = ("#333", "#ddd")
+ZERO = ("#aaa", "#555")
 
 # --- Spill, as the earlier reports score it and as the reference edit scores it --------------------------------------------
 
@@ -362,32 +364,34 @@ def reference_draw(data: dict, alt_text: str) -> str:
     def _plot() -> plt.Figure:
         fig, (ax, bx) = plt.subplots(1, 2, figsize=(6.6, 3.0), layout="constrained", width_ratios=[1, 1.1])
         lim = (-0.03, 0.08)
-        ax.plot(lim, lim, color=ZERO, lw=0.6, ls=":", zorder=0)
+        ax.plot(lim, lim, color=light_dark(*ZERO), lw=0.6, ls=":", zorder=0)
         for f in (ax.axhline, ax.axvline):
-            f(data["criterion"], color=RULE, lw=0.6, ls="--", zorder=0)
+            f(data["criterion"], color=light_dark(*RULE), lw=0.6, ls="--", zorder=0)
         for r in data["runs"]:
-            ink = OVER_INK if r["over"] else WITHIN_INK
+            ink = light_dark(*OVER_INK) if r["over"] else light_dark(*WITHIN_INK)
             ax.plot(r["control"], r["reference"], "o", color=ink, ms=4.5, zorder=2)
             ax.annotate(str(r["seed"]), (r["control"], r["reference"]), xytext=(3, 2), textcoords="offset points",
-                        fontsize=6, color=RULE)  # fmt: skip
+                        fontsize=6, color=light_dark(*RULE))  # fmt: skip
         ax.set_xlim(lim)
         ax.set_ylim(lim)
         ax.set_aspect("equal")
         ax.set_xlabel("spill, net of control", fontsize=8)
         ax.set_ylabel("spill, net of reference", fontsize=8)
-        cols = [("controls", data["controls"], CTL_INK, "s")] + [
-            (f"{name}\nepoch {STOP_EPOCH}", data["early"][arm], ARM_INK[arm], m)
+        cols = [("controls", data["controls"], light_dark(*CTL_INK), "s")] + [
+            (f"{name}\nepoch {STOP_EPOCH}", data["early"][arm], light_dark(*ARM_INK[arm]), m)
             for arm, name, m in (("falloff", "falloff", "D"), ("step-soft", "step, soft τ", "v"))
         ]
         rng = np.random.default_rng(0)
         for i, (_, vals, ink, mark) in enumerate(cols):
             v = np.asarray(vals)
-            bx.plot([i, i], [v.min(), v.max()], color=GHOST, lw=4, alpha=0.5, solid_capstyle="round", zorder=0)
+            bx.plot(
+                [i, i], [v.min(), v.max()], color=light_dark(*GHOST), lw=4, alpha=0.5, solid_capstyle="round", zorder=0
+            )
             bx.scatter(i + rng.uniform(-0.15, 0.15, len(v)), v, s=9, color=ink, alpha=0.6, marker=mark, lw=0,
                        zorder=1)  # fmt: skip
-            bx.plot(i, v.mean(), marker=mark, color=ink, ms=7, mec=RULE, mew=0.6, zorder=2)
-        bx.axhline(data["criterion"], color=RULE, lw=0.6, ls="--", zorder=0)
-        bx.axhline(0, color=ZERO, lw=0.5, zorder=0)
+            bx.plot(i, v.mean(), marker=mark, color=ink, ms=7, mec=light_dark(*RULE), mew=0.6, zorder=2)
+        bx.axhline(data["criterion"], color=light_dark(*RULE), lw=0.6, ls="--", zorder=0)
+        bx.axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
         bx.set_xticks(range(len(cols)), [c[0] for c in cols], fontsize=7)
         bx.set_xlim(-0.6, len(cols) - 0.4)
         bx.set_ylim(lim)
@@ -481,18 +485,18 @@ def track_draw(data: dict, alt_text: str) -> str:
             6, 1, figsize=(6.4, 7.0), layout="constrained", sharex=True, height_ratios=[3, 1.6, 1.4, 0.6, 0.6, 0.6]
         )
         ep = data["epoch"]
-        ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
-        ax.axhline(data["criterion"], color=RULE, lw=0.7, ls="--", zorder=0)
+        ax.axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
+        ax.axhline(data["criterion"], color=light_dark(*RULE), lw=0.7, ls="--", zorder=0)
         for a_ in (ax, sx, rx, wax, tax, nax):
-            a_.axvline(data["stop"], color=ZERO, lw=0.6, ls=":", zorder=0)
+            a_.axvline(data["stop"], color=light_dark(*ZERO), lw=0.6, ls=":", zorder=0)
         for r in data["runs"]:
-            ink, mark = (OVER_INK, "o") if r["over"] else (WITHIN_INK, "s")
+            ink, mark = (light_dark(*OVER_INK), "o") if r["over"] else (light_dark(*WITHIN_INK), "s")
             ax.plot(ep, r["raw"], color=ink, lw=0.3, alpha=0.35, zorder=1)
             ax.plot(ep, r["smoothed"], color=ink, lw=1.0, marker=mark, ms=1.6, markevery=5, zorder=2)
             sx.plot(ep, r["swing"], color=ink, lw=0.9, marker=mark, ms=1.6, markevery=5, zorder=2)
         ys = spread([r["smoothed"][-1] for r in data["runs"]], 0.006)
         for r, y in zip(data["runs"], ys, strict=True):
-            ink = OVER_INK if r["over"] else WITHIN_INK
+            ink = light_dark(*OVER_INK) if r["over"] else light_dark(*WITHIN_INK)
             ax.annotate(str(r["seed"]), (ep[-1], y), xytext=(3, 0), textcoords="offset points",
                         fontsize=6, color=ink, va="center")  # fmt: skip
         ax.set_ylim(-0.03, 0.1)
@@ -500,25 +504,34 @@ def track_draw(data: dict, alt_text: str) -> str:
         sx.set_ylim(0, 0.04)
         sx.set_yticks([0, 0.02, 0.04])
         sx.set_ylabel("change per record", fontsize=8)
-        rx.axhline(0, color=ZERO, lw=0.5, zorder=0)
-        rx.plot(ep, data["rho_smoothed"], color=RULE, lw=1.0, marker="o", ms=1.6, markevery=5, label="smoothed spill")
-        rx.plot(ep, data["rho_swing"], color=RULE, lw=0.8, ls="--", label="change per record")
+        rx.axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
+        rx.plot(
+            ep,
+            data["rho_smoothed"],
+            color=light_dark(*RULE),
+            lw=1.0,
+            marker="o",
+            ms=1.6,
+            markevery=5,
+            label="smoothed spill",
+        )
+        rx.plot(ep, data["rho_swing"], color=light_dark(*RULE), lw=0.8, ls="--", label="change per record")
         rx.set_ylim(-0.6, 1.05)
         rx.set_yticks([-0.5, 0, 0.5, 1])
         rx.set_ylabel("rank corr.\nwith the end", fontsize=8)
         rx.legend(fontsize=6, frameon=False, loc="lower right", ncols=2)
         sch = data["schedule"]
-        wax.plot(ep, sch["weight"], color=RULE, lw=1.0)
+        wax.plot(ep, sch["weight"], color=light_dark(*RULE), lw=1.0)
         wax.set_ylim(0, 0.12)
         wax.set_yticks([0, 0.1])
         wax.set_ylabel("$\\lambda_a$", fontsize=8)
-        tax.plot(ep, sch["tau"], color=RULE, lw=1.0)
+        tax.plot(ep, sch["tau"], color=light_dark(*RULE), lw=1.0)
         tax.set_yscale("log")
         tax.set_ylim(0.07, 1.4)
         tax.set_yticks([0.1, 1], ["0.1", "1"])
         tax.minorticks_off()
         tax.set_ylabel("$\\tau_p$", fontsize=8)
-        nax.plot(ep, sch["anti"], color=RULE, lw=1.0)
+        nax.plot(ep, sch["anti"], color=light_dark(*RULE), lw=1.0)
         nax.set_ylim(0, 0.28)
         nax.set_yticks([0, 0.2])
         nax.set_ylabel("$\\lambda_{\\bar s}$", fontsize=8)
@@ -574,26 +587,26 @@ def value_draw(data: dict, alt_text: str) -> str:
             3, 1, figsize=(6.4, 4.4), layout="constrained", sharex=True, height_ratios=[2, 2, 0.6]
         )
         ep = data["epoch"]
-        ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
-        ax.axhline(data["criterion"], color=RULE, lw=0.7, ls="--", zorder=0)
+        ax.axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
+        ax.axhline(data["criterion"], color=light_dark(*RULE), lw=0.7, ls="--", zorder=0)
         for r in data["runs"]:
-            ink, mark = (OVER_INK, "o") if r["over"] else (WITHIN_INK, "s")
+            ink, mark = (light_dark(*OVER_INK), "o") if r["over"] else (light_dark(*WITHIN_INK), "s")
             ax.plot(ep, r["net"], color=ink, lw=1.0, marker=mark, ms=1.6, markevery=5, zorder=2)
             bx.plot(ep, r["score"], color=ink, lw=0.8, zorder=2)
             i = int(np.argmin(np.abs(np.asarray(ep) - r["learned"])))
-            bx.plot(ep[i], r["score"][i], marker=mark, color=ink, ms=4, mec=RULE, mew=0.4, zorder=3)
+            bx.plot(ep[i], r["score"][i], marker=mark, color=ink, ms=4, mec=light_dark(*RULE), mew=0.4, zorder=3)
             below = sorted(x["learned"] for x in data["runs"]).index(r["learned"]) % 2 == 0  # alternate by epoch
             bx.annotate(str(r["seed"]), (ep[i], r["score"][i]), xytext=(4, -8 if below else 4), textcoords="offset points",
                         fontsize=6, color=ink)  # fmt: skip
         ys = spread([r["net"][-1] for r in data["runs"]], 0.006)
         for r, y in zip(data["runs"], ys, strict=True):
             ax.annotate(str(r["seed"]), (ep[-1], y), xytext=(3, 0), textcoords="offset points", fontsize=6,
-                        color=OVER_INK if r["over"] else WITHIN_INK, va="center")  # fmt: skip
+                        color=light_dark(*OVER_INK) if r["over"] else light_dark(*WITHIN_INK), va="center")  # fmt: skip
         ax.set_ylim(-0.07, 0.04)
         ax.set_ylabel("spill on value-hsv", fontsize=8)
         bx.set_ylim(0.1, 0.6)
         bx.set_ylabel("task score", fontsize=8)
-        nax.plot(ep, data["anti"], color=RULE, lw=1.0)
+        nax.plot(ep, data["anti"], color=light_dark(*RULE), lw=1.0)
         nax.set_ylim(0, 0.28)
         nax.set_yticks([0, 0.2])
         nax.set_ylabel("$\\lambda_{\\bar s}$", fontsize=8)
@@ -722,16 +735,16 @@ def probe_draw(data: dict, alt_text: str) -> str:
         fig, (ax, bx) = plt.subplots(1, 2, figsize=(6.6, 2.8), layout="constrained", sharex=True)
         ep = data["epoch"]
         for r in data["runs"]:
-            ink = OVER_INK if r["over"] else WITHIN_INK
-            ax.plot(ep, r["alone_anchored"], color=GHOST, lw=0.6, zorder=1)
+            ink = light_dark(*OVER_INK) if r["over"] else light_dark(*WITHIN_INK)
+            ax.plot(ep, r["alone_anchored"], color=light_dark(*GHOST), lw=0.6, zorder=1)
             ax.plot(ep, r["alone_other"], color=ink, lw=0.8, alpha=0.85, zorder=2)
             bx.plot(ep, r["whole_other"], color=ink, lw=0.8, alpha=0.85, zorder=2)
         ys = spread([r["whole_other"][-1] for r in data["runs"]], 0.011)
         for r, y in zip(data["runs"], ys, strict=True):
             bx.annotate(str(r["seed"]), (ep[-1], y), xytext=(3, 0), textcoords="offset points", fontsize=6,
-                        color=OVER_INK if r["over"] else WITHIN_INK, va="center")  # fmt: skip
+                        color=light_dark(*OVER_INK) if r["over"] else light_dark(*WITHIN_INK), va="center")  # fmt: skip
         for a_ in (ax, bx):
-            a_.axvline(data["stop"], color=ZERO, lw=0.6, ls=":", zorder=0)
+            a_.axvline(data["stop"], color=light_dark(*ZERO), lw=0.6, ls=":", zorder=0)
             a_.set_xlabel("epoch", fontsize=8)
             a_.tick_params(labelsize=7)
             a_.set_xlim(0, 430)

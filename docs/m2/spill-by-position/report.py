@@ -130,12 +130,14 @@ def ghost_color() -> str:
     return light_dark("#bbb", "#555")
 
 
+# Inks are (light, dark) pairs, resolved with `light_dark` where a figure draws: it picks by the theme active when
+# it is called, so a value resolved at import would give the dark render the light ink.
 SET_STYLE = {
-    "every position": (light_dark("#333", "#ddd"), "s"),
-    "example answers": (light_dark("#c0392b", "#ff8a76"), "o"),
-    "rest": (light_dark("#1f6fb2", "#7ab8f5"), "^"),
-    "query operands": (light_dark("#2e8b57", "#7fd8a4"), "D"),
-    "query =": (light_dark("#8e44ad", "#c39bd3"), "v"),
+    "every position": (("#333", "#ddd"), "s"),
+    "example answers": (("#c0392b", "#ff8a76"), "o"),
+    "rest": (("#1f6fb2", "#7ab8f5"), "^"),
+    "query operands": (("#2e8b57", "#7fd8a4"), "D"),
+    "query =": (("#8e44ad", "#c39bd3"), "v"),
 }
 
 
@@ -278,7 +280,8 @@ def tradeoff_draw(data: dict, alt_text: str) -> str:
             ax.axhline(ex23.SELECTIVITY_GATE, color=rule_color(), lw=0.8, ls="--", zorder=1)
             ax.axhline(0, color=rule_color(), lw=0.4, zorder=1)
             for name, d in sets.items():
-                color, m = SET_STYLE[name]
+                ink, m = SET_STYLE[name]
+                color = light_dark(*ink)
                 ax.plot(d["runs_removal"], d["runs_spill"], m, ms=3, color=color, alpha=0.3, mew=0, zorder=2)
                 ax.plot([0, *d["removal"]], [0, *d["spill"]], "-", color=color, lw=1.2, zorder=3)
                 ax.plot(d["removal"], d["spill"], m, ms=4.5, color=color, mec=light_dark("white", "#111"),
@@ -378,8 +381,8 @@ def role_tick(r: str) -> str:
 
 
 SERIES_STYLE = {
-    "other runs": (light_dark("#c0392b", "#ff8a76"), "o"),
-    "latched separator": (light_dark("#1f6fb2", "#7ab8f5"), "^"),
+    "other runs": (("#c0392b", "#ff8a76"), "o"),
+    "latched separator": (("#1f6fb2", "#7ab8f5"), "^"),
 }
 # The runs with a latched separator are drawn with hollow markers, in the map and in the scatter of E3.
 
@@ -400,7 +403,8 @@ def map_panel(ax, roles: list[str], panel: dict, what: str) -> None:
     for g in panel["ghosts"][what]:
         smooth_step(ax, x, g, ramp=0.6, color=ghost_color(), lw=0.5, alpha=0.8, zorder=1)
     for name, s in panel["series"].items():
-        color, m = SERIES_STYLE[name]
+        ink, m = SERIES_STYLE[name]
+        color = light_dark(*ink)
         smooth_step(ax, x, s[what], ramp=0.6, color=color, lw=1.2, zorder=3)
         hollow = name == "latched separator"
         ax.plot(x, s[what], m, ls="", ms=3.5, color=color, mfc=light_dark("white", "#111") if hollow else color,
@@ -570,7 +574,7 @@ def scatter_draw(rows: list[dict], alt_text: str) -> str:
         ax.plot([0, hi], [0, hi], ":", color=rule_color(), lw=0.8)
         ax.axhline(ex23.SELECTIVITY_GATE, color=rule_color(), lw=0.7, ls="--")
         ax.axvline(ex23.SELECTIVITY_GATE, color=rule_color(), lw=0.7, ls="--")
-        color = SERIES_STYLE["other runs"][0]
+        color = light_dark(*SERIES_STYLE["other runs"][0])
         for r in rows:
             m = "o" if r["epochs"] == SHORT else "^"
             if r["sep"]:

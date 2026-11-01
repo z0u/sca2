@@ -150,26 +150,25 @@ def table_html(head: list[str], rows: list[list[str]], caption: str) -> str:
     return figure_html(table, caption=caption, class_="report-figure")
 
 
+# Inks are (light, dark) pairs, resolved with `light_dark` where a figure draws: it picks by the theme active when
+# it is called, so a value resolved at import would give the dark render the light ink.
 INK = {
-    BASE: light_dark("#2a9d8f", "#7fd8c8"),
-    "ramp-emb": light_dark("#c0392b", "#ff8a76"),
-    "ramp-1": light_dark("#0b3c73", "#9fcbff"),
-    "ramp-emb-total": light_dark("#e08e0b", "#f5b950"),
-    "ramp-1-total": light_dark("#6c4fa3", "#b9a2e8"),
+    BASE: ("#2a9d8f", "#7fd8c8"),
+    "ramp-emb": ("#c0392b", "#ff8a76"),
+    "ramp-1": ("#0b3c73", "#9fcbff"),
+    "ramp-emb-total": ("#e08e0b", "#f5b950"),
+    "ramp-1-total": ("#6c4fa3", "#b9a2e8"),
 }
 MARK = {BASE: "D", "ramp-emb": "^", "ramp-1": "s", "ramp-emb-total": "v", "ramp-1-total": "o"}
-GHOST = light_dark("#bbb", "#555")
-RULE = light_dark("#333", "#ddd")
+GHOST = ("#bbb", "#555")
+RULE = ("#333", "#ddd")
 SLICE_TICK = ["emb", "1", "2", "3", "4"]
 SLICE_INK = [
-    light_dark(c, d)
-    for c, d in (
-        ("#bbb", "#666"),
-        ("#9ecae1", "#36628f"),
-        ("#6baed6", "#4f86b8"),
-        ("#2171b5", "#8cbdeb"),
-        ("#08306b", "#d6e8fa"),
-    )
+    ("#bbb", "#666"),
+    ("#9ecae1", "#36628f"),
+    ("#6baed6", "#4f86b8"),
+    ("#2171b5", "#8cbdeb"),
+    ("#08306b", "#d6e8fa"),
 ]
 
 # --- Summaries the prose quotes -------------------------------------------------------------------------------
@@ -241,16 +240,24 @@ def dose_draw(data: dict, alt_text: str) -> str:
                 for other in arms:
                     if other is not arm:
                         for r in other["runs"]:
-                            ax.plot(data["doses"], r[key], color=GHOST, lw=0.4, alpha=0.5, zorder=1)
+                            ax.plot(data["doses"], r[key], color=light_dark(*GHOST), lw=0.4, alpha=0.5, zorder=1)
                 a = arm["arm"]
                 for r, lost in zip(arm["runs"], arm["lost"], strict=True):
-                    ax.plot(data["doses"], r[key], color=INK[a], lw=0.7, alpha=0.8, ls="--" if lost else "-", zorder=2)
+                    ax.plot(
+                        data["doses"],
+                        r[key],
+                        color=light_dark(*INK[a]),
+                        lw=0.7,
+                        alpha=0.8,
+                        ls="--" if lost else "-",
+                        zorder=2,
+                    )
                 mean = np.mean([r[key] for r in arm["runs"]], axis=0)
-                ax.plot(data["doses"], mean, color=INK[a], lw=1.7, marker=MARK[a], ms=4.5, zorder=3)
+                ax.plot(data["doses"], mean, color=light_dark(*INK[a]), lw=1.7, marker=MARK[a], ms=4.5, zorder=3)
                 if row == 0:
                     ax.set_title(arm["name"], fontsize=7)
                 else:
-                    ax.axhline(CRITERION, color=RULE, lw=0.9, ls="--", zorder=1)
+                    ax.axhline(CRITERION, color=light_dark(*RULE), lw=0.9, ls="--", zorder=1)
                     ax.set_xlabel("dose", fontsize=8)
                 ax.set_xticks(data["doses"], [f"{g:g}" for g in data["doses"]], fontsize=6)
                 ax.tick_params(labelsize=7)
@@ -341,7 +348,7 @@ def draw_pull(ax: plt.Axes, sched: dict, label: bool = False) -> None:
     """A strip of the pull weight on each slice under an epoch chart, one line per pulled slice, shaded by depth."""
     for sl, w in enumerate(sched["pull"]):
         if max(w) > 0:
-            ax.plot(sched["epoch"], w, color=SLICE_INK[sl], lw=1.1, label=f"slice {sl}" if label else None)
+            ax.plot(sched["epoch"], w, color=light_dark(*SLICE_INK[sl]), lw=1.1, label=f"slice {sl}" if label else None)
     ax.set_ylim(0, 0.16)
     ax.set_yticks([0, 0.1, 0.15])
     ax.tick_params(labelsize=7)
@@ -407,9 +414,16 @@ def track_draw(data: dict, alt_text: str) -> str:
             for other in arms:
                 if other is not arm:
                     for r in other["runs"]:
-                        ax.plot(r["epoch"], r["alpha"], color=GHOST, lw=0.4, alpha=0.4, zorder=1)
+                        ax.plot(r["epoch"], r["alpha"], color=light_dark(*GHOST), lw=0.4, alpha=0.4, zorder=1)
             for r in arm["runs"]:
-                ax.plot(r["epoch"], r["alpha"], color=INK[arm["arm"]], lw=0.8, ls="--" if r["lost"] else "-", zorder=2)
+                ax.plot(
+                    r["epoch"],
+                    r["alpha"],
+                    color=light_dark(*INK[arm["arm"]]),
+                    lw=0.8,
+                    ls="--" if r["lost"] else "-",
+                    zorder=2,
+                )
             ax.set_title(arm["name"], fontsize=7)
             ax.set_ylim(-0.05, 0.8)
             ax.tick_params(labelsize=7)
@@ -479,15 +493,15 @@ def depth_draw(data: dict, alt_text: str) -> str:
                 ax.plot(
                     x,
                     np.mean(arm[key], axis=0),
-                    color=INK[a],
+                    color=light_dark(*INK[a]),
                     lw=1.4,
                     marker=MARK[a],
                     ms=4,
                     zorder=3,
                     label=arm["name"],
                 )
-                pax.plot(x, arm["pull"], color=INK[a], lw=1.1, marker=MARK[a], ms=3)
-            aax.plot(x, data["anti"], color=RULE, lw=1.1, marker=".", ms=4)
+                pax.plot(x, arm["pull"], color=light_dark(*INK[a]), lw=1.1, marker=MARK[a], ms=3)
+            aax.plot(x, data["anti"], color=light_dark(*RULE), lw=1.1, marker=".", ms=4)
             ax.set_ylim(-0.03, 0.75 if key == "anchored" else 0.25)
             pax.set_ylim(-0.05, 1.6)
             pax.set_yticks([0, 1])

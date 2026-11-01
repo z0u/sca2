@@ -160,10 +160,14 @@ def table_html(head: list[str], rows: list[list[str]], caption: str) -> str:
     return figure_html(table, caption=caption, class_="report-figure")
 
 
-INK = {NEW: light_dark("#0b3c73", "#cfe6ff"), OLD: light_dark("#2a9d8f", "#7fd8c8")}
+# Inks are (light, dark) pairs, resolved with `light_dark` where a figure draws: it picks by the theme active when
+# it is called, so a value resolved at import would give the dark render the light ink.
+INK = {NEW: ("#0b3c73", "#cfe6ff"), OLD: ("#2a9d8f", "#7fd8c8")}
 MARK = {NEW: "s", OLD: "D"}
-GHOST = light_dark("#bbb", "#555")
-AXIS_INK, ROT_INK, RAND_INK = light_dark("#555", "#bbb"), light_dark("#c0392b", "#ff8a76"), light_dark("#888", "#999")
+GHOST = ("#bbb", "#555")
+AXIS_INK = ("#555", "#bbb")
+ROT_INK = ("#c0392b", "#ff8a76")
+RAND_INK = ("#888", "#999")
 
 # --- Summaries the prose quotes ---------------------------------------------------------------------------------
 
@@ -292,9 +296,9 @@ def depth_draw(data: dict, alt_text: str) -> str:
             for series in data["series"]:
                 w = series["which"]
                 for r in series[key]:
-                    ax.plot(x, r, color=INK[w], lw=0.5, alpha=0.6, zorder=2)
+                    ax.plot(x, r, color=light_dark(*INK[w]), lw=0.5, alpha=0.6, zorder=2)
                 ax.plot(
-                    x, np.mean(series[key], axis=0), color=INK[w], lw=1.6, marker=MARK[w], ms=4.5, zorder=3,
+                    x, np.mean(series[key], axis=0), color=light_dark(*INK[w]), lw=1.6, marker=MARK[w], ms=4.5, zorder=3,
                     label=series["name"],
                 )  # fmt: skip
             wax.plot(x, data["holds"], color=light_dark("#333", "#ddd"), lw=1.2, marker="o", ms=3)
@@ -382,10 +386,17 @@ def dose_draw(data: dict, alt_text: str) -> str:
             for series in data["series"]:
                 w = series["which"]
                 for r in series["runs"]:
-                    ax.plot(data["doses"], r[key], color=INK[w], lw=0.6, alpha=0.8, zorder=2)
+                    ax.plot(data["doses"], r[key], color=light_dark(*INK[w]), lw=0.6, alpha=0.8, zorder=2)
                 mean = np.mean([r[key] for r in series["runs"]], axis=0)
                 ax.plot(
-                    data["doses"], mean, color=INK[w], lw=1.7, marker=MARK[w], ms=4.5, zorder=3, label=series["name"]
+                    data["doses"],
+                    mean,
+                    color=light_dark(*INK[w]),
+                    lw=1.7,
+                    marker=MARK[w],
+                    ms=4.5,
+                    zorder=3,
+                    label=series["name"],
                 )
             ax.set_title(title, fontsize=8)
             ax.set_xlabel("dose", fontsize=8)
@@ -528,7 +539,10 @@ def spectrum_draw(data: dict, alt_text: str) -> str:
         fig, axes = plt.subplots(1, 2, figsize=(6.4, 2.4), layout="constrained", sharex=True, sharey=True)
         x = np.arange(1, C + 1)
         for ax, arm in zip(axes, data["arms"], strict=True):
-            for key, ink, label in (("axes", AXIS_INK, "coordinate axes"), ("rotated", ROT_INK, "rotated basis")):
+            for key, ink, label in (
+                ("axes", light_dark(*AXIS_INK), "coordinate axes"),
+                ("rotated", light_dark(*ROT_INK), "rotated basis"),
+            ):
                 for i, r in enumerate(arm[key]):
                     ax.plot(x, r, color=ink, lw=0.7, alpha=0.8, label=label if i == 0 else None)
             ax.axhline(1 / C, color=light_dark("#aaa", "#555"), lw=0.5, ls=":", zorder=0)
@@ -593,16 +607,18 @@ def cost_draw(data: dict, alt_text: str) -> str:
         for ax, arm in zip(axes, data["arms"], strict=True):
             for i in range(len(data["seeds"])):
                 for key, ink, dx, mk in (
-                    ("axes", AXIS_INK, -0.22, "."),
-                    ("rotated", ROT_INK, 0.0, "."),
-                    ("random", RAND_INK, 0.22, "o"),
+                    ("axes", light_dark(*AXIS_INK), -0.22, "."),
+                    ("rotated", light_dark(*ROT_INK), 0.0, "."),
+                    ("random", light_dark(*RAND_INK), 0.22, "o"),
                 ):
                     v = np.asarray(arm[key][i])
                     ax.scatter(
                         i + dx + jit[: len(v)] * 0.5, v, s=6 if mk == "." else 9, color=ink, alpha=0.5, marker=mk,
                         facecolors="none" if mk == "o" else ink, lw=0.6, zorder=2,
                     )  # fmt: skip
-                ax.scatter([i - 0.22], [arm["e1"][i]], s=28, marker="s", color=INK[NEW], zorder=4, label="e₁")
+                ax.scatter(
+                    [i - 0.22], [arm["e1"][i]], s=28, marker="s", color=light_dark(*INK[NEW]), zorder=4, label="e₁"
+                )
             ax.set_xticks(range(len(data["seeds"])), [str(s) for s in data["seeds"]])
             ax.set_xlabel("seed", fontsize=8)
             ax.set_title(arm["name"], fontsize=8)
