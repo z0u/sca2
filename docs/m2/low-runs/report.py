@@ -671,7 +671,11 @@ def evidence_draw(data: dict, alt_text: str) -> str:
     return _plot()
 
 
-ARC_RUNS = (fl.label_of(715, None), fl.cross_label_of(715, 715))  # the split pair: low run, then its twin
+ARC_RUNS = (
+    fl.label_of(715, None),
+    fl.cross_label_of(715, 715),
+    ex.fc.label_of(715, None),
+)  # the split pair, then per-visit
 
 
 def arc_figure() -> str:
@@ -680,13 +684,13 @@ def arc_figure() -> str:
         "points": [{s: EVIDENCE[lab]["slices"][s]["arc_points"] for s in ("2", "3")} for lab in ARC_RUNS],
     }
     alt = """
-        The states at the example answers of the two runs at seed 715 (the low run above, its twin below), at slice
-        2 (left) and slice 3 (right), drawn in the plane of e₁ (horizontal) and the direction a non-fitting answer
-        has (vertical), a few hundred examples of each kind. The states are unit vectors, so a state that lies in
+        The states at the example answers of three runs at seed 715 (the low run, its twin, and the per-visit run,
+        one per row), at slice 2 (left) and slice 3 (right), drawn in the plane of e₁ (horizontal) and the
+        direction a non-fitting answer has (vertical), a few hundred examples of each kind. The states are unit vectors, so a state that lies in
         this plane sits on the unit circle. Non-fitting examples cluster at the bottom, at e₁ near zero, on the
         circle at slice 3 and inside it at slice 2; fitting examples spread along the arc from there toward e₁ = 1
-        on the right, further along at slice 3 than at slice 2. The two runs have the same shape, with the low
-        run's fitting examples a little further from e₁ at slice 3.
+        on the right, further along at slice 3 than at slice 2. The three runs have the same shape, with the
+        fitting examples of the low run a little further from e₁ at slice 3.
     """
     return arc_draw(data, alt)
 
@@ -698,13 +702,15 @@ def arc_draw(data: dict, alt_text: str) -> str:
         alt_text=alt_text,
         caption="""
             **The arc from the non-fitting direction to e₁.** States at the example answers in the plane spanned by
-            e₁ (horizontal) and the direction a non-fitting answer has (vertical): 400 fitting examples (blue) and
-            400 non-fitting ones (grey) per panel. **Rows:** the low run at seed 715, then its twin. **Columns:**
-            slice 2, slice 3. The states are unit vectors, so a state in this plane lies on the dotted unit circle.
+            e₁ (horizontal) and the direction a non-fitting answer has (vertical): 400 fitting examples (red for
+            the low run, blue for the others) and 400 non-fitting ones (grey) per panel. **Rows:** the low run at
+            seed 715, its twin, and the per-visit run at the same seed. **Columns:** slice 2, slice 3. The states
+            are unit vectors, so a state that lies in this plane sits on the dotted unit circle; one inside the
+            circle has part of its length in other directions.
         """,
     )
     def _plot() -> plt.Figure:
-        fig, axes = plt.subplots(2, 2, figsize=(5.2, 5.0), layout="constrained", sharex=True, sharey=True)
+        fig, axes = plt.subplots(3, 2, figsize=(5.2, 7.3), layout="constrained", sharex=True, sharey=True)
         t = np.linspace(0, 2 * np.pi, 400)
         for (name, low), pts, row in zip(data["runs"], data["points"], axes, strict=True):
             for s, ax in zip(("2", "3"), row, strict=True):
@@ -728,7 +734,7 @@ def arc_draw(data: dict, alt_text: str) -> str:
             fig,
             [
                 (ink_low(), "o", "fitting examples, low run"),
-                (ink_normal(), "o", "fitting, its twin"),
+                (ink_normal(), "o", "fitting, other runs"),
                 (ghost(), "o", "non-fitting"),
             ],
             lines=False,
@@ -1177,7 +1183,7 @@ What is that off-axis direction? Two checks say what it is and that it is real. 
 
 {arc_figure()}
 
-The figure draws that arc for the two runs at seed 715. Each answer state is a unit vector, so in the plane of e₁ and the non-fitting direction a state that lies in the plane sits on the unit circle. The non-fitting examples gather at the bottom, where e₁ is near zero: on the circle at slice 3, and inside it at slice 2, where the state still has more in other directions. The fitting examples spread from there along the circle toward e₁ = 1, further along at slice 3 than at slice 2. The low run and its twin have the same shape; the fitting examples of the low run sit a little further from e₁ at slice 3, which is the small α gap in the table of E1. So the writer gives the readers much the same picture in both runs, which is the point of E1 seen from inside. Fixing one end of the arc is what makes the other end visible. Without e₁ in place there would be two unnamed directions and nothing to say which is which, so an anchor is also an instrument for reading the representation.
+The figure draws that arc for three runs at seed 715: the low run, its twin, and the per-visit run. Each answer state is a unit vector, so in the plane of e₁ and the non-fitting direction a state that lies in the plane sits on the unit circle, and one that sits inside the circle has part of its length in other directions. The non-fitting examples gather at the bottom, where e₁ is near zero: on the circle at slice 3, and inside it at slice 2. The plane is a projection, so "arc" is a simplification: two non-fitting examples that land on the same point here can be far apart in the other directions, as the ones at slice 2 are, and the figure says nothing about whether an example that fits `lighten` and one that fits `mix` sit near each other. What it does say is that every fitting example has left the non-fitting direction by about as much as it has gained on e₁. The fitting examples spread along the circle toward e₁ = 1, further along at slice 3 than at slice 2, and at slice 3 the ones near the top sit at α close to 1. The three runs have the same shape; the fitting examples of the low run sit a little further from e₁ at slice 3, which is the small α gap in the table of E1. So the writer gives the readers much the same picture in a low run, its twin, and a per-visit run, which is the point of E1 seen from inside. Fixing one end of the arc is what makes the other end visible. Without e₁ in place there would be two unnamed directions and nothing to say which is which, so an anchor is also an instrument for reading the representation.
 
 So, to a first approximation, the evidence that an example fits is one vector with two parts. One component lies along e₁, where the anchor placed it. The other is how far the state has left the direction a non-fitting answer has, which the loss made on its own and the anchor never touched. Both parts are there in every run, low or not, and nothing in the end state of the writer (block 1) sets the low runs apart. What has to differ is how much the readers take from each part.
 """
@@ -1227,13 +1233,13 @@ The off-axis evidence is not what changes. The fits probe with e₁ zeroed is ab
 rf"""
 ## Discussion
 
-As far as the loss and the anchor term can see, a low run and its twin are the same solution. They have the same loss and the same alignment, and a different outcome under the edit. The difference is inside the reader blocks. The evidence that an example fits `difference` is one vector with two parts: a part along e₁, which the anchor put there, and a part along one other direction, how far the state has left the direction a non-fitting answer has, which the loss made on its own. A reader can take the evidence from either part, and the readers of the low runs take more of it from the part off the axis. These edits cannot tell whether that is a different weighting of the same two inputs or a reader built a little differently. Either way, it is something we are not optimizing for, and the model has to settle it one way or the other.
+As far as the loss and the anchor term can see, a low run and its twin are the same solution. They have the same loss and the same alignment, and a different outcome under the edit. The difference is inside the reader blocks. The evidence that an example fits `difference` is one vector with two parts: a part along e₁, which the anchor put there, and a part along one other direction, how far the state has left the direction a non-fitting answer has, which the loss made on its own. A reader can look for `difference`-ness along e₁ or for the absence of not-`difference`-ness along the other direction, and the readers of the low runs do more of the second. These edits cannot tell whether that is a different weighting of the same two inputs or a reader built a little differently. Either way, it is something we are not optimizing for, and the model has to settle it one way or the other.
 
-The anchor term asks for the e₁ part, and the anti term keeps e₁ off the other positions. But no term asks the readers to use e₁, so training is flat along that choice. A run settles somewhere on it early, as the twins show, and then stays or drifts during the anneal. That fits the fixed-labels finding that neither the label set nor the seed decides which runs end low. It also says what a twitchy landscape means here: a direction the loss does not see, with no need for a rugged loss.
+The anchor term asks for the e₁ part, and the anti term keeps e₁ off the other positions. But no term asks the readers to use e₁, so training is flat along that choice. A run settles somewhere on it early, as the twins show, and then stays or drifts during the anneal. That fits the fixed-labels finding that neither the label set nor the seed decides which runs end low.
 
 None of this is special to the fixed-label runs. The off-axis evidence is there in the per-visit runs too, and their readers also take some of it: the full edit leaves a few hundredths of the way in every run. The fixed-label runs lean on it more often, and more heavily. The per-visit draw may spread less because the pull reaches nearly every `difference` context over a run. The e₁ part is then written on the whole corpus, and the readers have less reason to prefer the other part. A fixed set leaves most contexts with only the off-axis part during training. That is a guess, and this re-analysis does not test it.
 
-If it holds, the lever is on the readers rather than on the writer. The most targeted term would make the prediction depend on e₁. On the labelled contexts, it would run a second forward pass with e₁ removed, and train it toward the answer that the absence of the op would give. A run that reads from off the axis would then pay for it. That costs one forward pass per labelled context and needs nothing but the labels, so it would carry over to real text. It would need its own experiment. Another option is a second anchored direction for the off-axis part, since the evidence has about two directions. But an earlier multi-axis anchor did not pay off, and the reader could still prefer a third direction.
+If it holds, the lever is on the readers rather than on the writer. The most targeted term would make the prediction depend on e₁. On the labelled contexts, it would run a second forward pass with e₁ removed, and train it toward the answer that the absence of the op would give (the target null). A run that reads from off the axis would then pay for it. That costs one forward pass per labelled context, or less: the edit can be applied to a random fraction of the labelled contexts inside the ordinary forward pass, with the target null as their target, so a context and its edited copy can sit in one batch. Either way it needs nothing but the labels, so it would carry over to real text. It would need its own experiment. Another option is a second anchored direction for the off-axis part, since the evidence has about two directions. But an earlier multi-axis anchor did not pay off, and the reader could still prefer a third direction.
 
 As for scoring, the low state is invisible to the signals that the loss-rate screen uses, so an early call cannot catch it. The e₁ edit cannot catch it either until about half-way through training (epoch {SCREEN_EPOCH} on these runs), since some normal runs start late and sit under the low ones before then.
 """
