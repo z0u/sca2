@@ -27,6 +27,7 @@ __all__ = [
     "compute_env",
     "data_root",
     "describe_numerics_drift",
+    "experiments_root",
     "gpu_name",
     "in_declared_phase",
     "installed_numerics",
@@ -53,6 +54,17 @@ def data_root() -> Path:
         if any((d / m).exists() for m in _ROOT_MARKERS):
             return d / ".mini"
     return cwd / ".mini"
+
+
+def experiments_root() -> Path:
+    """Where local experiment state lives for the active storage profile: one ``<name>/`` per experiment.
+
+    That is :func:`data_root` under the base configuration, and ``<data_root>/profiles/<profile>/`` under ``MINI_PROFILE``. A local run keeps its memo records in its experiment directory, so without the split a run made under one profile would read as already done under another: every task skips, nothing reaches that profile's bucket, and the report then finds nothing published. Modal keeps the two apart with the profile's Environment; this is the local counterpart. The local fallback store (``store/``) sits beside the experiments (:func:`~mini.store.store_root_for`), so it splits the same way.
+    """
+    from mini.store import active_profile
+
+    root = data_root()
+    return root if (profile := active_profile()) is None else root / "profiles" / profile
 
 
 # Env var naming a directory for the caches that are safe to share between checkouts (the weave cache

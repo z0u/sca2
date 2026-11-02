@@ -1,7 +1,8 @@
 ---
-status: partial
+status: done
 tags: [D2.2, edit-effects, measurement]
 opened: 2026-10-26
+closed: 2026-11-01
 ---
 # An absolute tolerance for the write
 
@@ -16,3 +17,5 @@ If adopted, the D2.2 design would name the floor next to the tolerance, and the 
 **2026-10-30, science desk** — The [write-floor report](/docs/m2/write-floor/report.py) proposes a floor from stored arrays, on `τ_ℓ fixed`, `falloff`, `step, soft τ` and `pool 1–3, soft τ`. Drawing the held-out contexts again moves the excess by hundredths of a degree, so it cannot set the floor. The seed spread of the bound at sites with a bound under 10° gives one: 1.13° at the 95% quantile. With it, every site over the tolerance at a `?`, `,` or ⏎ drops out, and what stays is at operands at slice 1 (slice 2 too on the step): one run each on `τ_ℓ fixed` and `falloff`, three on the step, and all eight on the pool. A rule relative to each site (an excess over twice its seed spread) flags a few symbol sites instead, so adopting the floor is a choice between the two. Left for review: whether to adopt it, and naming it in the D2.2 design. The reference-direction source was not measured, since it needs a new pass.
 
 **2026-10-30, science desk** — Renamed on review: the floor is now the *absolute tolerance*, beside the ratio as the *relative tolerance* (as in numpy's `atol` and `rtol`), since "floor" already names the chance-level baseline and the end of an anneal in other reports. The review was fine with adopting it. Proposed for a gate, not yet agreed: count runs with any site over both (at most one in eight), with no role labels.
+
+**2026-11-01, housekeeping** — Closing: the [D2.2 design](/docs/m2/d2.2/design.md) now names both tolerances under "Over the write bound", with the gate counted in runs (at most one run in eight with any site over), as of #324. Reports published before then quote the ratio alone; fixed-effects is one. A new report that scores the write applies both from its own code, since there is no shared helper for it yet.

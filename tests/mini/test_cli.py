@@ -73,6 +73,44 @@ def test_ls_and_status_surface_memo_experiments(tmp_path: Path, monkeypatch, cap
     assert "train-" in status_out and "2 tasks" in status_out  # per-task memo records
 
 
+def test_local_state_is_kept_apart_per_storage_profile(tmp_path: Path, monkeypatch, capsys):
+    """A run under `MINI_PROFILE=dev` keeps its memo records under `.mini/profiles/dev/`, so the same experiment under the base configuration starts from nothing rather than reading as done (the equals-evidence hazard)."""
+    monkeypatch.chdir(tmp_path)
+    from mini.__main__ import cmd_ls
+    from mini.runs import data_root, experiments_root
+    from mini.store import LocalStore, project_store
+
+    calls = tmp_path / "calls"
+    calls.mkdir()
+
+    def train(x):
+        (calls / f"{os.getpid()}-{x}").touch()
+        return x * 2
+
+    def sweep():
+        return Experiment(name="split", main=lambda ctx: ctx.map(train, [1, 2]))
+
+    monkeypatch.setenv("MINI_PROFILE", "dev")
+    assert experiments_root() == data_root() / "profiles" / "dev"
+    store = project_store()
+    assert (
+        isinstance(store, LocalStore) and store.root == data_root() / "profiles" / "dev" / "store"
+    )  # beside the profile's experiments
+    _drive(sweep(), LocalApparatus("split"))
+    assert (data_root() / "profiles" / "dev" / "split" / ".control" / "memo").is_dir()
+    assert not (data_root() / "split").exists()
+    cmd_ls(argparse.Namespace())
+    assert "split" in capsys.readouterr().out
+    assert len(list(calls.iterdir())) == 2
+
+    monkeypatch.delenv("MINI_PROFILE")
+    assert experiments_root() == data_root()
+    cmd_ls(argparse.Namespace())
+    assert "no experiments" in capsys.readouterr().out  # dev's records don't leak into the base listing
+    _drive(sweep(), LocalApparatus("split"))
+    assert len(list(calls.iterdir())) == 4, "the base run must compute, not reuse dev's records"
+
+
 def test_status_and_ls_report_done_despite_superseded_failure(tmp_path: Path, monkeypatch, capsys):
     """The scenario a monitor agent hits: a task fails, the fn is *replaced* by one with a new name (a new identity — re-keying every cell), and the run completes under the new keys. ``status``/``ls`` must report the *run* as done — aggregating over the requested set — with the orphaned old records shown but marked, not poisoning the state a poller acts on."""
     monkeypatch.chdir(tmp_path)
