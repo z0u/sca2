@@ -745,6 +745,8 @@ A fixed labelled set at one context in fifty is enough for the anchor to settle 
 
 But removal is less reliable with a fixed set: a few runs in eight end well short of the rest (E2), mostly because they never reach the level of the others (E3). Since a fixed set five times larger did no better, more labels of the same kind do not seem to be the fix, at least between about 900 and 4,300 contexts. Nor do the low runs' sets differ from the others in what their contexts show (E4), and in new pairings of set and seed the low runs move about: the same set at the same seed can end low or high depending on the last bits of the arithmetic (E5). The per-visit draw spreads less, and that may come from averaging over almost every context, which could steady a run against such small differences.
 
+The [low-runs](/docs/m2/low-runs/report.py) report follows the low tail into the model. Every run writes the evidence that an example fits `difference` both on e₁ and along a second direction, and the low runs are the ones whose reader blocks take more of that evidence from off the axis, a difference that the loss and the anchor term do not see. The same off-axis part is in the per-visit runs at a few hundredths, so the fixed set makes a general mechanism more visible rather than a new one.
+
 If this holds, a comparison against post-hoc methods with fixed labels should expect a wider spread on the anchored side than the fixed confirmation showed. With that spread, eight runs give a noisy seed mean.
 """
 
@@ -758,6 +760,9 @@ r"""
 
 [soft pool scout](/docs/m2/soft-pool-scout/report.py)
 :   The pool over slices 1 to 3 with $\tau_\ell$ held at 0.1 keeps the anchor on all eight seeds with no early spill, and one seed rises late to near the criterion.
+
+[low-runs](/docs/m2/low-runs/report.py)
+:   Re-analysis of the 48 stored runs of this experiment and the fixed confirmation: the low runs read part of the evidence for `difference` from off e₁, through the reader blocks, and twins trained from the same labels, seed and batches match in loss and α while parting in removal.
 
 [post-hoc comparison plan](/docs/m2/d2.2/post-hoc-comparison.md)
 :   Plans a comparison of the edit along e₁ with directions fitted after training on the controls at seeds 712 to 719, with the anchor's tolerance of scarce labels among the claims it tests.
