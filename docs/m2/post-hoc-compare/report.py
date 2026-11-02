@@ -24,8 +24,8 @@ r"""
 - [The trade-off (E1)](#the-trade-off-e1) — <what we saw, in one sentence>.
 - [Spill at matched removal (H1)](#spill-at-matched-removal-h1) — **<verdict>**. <One sentence.>
 - [Removal at the spill criterion (H2)](#removal-at-the-spill-criterion-h2) — **<verdict>**. <One sentence.>
-- [The ceiling against the fitters (H3a)](#the-ceiling-against-the-fitters-h3a) — **<verdict>**. <One sentence.>
-- [The ceiling against the anchor (H3b)](#the-ceiling-against-the-anchor-h3b) — **<verdict>**. <One sentence.>
+- [The ceiling against the fitters (H3)](#the-ceiling-against-the-fitters-h3) — **<verdict>**. <One sentence.>
+- [The ceiling against the anchor (S1)](#the-ceiling-against-the-anchor-s1) — **<matches, falls short, or unresolved>**. <One sentence.>
 - [The fitters find a placed concept (H4)](#the-fitters-find-a-placed-concept-h4) — **<verdict>**. <One sentence.>
 - [Grading, landing, and where the answers go (E2)](#grading-landing-and-where-the-answers-go-e2) — <one sentence>.
 - [How many labels a fitter needs (E3)](#how-many-labels-a-fitter-needs-e3) — <one sentence>.
@@ -80,7 +80,7 @@ Iterated probe (INLP)
 Optimized direction
 :   A unit vector per edited slice, fitted by gradient descent on the control so that the edited answers on `difference` contexts move toward the target null while the answers on the other contexts stay where they were. It uses the target null, which no real pipeline has, so it is a diagnostic ceiling: about the best a rank-1 edit (an edit along one direction) of this control could do with the scoring in hand. [COAST](https://arxiv.org/abs/2605.01167) is its nearest published relative.
 
-The first four are the standard fitters that H1 and H2 judge. Each is also fitted on the anchored runs, where training placed the concept on e₁, as a check that the fitters can find a concept that is there (H4). A fitter that misses that check is left out of the verdicts of H1 to H3b. The sans-diff model, trained with no loss on `difference`, stays the reference for how close to the target null a model of this size comes.
+The first four are the standard fitters that H1 and H2 judge. Each is also fitted on the anchored runs, where training placed the concept on e₁, as a check that the fitters can find a concept that is there (H4). A fitter that misses that check is left out of the verdicts of H1, H2, H3, and S1. The sans-diff model, trained with no loss on `difference`, stays the reference for how close to the target null a model of this size comes.
 """
 
 # %%
@@ -124,7 +124,7 @@ The fits at the example answers and the query `=` use role labels a real corpus 
 The anchor gets no grid. Its one configuration is the published edit, which was reached through some thirty experiments at other seeds. The fitters arrive with their own literatures behind them, and get a per-run grid on top.
 
 Selection rule (frozen)
-:   Per method and per run, every configuration is scored on the tuning set, net of the median drop under the same operator form along fifteen fixed coordinate axes other than e₁, and the frontier is taken: the configurations that no other beats on both removal and spill. Two points are read off the frontier. *Removal at the spill criterion* is where the frontier crosses a spill of 0.02, interpolated linearly between the two frontier configurations that bracket it, or the configuration with the least spill if none is within the criterion. *Spill at matched removal* is where the frontier crosses the seed mean of the anchored removal, interpolated the same way; a frontier that never reaches that removal has no such point, and the run is recorded as not matched. The bracketing configurations are then scored on the test set, and each point is their test scores mixed with the weights found on the tuning set, so the test set chooses nothing, and the point can sit a little off the line on the test set; the table shows where it sits.
+:   Per method and per run, every configuration is scored on the tuning set, net of the median drop under the same operator form along fifteen fixed coordinate axes other than e₁, and the frontier is taken: the configurations that no other beats on both removal and spill. Two points are read off the frontier. *Removal at the spill criterion* is where the frontier crosses a spill of 0.02, interpolated linearly between the two frontier configurations that bracket it; if no configuration is within the criterion it is the one with the least spill, and if every one is within it it is the one with the most removal. *Spill at matched removal* is where the frontier crosses the seed mean of the anchored removal at full dose, interpolated the same way; a frontier that never reaches that removal has no such point, and the run is recorded as not matched. The bracketing configurations are then scored on the test set, and each point is their test scores mixed with the weights found on the tuning set, so the test set chooses nothing, and the point can sit a little off the line on the test set; the table shows where it sits.
 <!-- REVIEW: the first draft took the tuning frontier on raw drops. A typical coordinate axis of a control costs about 0.03 per op at full dose (reference-baseline), so raw 0.02 on the tuning set would have meant about −0.01 net, and the selection would have sat inside the criterion it is judged against, biased against the fitters. The axis median is fitter-independent, so fifteen axes per operator form cost about 2,500 passes per run. Verify: the axis subsample is fixed before the run, and the test-set baselines are the full ones of the Measurements. -->
 
 Removal at the spill criterion mirrors what a practitioner with one of these methods would do: sweep the layer and the strength on a validation set, keep the side effects within a tolerance, and take the strongest edit that does.
@@ -169,7 +169,7 @@ r"""
 
 **What we expect.** In short: turn each fitter up until it removes as much of `difference` as the anchor does, and on most runs it will cost another op more than the criterion allows.
 
-The rule. For each fitter we count the runs, out of eight, whose spill at matched removal is over 0.02 net. A run whose frontier never reaches the anchored removal counts as over, since that fitter cannot remove as much at any spill. For the anchor we count the runs whose spill at full dose is over 0.02 net. A one-sided Fisher exact test[^fisher] then says whether the fitter count is higher than the anchored count by more than chance would give. A fitter passes if its count is five or more and the test gives p below 0.05, and misses if its count is under five. A count of five or more that the test does not separate from the anchor (which can happen only if the anchor spills on several runs too) would be outside the plan, and that fitter would be Unresolved. H1 passes if every fitter that passes H4 passes, is partial if some do, and misses if none do. A fitter that misses would mean that, on this model, a searched direction serves as well as a placed one.
+The rule. For each fitter we count the runs, out of eight, whose spill at matched removal is over 0.02 net. A run whose frontier never reaches the anchored removal counts as over, since that fitter cannot remove as much at any spill. For the anchor we count the runs whose spill at full dose is over 0.02 net. A one-sided Fisher exact test[^fisher] then says whether the fitter count is higher than the anchored count by more than chance would give. A fitter passes if its count is five or more and the test gives p below 0.05, and misses if its count is under five. A count of five or more that the test cannot tell apart from the anchored count (which can happen only if the anchor itself spills on one or more runs; five against one gives p of 0.06) would be outside the plan, and that fitter would be Unresolved. Among the fitters that pass H4, H1 passes if every fitter with a resolved verdict passes, misses if every one misses, and is partial otherwise; it is Unresolved if no fitter passes H4 or none has a resolved verdict. The Findings line names any fitter left out or Unresolved. A fitter that misses would mean that, on this model, a searched direction serves as well as a placed one.
 
 [^fisher]: Fisher exact test: a test of whether two counts out of the same number of trials differ by more than chance. With the anchor at none of eight, a fitter at four or more of eight gives p below 0.05.
 
@@ -185,9 +185,11 @@ r"""
 
 **What we expect.** In short: hold each fitter to the same spill limit as the anchor, and it will remove less of `difference` than the anchor does.
 
-The rule. For each fitter we take the difference of seed means between the anchored removal (at full dose, or where its own dose curve crosses the criterion if it spills past it) and the removal at the spill criterion of the fitter, with a 95% Welch t interval. A fitter passes if the interval lies above zero (the anchor removes more). It misses if the interval lies below zero (the fitter removes more), or contains zero and lies within 0.05 of it on both sides (the two remove about as much). An interval that contains zero and reaches further than 0.05 on either side would mean the seeds could not tell, and that fitter would be Unresolved. H2 passes if every fitter that passes H4 passes, is partial if some do, and misses if none do.
+The rule. For each fitter we take the difference of seed means between the anchored removal (at full dose, or where its own dose curve crosses the criterion if it spills past it) and the removal at the spill criterion of the fitter, with a 95% Welch t interval[^welch]. A fitter passes if the interval lies wholly above zero (the anchor removes more). It misses if the interval lies wholly below zero (the fitter removes more), or contains zero and lies within 0.05 of it on both sides (the two remove about as much). An interval that contains zero and reaches further than 0.05 on either side would mean the seeds could not tell, and that fitter would be Unresolved. Among the fitters that pass H4, H2 passes if every fitter with a resolved verdict passes, misses if every one misses, and is partial otherwise; it is Unresolved if no fitter passes H4 or none has a resolved verdict. The Findings line names any fitter left out or Unresolved.
 
-A small edge for a fitter would not count against the anchor: every run writes the evidence for the op partly off e₁ (the low-runs experiment), so the edit along e₁ leaves a few hundredths behind, and a fitted direction can take in both parts.
+A small edge for a fitter would be a miss under this rule, and would not surprise us: every run writes the evidence for the op partly off e₁ (the low-runs experiment), so the edit along e₁ leaves a little behind, and a fitted direction can take in both parts.
+
+[^welch]: Welch t interval: a 95% confidence interval for the gap between two means that lets the two groups scatter by different amounts. An interval wholly above zero means the eight anchored runs remove more than the eight fitted ones by more than seed-to-seed scatter accounts for.
 
 /// admonition | TODO
 Removal at the spill criterion per run, per fitter and for the anchor, with seed means. Table: the difference of seed means and its interval per fitter.
@@ -197,11 +199,11 @@ Removal at the spill criterion per run, per fitter and for the anchor, with seed
 # %%
 
 r"""
-## The ceiling against the fitters (H3a)
+## The ceiling against the fitters (H3)
 
 **What we expect.** In short: the optimized direction, which is searched for with the scoring in hand, does better than every standard fitter.
 
-The rule. Among the standard fitters that pass H4, its removal at the spill criterion is at least the highest seed mean, and its count over the criterion at matched removal (as in H1) is at most the lowest. It passes if both hold, and misses if neither does; one without the other would be outside the plan, and the verdict would be Unresolved.
+The rule. Among the standard fitters that pass H4, its removal at the spill criterion is at least the highest seed mean, and its count over the criterion at matched removal (as in H1) is at most the lowest. It passes if both hold, and misses if neither does; one without the other would be outside the plan, and the verdict would be Unresolved, as it would be if no standard fitter passes H4. The comparison is between seed means and counts, with no interval, which is enough for a check that the ceiling is a ceiling.
 
 /// admonition | TODO
 The two measures for the optimized direction beside the standard fitters, per run.
@@ -211,12 +213,12 @@ The two measures for the optimized direction beside the standard fitters, per ru
 # %%
 
 r"""
-## The ceiling against the anchor (H3b)
+## The ceiling against the anchor (S1)
 
-**What we expect.** This hypothesis names two outcomes and predicts neither. In short: either the best rank-1 search on the control does as well as the anchor, or it still falls short.
+**What we expect.** This section predicts nothing: it is a frozen rule that decides between two outcomes, and its badge is Decided, or Unresolved. In short: either the best rank-1 search on the control does as well as the anchor, or it still falls short.
 
-The rule. The ceiling *matches* the anchor if the 95% Welch interval on the difference of seed means in removal at the spill criterion contains zero and the Fisher test does not separate its count over the criterion at matched removal from the anchored count; then the advantage of placing the concept is that no search is needed. The ceiling *falls short* if the interval lies above zero; then the control holds the op in a way no rank-1 edit removes cleanly, which is the stronger claim for the anchor. Any other result (the interval below zero, or an interval that contains zero beside a count the Fisher test separates) would be outside the plan, and the verdict would be Unresolved.
-<!-- REVIEW: H3 was split in two at the paper round before the freeze. As one hypothesis, its verdict sat on the clause that changes the post least (the ceiling beats the fitters), and the comparison with the anchor, which decides the framing, carried none. Verify: H3b names both outcomes and the Findings show its verdict. -->
+The rule. The ceiling *matches* the anchor if the 95% Welch interval on the difference of seed means in removal at the spill criterion contains zero and lies within 0.05 of it on both sides (as for a miss of H2), and the Fisher test cannot tell its count over the criterion at matched removal apart from the anchored count; then the advantage of placing the concept is that no search is needed. The ceiling *falls short* if the interval lies wholly above zero; then the control holds the op in a way no rank-1 edit removes cleanly, which is the stronger claim for the anchor. Any other result (the interval wholly below zero, an interval that contains zero but reaches further than 0.05, or a count the Fisher test does tell apart) would be outside the plan, and the verdict would be Unresolved.
+<!-- REVIEW: H3 was split in two at the paper round before the freeze. As one hypothesis, its verdict sat on the clause that changes the post least (the ceiling beats the fitters), and the comparison with the anchor, which decides the framing, carried none. Verify: S1 names both outcomes and the Findings show which held. A second review made the comparison with the anchor an S section, since it predicts nothing, and gave "matches" the same 0.05 band as a miss of H2, so an interval too wide to tell is Unresolved rather than a match. -->
 
 /// admonition | TODO
 The two measures for the optimized direction beside the anchor, per run, with the interval and the Fisher p.
@@ -230,12 +232,12 @@ r"""
 
 **What we expect.** In short: on the anchored runs, where training placed the op on e₁, each standard fitter removes about as much as the edit along e₁ does, within the same spill limit. A fitter that cannot do that where the concept is known to be is no fair stand-in for its method on the controls.
 
-The rule. Restricted to fits on the pooled positions or at the example answers, a fitter passes if its removal at the spill criterion on the anchored runs is within 0.1 of what the edit along e₁ removes at full dose on the same runs (seed means), and misses otherwise. A fitter that finds e₁ but has to stop short of it to stay within the criterion, as INLP may when its extra directions cost spill, misses. The query `=` is left out: the clean alignment there is near zero in the anchored runs (the mid-block-edit experiment), so a fit at that site is not expected to find e₁.
+The rule. Restricted to fits on the pooled positions or at the example answers, a fitter passes if its removal at the spill criterion on the anchored runs is no more than 0.1 below what the edit along e₁ removes at full dose on the same runs (seed means), and misses otherwise. A fitter that finds e₁ but has to stop short of it to stay within the criterion, as INLP may when its extra directions cost spill, misses. On the anchored runs the fitter takes its permuted-label baseline, and the edit along e₁ keeps its published one. The query `=` is left out: the clean alignment there is near zero in the anchored runs (the mid-block-edit experiment), so a fit at that site is not expected to find e₁.
 
 Beside the verdict, and not part of it, we report how close each fitted direction is to e₁: the cosine with e₁ at each of slices 1 to 3, for the target and site of the selected configuration (the seed mean of its absolute value; for INLP, the largest cosine between e₁ and the span).
 <!-- REVIEW: the first draft also gated H4 on a cosine of 0.9 with e₁. The paper round asked whether that assumes every `difference` context sits fully on e₁; it does not, and the low-runs experiment found part of the evidence off e₁ in every run, so a fitted direction can remove the op while pointing partly elsewhere. H4 now gates on removal within the spill criterion, which is what the fitter is used for, and reports the cosine. Verify: the TODO below still shows the cosine. -->
 
-The rule for a miss, frozen here: a fitter that misses H4 is left out of the verdicts of H1 to H3b, its rows stay in the tables marked as such, and the report names it as a method the comparison could not fairly score.
+The rule for a miss, frozen here: a fitter that misses H4 is left out of the verdicts of H1, H2, H3, and S1, its rows stay in the tables marked as such, and the report names it as a method the comparison could not fairly score. A fitter that cannot remove a placed concept would likely do badly on the controls too, so leaving it out leans toward the fitters, which is the cautious direction for a claim about the anchor.
 
 /// admonition | TODO
 Cosine with e₁ per slice and per run, per fitter; removal at the spill criterion on the anchored runs against the edit along e₁.
