@@ -77,6 +77,10 @@ PREFIX = "reports/m2/low-runs"
 END_REF = PREFIX + "/end"
 ALONG_REF = PREFIX + "/along"
 ROUTES_REF = PREFIX + "/routes"
+EVIDENCE_REF = PREFIX + "/evidence"
+TWINS_REF = PREFIX + "/twins"
+PC_COUNTS = (1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 63)
+"""How many principal components of the off-axis state the evidence probe is given, in turn."""
 CROSS_KEPT_REF = PREFIX + "/cross-kept/{label}"
 """The kept checkpoints of the crossed runs. The fixed-labels experiment published only their end checkpoints, so
 these refs were set from its train results (the `kept_checkpoints` artifact of each crossed run) before this
@@ -404,6 +408,82 @@ def routes_one(checkpoint, holdout, label: str) -> dict:
     return out
 
 
+def evidence_one(checkpoint, holdout, label: str) -> dict:
+    """How many directions the off-axis evidence takes, and where it sits: at slices 2 and 3, the fits probe given the
+    top principal components of the off-axis answer state in turn, the AUC of the one off-axis direction that
+    separates the class means, and the share of the class-mean difference that lies along e₁. Beside them, the
+    alignment with e₁ by slice and position, on `difference` contexts and on the rest, for the figure that shows
+    where the probe reads.
+    """
+    from mini import get_data_dir
+    from mini.store import get
+    from sca.anchoring import alignment
+
+    workdir = get_data_dir() / NAME / "evidence" / label
+    model, _, color_ids, tok2color = ex2216._load_run(checkpoint, workdir)
+    scorer = _Scorer(get(holdout, workdir / "holdout.npz"), tok2color, color_ids)
+    ho = scorer.ho
+    a_id = OP_NAMES.index(ANCHORED_OP)
+    n_colors = len(color_ids)
+    y = tok2color[ho.tokens[:, list(ANSWERS)]]
+    a = tok2color[ho.tokens[:, [UNIT * i for i in range(K)]]]
+    b = tok2color[ho.tokens[:, [UNIT * i + 2 for i in range(K)]]]
+    fits = (scorer.table.lookup(a * n_colors + b, y)[a_id] > 0).ravel()
+    groups = np.repeat(np.arange(len(ho.tokens)), K)
+    st = _states(model, ho.tokens)
+    out: dict[str, Any] = {"label": label, "pc_counts": list(PC_COUNTS), "slices": {}}
+    for s in (2, 3):
+        x = st[s][:, list(ANSWERS)].reshape(-1, st.shape[-1]).astype(np.float64)
+        d_full = x[fits].mean(0) - x[~fits].mean(0)
+        off = x.copy()
+        off[:, 0] = 0
+        offc = off - off.mean(0)
+        _, sv, vt = np.linalg.svd(offc, full_matrices=False)
+        pcs = offc @ vt.T
+        d_off = off[fits].mean(0) - off[~fits].mean(0)
+        out["slices"][str(s)] = {
+            "e1_share_of_mean_difference": float(d_full[0] ** 2 / (d_full @ d_full)),
+            "mean_difference_direction_auc": _auc(off @ d_off, fits),
+            "auc_by_pcs": [_probe_auc(pcs[:, :k], fits.astype(float), groups) for k in PC_COUNTS],
+            "variance_by_pcs": (np.cumsum(sv**2) / (sv**2).sum())[[k - 1 for k in PC_COUNTS]].tolist(),
+        }
+    cos = alignment(model, ho.tokens)
+    dif = ho.op_ids == a_id
+    out["alpha_by_position"] = {
+        "difference": cos[:, dif].mean(1).tolist(),
+        "other": cos[:, ~dif].mean(1).tolist(),
+    }
+    return out
+
+
+def twins_distance(kepts: list, checkpoints: list, labels: list[str], epochs: tuple[int, ...]) -> dict:
+    """How far apart the weights of the runs are along training: the relative distance between every pair of runs
+    at each kept epoch and at the end, so a twin pair can be compared with a pair of seeds.
+    """
+    import equinox as eqx
+    import jax
+    from mini import get_data_dir
+
+    def flat(model) -> np.ndarray:
+        return np.concatenate([np.asarray(x).ravel() for x in jax.tree_util.tree_leaves(eqx.filter(model, eqx.is_array))]).astype(np.float64)  # fmt: skip
+
+    all_epochs = [*epochs, EPOCHS]
+    thetas = []
+    for kept, checkpoint, label in zip(kepts, checkpoints, labels, strict=True):
+        workdir = get_data_dir() / NAME / "twins" / label
+        end_model = ex2216._load_run(checkpoint, workdir)[0]
+        models = [ex2221.kept_checkpoint(kept, e, workdir / "kept")[0] for e in epochs] + [end_model]
+        thetas.append([flat(m) for m in models])
+    n = len(labels)
+    dist = np.zeros((len(all_epochs), n, n))
+    for t in range(len(all_epochs)):
+        for i in range(n):
+            for j in range(n):
+                a, b = thetas[i][t], thetas[j][t]
+                dist[t, i, j] = np.linalg.norm(a - b) / np.sqrt(np.linalg.norm(a) * np.linalg.norm(b))
+    return {"labels": list(labels), "epochs": all_epochs, "distance": dist.tolist()}
+
+
 # =============================================================================================
 # The DAG
 # =============================================================================================
@@ -426,7 +506,7 @@ def design() -> dict[str, Any]:
     }
 
 
-def publish(rows: list[dict], end: list[dict], along: list[list[dict]], routes: list[dict]) -> dict:
+def publish(rows: list[dict], end: list[dict], along: list[list[dict]], routes: list[dict], evidence: list[dict], twins: dict) -> dict:  # fmt: skip
     import json
 
     from mini.store import put, set_ref
@@ -438,7 +518,10 @@ def publish(rows: list[dict], end: list[dict], along: list[list[dict]], routes: 
     set_ref(ALONG_REF, put(json.dumps(body).encode(), name=f"{NAME}-along.json"))
     body = {"design": design(), "runs": [meta[r["label"]] | r for r in routes]}
     set_ref(ROUTES_REF, put(json.dumps(body).encode(), name=f"{NAME}-routes.json"))
-    return {"n_end": len(end), "n_along": len(along), "n_routes": len(routes)}
+    body = {"design": design(), "runs": [meta[r["label"]] | r for r in evidence]}
+    set_ref(EVIDENCE_REF, put(json.dumps(body).encode(), name=f"{NAME}-evidence.json"))
+    set_ref(TWINS_REF, put(json.dumps({"design": design()} | twins).encode(), name=f"{NAME}-twins.json"))
+    return {"n_end": len(end), "n_along": len(along), "n_routes": len(routes), "n_evidence": len(evidence)}
 
 
 def main(ctx: Ctx) -> dict:
@@ -478,11 +561,30 @@ def main(ctx: Ctx) -> dict:
         [r["label"] for r in rows],
         role="measure",
     )
-    return ctx.run(publish, rows, end, along, routes, role="prep")
+    evidence = ctx.map(
+        evidence_one,
+        [arts[r["checkpoint"]] for r in rows],
+        [resolved["holdout"]] * n,
+        [r["label"] for r in rows],
+        role="measure",
+    )
+    twin_labels = [lab for s in fl.CROSS_SEEDS for lab in (fl.label_of(s, None), fl.cross_label_of(s, s))]
+    twin_rows = [next(r for r in rows if r["label"] == lab) for lab in twin_labels]
+    twins = ctx.run(
+        twins_distance,
+        [arts[r["kept"]] for r in twin_rows],
+        [arts[r["checkpoint"]] for r in twin_rows],
+        twin_labels,
+        tuple(fl.KEEP),
+        role="twins",
+    )
+    return ctx.run(publish, rows, end, along, routes, evidence, twins, role="prep")
 
 
 COMPUTE = {
     "prep": dict(cpu=2, timeout=1800),
+    # Eight runs' kept checkpoints loaded and flattened on the host.
+    "twins": dict(cpu=4, timeout=3600),
     # A few dozen forward passes over the 14,000 held-out contexts per checkpoint, and fourteen checkpoints per run
     # along training; the probes are small ridge fits on the host.
     "measure": dict(gpu="L40S", cpu=2, timeout=3600, watchdog=900, watchdog_grace=600),
