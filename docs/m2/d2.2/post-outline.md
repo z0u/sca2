@@ -76,7 +76,9 @@ Settled: the low runs get a section of their own, and the post goes ahead withou
 
 ## 9. What the edit misses, and why some runs end low
 
-- Every run writes the evidence that an example fits `difference` in two places: along e₁, where the anchor put it, and in a second copy off the axis that the loss made on its own. The readers take some of the evidence from each, and the edit only reaches the first ([low-runs, PR #332](https://github.com/z0u/sca2/pull/332)).
+- Every run writes the evidence that an example fits `difference` as one vector with two parts: along e₁, where the anchor put it, and along the direction a non-fitting answer has, which the loss made on its own. The readers (attention, at block 3 or 4) take some of the evidence from each part, and the edit reaches only the first ([low-runs, PR #332](https://github.com/z0u/sca2/pull/332)).
+- Anchoring as an interpretability tool: fixing one end makes the other visible by contrast. The evidence is one arc on the unit sphere, from the non-fitting direction to e₁, and each example sits along it by how well it fits. Without e₁ in place these would be two unnamed directions. Figure candidate: the answer states of one run projected onto the plane of e₁ and the non-fitting direction, fitting and non-fitting examples in two colors, slices 2 and 3 side by side, with the arc drawn.
+- A cheap check before writing: whether the non-fitting direction is shared across ops or differs by op (stored checkpoints, no training).
 - Which copy the readers lean on is invisible to training: twins with the same labels, seed and batches match in loss and α for the whole run and part only in removal.
 - What this says about anchoring: it controls where one copy of the evidence goes, and the edit is bounded by how much the readers use that copy. The fixed-label low runs are the stress case; under the per-visit draw the same thing costs a few hundredths.
 - **Open:** whether to lead the post with "removes most of the op" and keep this as its own section after the claims, or to bring it into the headline. Recommendation: its own section, with one sentence in the headline pointing to it.
@@ -96,7 +98,7 @@ Settled: the low runs get a section of their own, and the post goes ahead withou
 
 ## Figures
 
-The D2.1 post took its figures from a page of their own ([D2.1 figures](/docs/m2/d2.1/report.py)), drawn from published results and uploaded from the bundle. A D2.2 figures page in the same shape is the natural next step once the sections above settle, with hand-drawn diagrams for sections 1, 2 and 7.
+The D2.1 post took its figures from a page of their own ([D2.1 figures](/docs/m2/d2.1/report.py)), drawn from published results and uploaded from the bundle. A D2.2 figures page in the same shape is the natural next step once the sections above settle, with hand-drawn diagrams for sections 1, 2 and 7, and the arc figure of section 9 drawn from stored checkpoints.
 
 ## Sources still moving
 
