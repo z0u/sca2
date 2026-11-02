@@ -80,6 +80,7 @@ ROUTES_REF = PREFIX + "/routes"
 EVIDENCE_REF = PREFIX + "/evidence"
 TWINS_REF = PREFIX + "/twins"
 PC_COUNTS = (1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 63)
+ARC_SAMPLE = 400  # answer states per class kept for the figure of the arc between the non-fitting direction and e₁
 """How many principal components of the off-axis state the evidence probe is given, in turn."""
 CROSS_KEPT_REF = PREFIX + "/cross-kept/{label}"
 """The kept checkpoints of the crossed runs. The fixed-labels experiment published only their end checkpoints, so
@@ -451,7 +452,13 @@ def evidence_one(checkpoint, holdout, label: str) -> dict:
         d_ren = ren[fits].mean(0) - ren[~fits].mean(0)
         v = d_ren / np.linalg.norm(d_ren)
         along_v = ren @ v
+        # A sample of answer states in the plane of e₁ and v, for the figure of the arc: the raw unit state's
+        # coordinates along e₁ and along v, a few hundred fitting and non-fitting examples each.
+        rng = np.random.default_rng(0)
+        pick = {k: rng.choice(np.flatnonzero(m), size=min(ARC_SAMPLE, int(m.sum())), replace=False) for k, m in (("fits", fits), ("not", ~fits))}  # fmt: skip
+        arc = {k: np.stack([x[i, 0], x[i] @ v], axis=1).round(4).tolist() for k, i in pick.items()}
         out["slices"][str(s)] = {
+            "arc_points": arc,
             "e1_share_of_mean_difference": float(d_full[0] ** 2 / (d_full @ d_full)),
             "mean_difference_direction_auc": _auc(off @ d_off, fits),
             "renormalized_direction_auc": _auc(along_v, fits),

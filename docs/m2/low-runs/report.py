@@ -671,6 +671,73 @@ def evidence_draw(data: dict, alt_text: str) -> str:
     return _plot()
 
 
+ARC_RUNS = (fl.label_of(715, None), fl.cross_label_of(715, 715))  # the split pair: low run, then its twin
+
+
+def arc_figure() -> str:
+    data = {
+        "runs": [[shown(lab), lab in LOW] for lab in ARC_RUNS],
+        "points": [{s: EVIDENCE[lab]["slices"][s]["arc_points"] for s in ("2", "3")} for lab in ARC_RUNS],
+    }
+    alt = """
+        The states at the example answers of the two runs at seed 715 (the low run above, its twin below), at slice
+        2 (left) and slice 3 (right), drawn in the plane of e₁ (horizontal) and the direction a non-fitting answer
+        has (vertical), a few hundred examples of each kind. The states are unit vectors, so a state that lies in
+        this plane sits on the unit circle. Non-fitting examples cluster at the bottom, at e₁ near zero, on the
+        circle at slice 3 and inside it at slice 2; fitting examples spread along the arc from there toward e₁ = 1
+        on the right, further along at slice 3 than at slice 2. The two runs have the same shape, with the low
+        run's fitting examples a little further from e₁ at slice 3.
+    """
+    return arc_draw(data, alt)
+
+
+@memo
+def arc_draw(data: dict, alt_text: str) -> str:
+    @themed(
+        name="low-runs-arc",
+        alt_text=alt_text,
+        caption="""
+            **The arc from the non-fitting direction to e₁.** States at the example answers in the plane spanned by
+            e₁ (horizontal) and the direction a non-fitting answer has (vertical): 400 fitting examples (blue) and
+            400 non-fitting ones (grey) per panel. **Rows:** the low run at seed 715, then its twin. **Columns:**
+            slice 2, slice 3. The states are unit vectors, so a state in this plane lies on the dotted unit circle.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(2, 2, figsize=(5.2, 5.0), layout="constrained", sharex=True, sharey=True)
+        t = np.linspace(0, 2 * np.pi, 400)
+        for (name, low), pts, row in zip(data["runs"], data["points"], axes, strict=True):
+            for s, ax in zip(("2", "3"), row, strict=True):
+                ax.plot(np.cos(t), np.sin(t), color=ghost(), lw=0.5, ls=":", zorder=1)
+                ax.axhline(0, color=ghost(), lw=0.4, zorder=1)
+                ax.axvline(0, color=ghost(), lw=0.4, zorder=1)
+                nf = np.asarray(pts[s]["not"])
+                ff = np.asarray(pts[s]["fits"])
+                ax.scatter(nf[:, 0], nf[:, 1], s=3, color=ghost(), alpha=0.6, lw=0, zorder=2)
+                ax.scatter(ff[:, 0], ff[:, 1], s=3, color=ink_low() if low else ink_normal(), alpha=0.7, lw=0, zorder=3)
+                ax.set_aspect("equal")
+                ax.set_xlim(-0.3, 1.1)
+                ax.set_ylim(-1.1, 0.5)
+                ax.tick_params(labelsize=6)
+                ax.set_title(f"{name}, slice {s}", fontsize=7)
+        for ax in axes[-1]:
+            ax.set_xlabel("coordinate along e₁", fontsize=7)
+        for ax in axes[:, 0]:
+            ax.set_ylabel("along the non-fitting direction", fontsize=7)
+        fig_legend(
+            fig,
+            [
+                (ink_low(), "o", "fitting examples, low run"),
+                (ink_normal(), "o", "fitting, its twin"),
+                (ghost(), "o", "non-fitting"),
+            ],
+            lines=False,
+        )
+        return fig
+
+    return _plot()
+
+
 def distance_figure() -> str:
     labs = TWINS["labels"]
     dist = np.asarray(TWINS["distance"])
@@ -1107,6 +1174,10 @@ How many directions does the off-axis evidence take? Few. Here the probe is give
 {evidence_figure()}
 
 What is that off-axis direction? Two checks say what it is and that it is real. First, the states are unit vectors, so a large e₁ coordinate leaves less length for everything else, and a probe on the zeroed state could be reading that shadow of e₁ rather than a direction. Renormalizing the zeroed states removes the shadow. The direction between the renormalized class means still scores AUC {fmt(REN_AUC["3"])} at slice 3, where the reader reads, and {fmt(REN_AUC["2"])} at slice 2, so the off-axis evidence is a direction the state has. Second, along that direction a non-fitting example sits at {fmt(REN_COORD["not"])} and a fitting one at {fmt(REN_COORD["fits"])} at slice 3: the direction is the one an answer state has when its example does not fit, and a fitting example has moved away from it, toward e₁. Among the fitting examples the e₁ coordinate and this coordinate move together (r = {fmt(E1_OFF_CORR)}), so examples do not divide into some that fit in one respect, written on e₁, and others that fit in another, written elsewhere. They lie along one arc, from the non-fitting state to e₁, and differ in how far along it they sit.
+
+{arc_figure()}
+
+The figure draws that arc for the two runs at seed 715. Each answer state is a unit vector, so in the plane of e₁ and the non-fitting direction a state that lies in the plane sits on the unit circle. The non-fitting examples gather at the bottom, where e₁ is near zero: on the circle at slice 3, and inside it at slice 2, where the state still has more in other directions. The fitting examples spread from there along the circle toward e₁ = 1, further along at slice 3 than at slice 2. The low run and its twin have the same shape; the fitting examples of the low run sit a little further from e₁ at slice 3, which is the small α gap in the table of E1. So the writer gives the readers much the same picture in both runs, which is the point of E1 seen from inside. Fixing one end of the arc is what makes the other end visible. Without e₁ in place there would be two unnamed directions and nothing to say which is which, so an anchor is also an instrument for reading the representation.
 
 So, to a first approximation, the evidence that an example fits is one vector with two parts. One component lies along e₁, where the anchor placed it. The other is how far the state has left the direction a non-fitting answer has, which the loss made on its own and the anchor never touched. Both parts are there in every run, low or not, and nothing in the end state of the writer (block 1) sets the low runs apart. What has to differ is how much the readers take from each part.
 """
