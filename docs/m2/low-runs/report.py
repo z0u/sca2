@@ -997,6 +997,13 @@ def _pcs_needed(lab: str, s: str) -> float:
 
 
 PCS_NEEDED = {s: np.array([_pcs_needed(lab, s) for lab in LABELS]) for s in ("2", "3")}
+REN_AUC = {
+    s: np.array([EVIDENCE[lab]["slices"][s]["renormalized_direction_auc"] for lab in LABELS]) for s in ("2", "3")
+}
+REN_COORD = {
+    k: np.array([EVIDENCE[lab]["slices"]["3"]["renormalized_coordinate"][k] for lab in LABELS]) for k in ("fits", "not")
+}
+E1_OFF_CORR = np.array([EVIDENCE[lab]["slices"]["3"]["e1_off_correlation_among_fits"] for lab in LABELS])
 _TD = np.asarray(TWINS["distance"])
 _TI = {lab: i for i, lab in enumerate(TWINS["labels"])}
 TWIN_DIST_FIRST = [float(_TD[0, _TI[a], _TI[b]]) for a, b in TWINS_ALL]
@@ -1023,7 +1030,7 @@ rf"""
 ## Observations
 
 - [Twins that split (E1)](#twins-that-split-e1): two label sets were each trained twice from the same seed and batches, and each pair ended with one run low and one not. Within a pair, validation loss and α at the example answers stay within a hundredth of each other for the whole run. Removal parts ways early in one pair and late in the other. By the first checkpoint, the weights of a twin pair are already most of the way to unrelated. So the last bits of the arithmetic make two different runs that happen to share a function.
-- [What survives the edit (E2)](#what-survives-the-edit-e2): after the edit, the model still gets right the contexts whose three examples all fit `difference`. Unexpectedly, the low runs keep several times as many of them. In every run, the evidence that an example fits has two parts, one on e₁ and one along a single direction off it, and a linear probe reads either part about as well.
+- [What survives the edit (E2)](#what-survives-the-edit-e2): after the edit, the model still gets right the contexts whose three examples all fit `difference`. Unexpectedly, the low runs keep several times as many of them. In every run, the evidence that an example fits has two parts, one on e₁ and one along a single direction off it, the direction a non-fitting answer has, and a linear probe reads either part about as well.
 - [Where the edit misses (E3)](#where-the-edit-misses-e3): before any baseline, the e₁ edit leaves a fifth of the way in the low runs, against a twentieth in the rest. Removing e₁ at the three example answers alone removes as much as the full edit. In half the low runs, block 4 also reads the answers, through their off-axis content. In the other half, the usual reader, block 3, takes part of the evidence from off the axis. Clearing the answers or the other example positions on top of the full edit lifts most low runs toward the rest, and which of the two does so differs by run.
 - [Peak and slide (E4)](#peak-and-slide-e4): the low runs peak lower than the rest, and give back a little more after the peak while the anti weight anneals. The off-axis evidence is in place early in every run, low or not. The two groups do not separate in removal until after epoch 200.
 
@@ -1048,7 +1055,7 @@ Edit share
 :   How much of `difference` an edit removes, with no baseline: its drop on `difference` as a share of the way from the clean score to the target null. The edit is the full edit, one slice of it, or an edit that removes every direction but e₁ (or the whole state, with no renormalization) at a set of positions.
 
 Fits probe
-:   Whether an example fits `difference`, decoded from the state at its answer. An example fits when its answer is one `difference` gives for its operands. The others carry replacement op noise. The probe is a ridge (regularized linear) probe on that state with the e₁ coordinate zeroed, fitted on half the held-out contexts of every op and scored on the rest by AUC: the chance that it ranks a fitting example above one that does not fit, so 0.5 is chance and 1 is perfect. It is shown beside the AUC of the e₁ coordinate alone. The figure above shows where the probe reads.
+:   Whether an example fits `difference`, decoded from the state at its answer. An example fits when its answer is one `difference` gives for its operands. The others carry replacement op noise. The probe is a ridge (regularized linear) probe on that state with the e₁ coordinate zeroed, fitted on half the held-out contexts of every op and scored on the rest by AUC: the chance that it ranks a fitting example above one that does not fit, so 0.5 is chance and 1 is perfect. It is shown beside the AUC of the e₁ coordinate alone. The figure above shows where the probe reads. E2 also scores one fixed off-axis direction, the one between the mean states of fitting and non-fitting examples, on the zeroed state and on the zeroed state renormalized to unit length.
 
 Query probe
 :   Whether the op of a context is `difference`: the same probe on the state at the query `=`.
@@ -1099,7 +1106,9 @@ How many directions does the off-axis evidence take? Few. Here the probe is give
 
 {evidence_figure()}
 
-So, to a first approximation, the evidence that an example fits is one vector with two parts. One component lies along e₁, where the anchor placed it, and the other lies along one other direction, which the loss made on its own. Both parts are there in every run, low or not, and nothing in the end state of the writer (block 1) sets the low runs apart. What has to differ is how much the readers take from each part.
+What is that off-axis direction? Two checks say what it is and that it is real. First, the states are unit vectors, so a large e₁ coordinate leaves less length for everything else, and a probe on the zeroed state could be reading that shadow of e₁ rather than a direction. Renormalizing the zeroed states removes the shadow. The direction between the renormalized class means still scores AUC {fmt(REN_AUC["3"])} at slice 3, where the reader reads, and {fmt(REN_AUC["2"])} at slice 2, so the off-axis evidence is a direction the state has. Second, along that direction a non-fitting example sits at {fmt(REN_COORD["not"])} and a fitting one at {fmt(REN_COORD["fits"])} at slice 3: the direction is the one an answer state has when its example does not fit, and a fitting example has moved away from it, toward e₁. Among the fitting examples the e₁ coordinate and this coordinate move together (r = {fmt(E1_OFF_CORR)}), so examples do not divide into some that fit in one respect, written on e₁, and others that fit in another, written elsewhere. They lie along one arc, from the non-fitting state to e₁, and differ in how far along it they sit.
+
+So, to a first approximation, the evidence that an example fits is one vector with two parts. One component lies along e₁, where the anchor placed it. The other is how far the state has left the direction a non-fitting answer has, which the loss made on its own and the anchor never touched. Both parts are there in every run, low or not, and nothing in the end state of the writer (block 1) sets the low runs apart. What has to differ is how much the readers take from each part.
 """
 
 # %%
@@ -1147,7 +1156,7 @@ The off-axis evidence is not what changes. The fits probe with e₁ zeroed is ab
 rf"""
 ## Discussion
 
-As far as the loss and the anchor term can see, a low run and its twin are the same solution. They have the same loss and the same alignment, and a different outcome under the edit. The difference is inside the reader blocks. The evidence that an example fits `difference` is one vector with two parts: a part along e₁, which the anchor put there, and a part along one other direction, which the loss made on its own. A reader can take the evidence from either part, and the readers of the low runs take more of it from the part off the axis. These edits cannot tell whether that is a different weighting of the same two inputs or a reader built a little differently. Either way, it is something we are not optimizing for, and the model has to settle it one way or the other.
+As far as the loss and the anchor term can see, a low run and its twin are the same solution. They have the same loss and the same alignment, and a different outcome under the edit. The difference is inside the reader blocks. The evidence that an example fits `difference` is one vector with two parts: a part along e₁, which the anchor put there, and a part along one other direction, how far the state has left the direction a non-fitting answer has, which the loss made on its own. A reader can take the evidence from either part, and the readers of the low runs take more of it from the part off the axis. These edits cannot tell whether that is a different weighting of the same two inputs or a reader built a little differently. Either way, it is something we are not optimizing for, and the model has to settle it one way or the other.
 
 The anchor term asks for the e₁ part, and the anti term keeps e₁ off the other positions. But no term asks the readers to use e₁, so training is flat along that choice. A run settles somewhere on it early, as the twins show, and then stays or drifts during the anneal. That fits the fixed-labels finding that neither the label set nor the seed decides which runs end low. It also says what a twitchy landscape means here: a direction the loss does not see, with no need for a rugged loss.
 

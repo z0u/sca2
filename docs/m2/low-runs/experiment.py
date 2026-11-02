@@ -411,7 +411,10 @@ def routes_one(checkpoint, holdout, label: str) -> dict:
 def evidence_one(checkpoint, holdout, label: str) -> dict:
     """How many directions the off-axis evidence takes, and where it sits: at slices 2 and 3, the fits probe given the
     top principal components of the off-axis answer state in turn, the AUC of the one off-axis direction that
-    separates the class means, and the share of the class-mean difference that lies along e₁. Beside them, the
+    separates the class means (on the zeroed state and on the zeroed state renormalized, which removes the shadow
+    e₁ casts on the length of the rest), the mean coordinate of each class along the renormalized direction, its
+    correlation with the e₁ coordinate among the fitting examples, and the share of the class-mean difference that
+    lies along e₁. Beside them, the
     alignment with e₁ by slice and position, on `difference` contexts and on the rest, for the figure that shows
     where the probe reads.
     """
@@ -441,9 +444,19 @@ def evidence_one(checkpoint, holdout, label: str) -> dict:
         _, sv, vt = np.linalg.svd(offc, full_matrices=False)
         pcs = offc @ vt.T
         d_off = off[fits].mean(0) - off[~fits].mean(0)
+        # The e₁ coordinate casts a shadow on the rest of a unit vector: the larger it is, the shorter the off-axis
+        # part. Renormalizing the off-axis part removes that shadow, so what separates the classes afterwards is
+        # a direction the off-axis part has, not a length it lacks.
+        ren = off / np.linalg.norm(off, axis=1, keepdims=True)
+        d_ren = ren[fits].mean(0) - ren[~fits].mean(0)
+        v = d_ren / np.linalg.norm(d_ren)
+        along_v = ren @ v
         out["slices"][str(s)] = {
             "e1_share_of_mean_difference": float(d_full[0] ** 2 / (d_full @ d_full)),
             "mean_difference_direction_auc": _auc(off @ d_off, fits),
+            "renormalized_direction_auc": _auc(along_v, fits),
+            "renormalized_coordinate": {"fits": float(along_v[fits].mean()), "not": float(along_v[~fits].mean())},
+            "e1_off_correlation_among_fits": float(np.corrcoef(x[fits, 0], along_v[fits])[0, 1]),
             "auc_by_pcs": [_probe_auc(pcs[:, :k], fits.astype(float), groups) for k in PC_COUNTS],
             "variance_by_pcs": (np.cumsum(sv**2) / (sv**2).sum())[[k - 1 for k in PC_COUNTS]].tolist(),
         }
