@@ -17,7 +17,7 @@ What D2.1 promised {.manual}
 
 Settled: the body of the post reports on the per-visit runs, since the reference model, the confusion matrices and the write bound all come from them, and the setup says plainly how the labels were drawn. Over 400 epochs about 34,000 of the 42,891 `difference` contexts carry a label at some point. Each label scheme stands in for something real. The per-visit draw is like a very large corpus, where most contexts are seen once and a fixed share of them is labelled. The fixed draw is like a small labelled set reused over many epochs. The fixed draw gets its own part of the labels section (section 7).
 
-Settled: the post waits for the post-hoc comparison, since a comparison is the first question a reader will ask. Its anchored arm is likely `τ_ℓ fixed` with the per-visit draw, to be checked with a Fable second opinion once the fixed-labels and low-runs reports merge.
+Settled: the post waits for the post-hoc comparison, since a comparison is the first question a reader will ask. Its anchored arm is likely `τ_ℓ fixed` with the per-visit draw, which a Fable second opinion supports (section 6).
 
 Settled: the low runs get a part of their own, and the post goes ahead without fixing them.
 
@@ -64,6 +64,9 @@ Settled: the low runs get a part of their own, and the post goes ahead without f
 
 - The difference in means, a ridge probe and LEACE (a linear eraser), fitted on the controls with every label, and edited through the same scorer ([plan](post-hoc-comparison.md), [PR #318](https://github.com/z0u/sca2/pull/318)).
 - How to describe the labels, for the comparison: the fitters get every `difference` label at once, about 43,000 contexts, while the anchor sees one in fifty per visit, which comes to about 34,000 distinct contexts over training. So the two are about level on distinct labelled contexts, and the comparison is fair in that sense. The fitters still have it easier in one way, since they see all their labels together on a model that has finished training. Whether the per-visit draw is realistic is a separate question, which section 7 answers with the fixed draw.
+- The anchored arm, from a second opinion in the low-runs thread: `τ_ℓ fixed` with the per-visit draw as the main arm, since one pass over a large corpus is per-visit by construction and no per-visit run showed the low tail. The fixed 1/50 draw can be one robustness row below the main table, since its runs already exist; it asks whether the ranking survives with the anchor at its weakest.
+- Say once that the fitters see every label at once while the anchor pull sees one in fifty per pass, so a reader doesn't take parity on distinct labels as a tie.
+- Expect a small removal edge for the fitters: the e₁ edit leaves a few hundredths of the op in normal runs (the off-axis part of section 7), and a fitted direction can pick up both parts. That edge is no mark against the anchor, and the post should say why before showing the numbers.
 - **Open:** the result.
 
 ## 7. How few labels? (claim e)
@@ -98,4 +101,4 @@ The D2.1 post took its figures from a page of their own ([D2.1 figures](/docs/m2
 ## Sources still moving
 
 - Fixed labels ([PR #323](https://github.com/z0u/sca2/pull/323)) and low runs ([PR #332](https://github.com/z0u/sca2/pull/332)) are in review.
-- The post-hoc comparison ([PR #318](https://github.com/z0u/sca2/pull/318)) is preregistered; its anchored arm is likely `τ_ℓ fixed` with the per-visit draw, pending a Fable second opinion after those two merge.
+- The post-hoc comparison ([PR #318](https://github.com/z0u/sca2/pull/318)) is preregistered; Fable-san recommended `τ_ℓ fixed` with the per-visit draw as its anchored arm, with the fixed draw as an optional robustness row; the choice is still to be confirmed in that thread.
