@@ -35,6 +35,8 @@ r"""
 
 /// admonition | How to read this report
 This report was preregistered: the predictions, the grid, and the rule that picks a configuration from it were frozen at commit `<hash>`, before any run of this experiment. Each section opens with what we expect, and the results replaced the placeholders in place.
+
+The hypotheses are judged one fitter at a time, and then as a whole. A fitter is *accepted* when it does what the test asks of a working method (in H1 and H2, matching or beating the anchor; in H4, finding a placed concept) and *rejected* when it does not. A hypothesis as a whole *passes* or *misses*.
 ///
 """
 
@@ -47,7 +49,7 @@ The anchored pipeline trains the model with a pull toward the first basis vector
 
 [^residual]: Residual stream: the running vector at each position, which every block reads from and adds its output to.
 
-A reader who knows the steering and erasure literature will ask whether a direction found after training does as well. A conventional pipeline trains with no pull and fits a direction for the concept post hoc, from the states and the labels. It then projects that direction out, replaces the component along it with a mean, or erases it with LEACE. If one of those matched the performance of the anchor on this model, we would have to say that the placement added nothing a search could not find.
+A reader who knows the steering and erasure literature will ask whether a direction found after training does as well. A conventional pipeline trains with no pull and fits a direction for the concept post hoc, from the states and the labels. It then projects that direction out, replaces the component along it with a mean, or erases it with LEACE. If one of those matched the performance of the anchor on this model, we would have to say that the placement added nothing a search could not find, in a model of this class.
 
 Ex-2.2.1 asked this once, for *red* on the D2.1 checkpoints. Every fitted direction there that removed at least half of *red* cost the lines with no red far more than the anchored edit did. But that run gave the fitters little: three control seeds, labels from the token alone, one fit per slice, and no tuning. So this report gives the fitters every advantage we can, scores them the same way as the anchor, and asks where they fall on the trade-off between removal and spill.
 """
@@ -72,15 +74,15 @@ Ridge probe
 :   The normalized weight vector of a linear readout of the target, fitted by least squares with an ℓ₂ penalty. It finds what can be read off the state linearly.
 
 LEACE
-:   Least-squares concept erasure ([Belrose et al., 2023](https://arxiv.org/abs/2306.03819)): the smallest affine edit, measured in the covariance-whitened norm, after which no linear probe can read the target. It removes one direction and measures how much to remove along another, so the edit is oblique (not a perpendicular projection).
+:   Least-squares concept erasure ([Belrose et al., 2023](https://arxiv.org/abs/2306.03819)): the smallest affine edit, measured in the covariance-whitened norm, after which no linear probe can read the target. For one target it works with two directions: c, the covariance of the states with the target (for a binary target, the difference in means), and Σ⁻¹c, where Σ is the covariance of the states, which is the direction a least-squares probe reads. It reads how much of the concept a state holds along Σ⁻¹c and moves the state back along c until that reading is the mean, so afterwards the probe reads the same value for every state. The two directions differ, so the edit is oblique (not a perpendicular projection).
 
 Iterated probe (INLP)
 :   The ridge probe fitted, projected out, and fitted again on what is left, to a rank of 2, 4, or 8; the edit removes the whole span. It covers the case of a concept held across several directions, which an edit along one could not remove.
 
 Optimized direction
-:   A unit vector per edited slice, fitted by gradient descent on the control so that the edited answers on `difference` contexts move toward the target null while the answers on the other contexts stay where they were. It uses the target null, which no real pipeline has, so it is a diagnostic ceiling: about the best a rank-1 edit (an edit along one direction) of this control could do with the scoring in hand. [COAST](https://arxiv.org/abs/2605.01167) is its nearest published relative.
+:   A unit vector per edited slice, fitted by gradient descent on the control so that the edited answers on `difference` contexts move toward the target null while the answers on the other contexts stay where they were. It uses the target null, which no real pipeline has, so it is a diagnostic ceiling: about the best a rank-1 edit (an edit along one direction) of this control could do with the scoring in hand. INLP edits a span of several directions, so this ceiling does not bound it. [COAST](https://arxiv.org/abs/2605.01167) is its nearest published relative.
 
-The first four are the standard fitters that H1 and H2 judge. Each is also fitted on the anchored runs, where training placed the concept on e₁, as a check that the fitters can find a concept that is there (H4). A fitter that misses that check is left out of the verdicts of H1, H2, H3, and S1. The sans-diff model, trained with no loss on `difference`, stays the reference for how close to the target null a model of this size comes.
+The first four are the standard fitters that H1 and H2 judge. Each is also fitted on the anchored runs, where training placed the concept on e₁, to check that it can find a concept that is there: it must remove about as much as the edit along e₁ does there, within the same spill limit. That check is H4, and a fitter that does not get through it is left out of the verdicts of H1, H2, H3, and S1. The sans-diff model, trained with no loss on `difference`, stays the reference for how close to the target null a model of this size comes.
 """
 
 # %%
@@ -158,7 +160,7 @@ r"""
 Each hypothesis takes a point from the trade-off shown here, so it comes first. The figure plots each post-hoc configuration as one mark at its seed-mean removal and spill on the test set. The frontier of each method is drawn as a line, and the anchored edit as a point with its dose curve. The table beside it gives, per method, the two frontier points of the selection rule (raw and net), the task change, and the sites, slices, and replacement that the bracketing configurations used.
 
 /// admonition | TODO
-Removal (y) against spill (x), one panel per method with the other methods drawn faintly behind; a mark per configuration, the frontier per method as a line, the anchor as a point and its dose curve; the criterion as a vertical rule. Table: removal at the spill criterion, spill at matched removal, raw and net, task change, and the selected configurations, per method.
+Removal (y) against spill (x), one panel per method with the other methods drawn faintly behind; a mark per configuration (seed means) and smaller marks per run, the frontier per method as a line, the anchor as a point and its dose curve, styled apart from the frontiers; the criterion as a vertical rule and the anchored removal as a horizontal one. The anchor panel is labelled SCA and has a bold border; a method accepted under both H1 and H2 gets a bold border in a second color (the optimized direction too, with the same rules applied to it for the figure only); the panel of a fitter rejected under H4 is hatched. Table: removal at the spill criterion, spill at matched removal, raw and net, task change, and the selected configurations, per method.
 ///
 """
 
@@ -167,9 +169,9 @@ Removal (y) against spill (x), one panel per method with the other methods drawn
 r"""
 ## Spill at matched removal (H1)
 
-**What we expect.** In short: turn each fitter up until it removes as much of `difference` as the anchor does, and on most runs it will cost another op more than the criterion allows.
+**What we expect.** If we turn each fitter up until it removes as much of `difference` as the anchor does, then on most runs it will cost another op more than the criterion allows.
 
-The rule. For each fitter we count the runs, out of eight, whose spill at matched removal is over 0.02 net. A run whose frontier never reaches the anchored removal counts as over, since that fitter cannot remove as much at any spill. For the anchor we count the runs whose spill at full dose is over 0.02 net. A one-sided Fisher exact test[^fisher] then says whether the fitter count is higher than the anchored count by more than chance would give. A fitter passes if its count is five or more and the test gives p below 0.05, and misses if its count is under five. A count of five or more that the test cannot tell apart from the anchored count (which can happen only if the anchor itself spills on one or more runs; five against one gives p of 0.06) would be outside the plan, and that fitter would be Unresolved. Among the fitters that pass H4, H1 passes if every fitter with a resolved verdict passes, misses if every one misses, and is partial otherwise; it is Unresolved if no fitter passes H4 or none has a resolved verdict. The Findings line names any fitter left out or Unresolved. A fitter that misses would mean that, on this model, a searched direction serves as well as a placed one.
+**The rule.** For each fitter we count the runs, out of eight, whose spill at matched removal is over 0.02 net. A run whose frontier never reaches the anchored removal counts as over, since that fitter cannot remove as much at any spill. For the anchor we count the runs whose spill at full dose is over 0.02 net. A one-sided Fisher exact test[^fisher] then says whether the fitter count is higher than the anchored count by more than chance would give. A fitter is rejected if its count is five or more and the test gives p below 0.05, and accepted if its count is under five. A count of five or more that the test cannot tell apart from the anchored count (which can happen only if the anchor itself spills on one or more runs; five against one gives p of 0.06) would be outside the plan, and that fitter would be Unresolved. Among the fitters accepted under H4, H1 passes if every fitter with a resolved verdict was rejected, misses if every one was accepted, and is partial otherwise; it is Unresolved if no fitter is accepted under H4 or none has a resolved verdict. The Findings line names any fitter left out or Unresolved. A fitter accepted here would mean that, on this model, a searched direction serves as well as a placed one.
 
 [^fisher]: Fisher exact test: a test of whether two counts out of the same number of trials differ by more than chance. With the anchor at none of eight, a fitter at four or more of eight gives p below 0.05.
 
@@ -183,16 +185,16 @@ Spill at matched removal per run, per fitter, with the anchor at full dose besid
 r"""
 ## Removal at the spill criterion (H2)
 
-**What we expect.** In short: hold each fitter to the same spill limit as the anchor, and it will remove less of `difference` than the anchor does.
+**What we expect.** If we hold each fitter to the same spill limit as the anchor, then it will remove less of `difference` than the anchor does.
 
-The rule. For each fitter we take the difference of seed means between the anchored removal (at full dose, or where its own dose curve crosses the criterion if it spills past it) and the removal at the spill criterion of the fitter, with a 95% Welch t interval[^welch]. A fitter passes if the interval lies wholly above zero (the anchor removes more). It misses if the interval lies wholly below zero (the fitter removes more), or contains zero and lies within 0.05 of it on both sides (the two remove about as much). An interval that contains zero and reaches further than 0.05 on either side would mean the seeds could not tell, and that fitter would be Unresolved. Among the fitters that pass H4, H2 passes if every fitter with a resolved verdict passes, misses if every one misses, and is partial otherwise; it is Unresolved if no fitter passes H4 or none has a resolved verdict. The Findings line names any fitter left out or Unresolved.
+**The rule.** For each fitter we take the difference of seed means between the anchored removal (at full dose, or where its own dose curve crosses the criterion if it spills past it) and the removal at the spill criterion of the fitter, with a 95% Welch t interval[^welch]. A fitter is rejected if the interval lies wholly above zero (the anchor removes more). It is accepted if the interval lies wholly below zero (the fitter removes more), or contains zero and lies within 0.05 of it on both sides (the two remove about as much). An interval that contains zero and reaches further than 0.05 on either side would mean the seeds could not tell, and that fitter would be Unresolved. Among the fitters accepted under H4, H2 passes if every fitter with a resolved verdict was rejected, misses if every one was accepted, and is partial otherwise; it is Unresolved if no fitter is accepted under H4 or none has a resolved verdict. The Findings line names any fitter left out or Unresolved.
 
-A small edge for a fitter would be a miss under this rule, and would not surprise us: every run writes the evidence for the op partly off e₁ (the low-runs experiment), so the edit along e₁ leaves a little behind, and a fitted direction can take in both parts.
+A small edge for a fitter would get it accepted under this rule, and would not surprise us: every run writes the evidence for the op partly off e₁ (the low-runs experiment), so the edit along e₁ leaves a little behind, and a fitted direction can take in both parts.
 
 [^welch]: Welch t interval: a 95% confidence interval for the gap between two means that lets the two groups scatter by different amounts. An interval wholly above zero means the eight anchored runs remove more than the eight fitted ones by more than seed-to-seed scatter accounts for.
 
 /// admonition | TODO
-Removal at the spill criterion per run, per fitter and for the anchor, with seed means. Table: the difference of seed means and its interval per fitter.
+Removal at the spill criterion per run, per fitter and for the anchor, with seed means. Table: the difference of seed means and its interval per fitter, with the seed standard deviation of each arm beside it.
 ///
 """
 
@@ -201,12 +203,14 @@ Removal at the spill criterion per run, per fitter and for the anchor, with seed
 r"""
 ## The ceiling against the fitters (H3)
 
-**What we expect.** In short: the optimized direction, which is searched for with the scoring in hand, does better than every standard fitter.
+**What we expect.** If we search for a direction with the scoring in hand, then it does better than every standard rank-1 fitter.
 
-The rule. Among the standard fitters that pass H4, its removal at the spill criterion is at least the highest seed mean, and its count over the criterion at matched removal (as in H1) is at most the lowest. It passes if both hold, and misses if neither does; one without the other would be outside the plan, and the verdict would be Unresolved, as it would be if no standard fitter passes H4. The comparison is between seed means and counts, with no interval, which is enough for a check that the ceiling is a ceiling.
+**The rule.** The comparison takes the rank-1 fitters accepted under H4: difference in means, the probe, and LEACE. Removal by the optimized direction at the spill criterion is at least the highest seed mean among them, and its count over the criterion at matched removal (as in H1) is at most the lowest. It passes if both hold, and misses if neither does; one without the other would be outside the plan, and the verdict would be Unresolved, as it would be if no rank-1 fitter is accepted under H4. The comparison is between seed means and counts, with no interval, which is enough for a check that the ceiling is a ceiling.
+
+INLP is left out of H3 because it edits a span of two to eight directions, which a rank-1 ceiling does not bound; its two measures are shown beside the others. If INLP does better than the ceiling, the control holds the op across several directions, which E5 looks at from another side. LEACE is rank-1 but oblique, and the ceiling is a perpendicular edit, so LEACE could in principle beat it too. We keep it in, since doing so would itself be a finding: it would say the oblique form matters.
 
 /// admonition | TODO
-The two measures for the optimized direction beside the standard fitters, per run.
+The two measures for the optimized direction beside the standard fitters (INLP included, marked as outside the rule), per run.
 ///
 """
 
@@ -215,10 +219,10 @@ The two measures for the optimized direction beside the standard fitters, per ru
 r"""
 ## The ceiling against the anchor (S1)
 
-**What we expect.** This section predicts nothing: it is a frozen rule that decides between two outcomes, and its badge is Decided, or Unresolved. In short: either the best rank-1 search on the control does as well as the anchor, or it still falls short.
+**What we expect.** This section predicts nothing: it is a frozen rule that decides between two outcomes, and its badge is Decided, or Unresolved. Either the best rank-1 search on the control does as well as the anchor, or it still falls short.
 
-The rule. The ceiling *matches* the anchor if the 95% Welch interval on the difference of seed means in removal at the spill criterion contains zero and lies within 0.05 of it on both sides (as for a miss of H2), and the Fisher test cannot tell its count over the criterion at matched removal apart from the anchored count; then the advantage of placing the concept is that no search is needed. The ceiling *falls short* if the interval lies wholly above zero; then the control holds the op in a way no rank-1 edit removes cleanly, which is the stronger claim for the anchor. Any other result (the interval wholly below zero, an interval that contains zero but reaches further than 0.05, or a count the Fisher test does tell apart) would be outside the plan, and the verdict would be Unresolved.
-<!-- REVIEW: H3 was split in two at the paper round before the freeze. As one hypothesis, its verdict sat on the clause that changes the post least (the ceiling beats the fitters), and the comparison with the anchor, which decides the framing, carried none. Verify: S1 names both outcomes and the Findings show which held. A second review made the comparison with the anchor an S section, since it predicts nothing, and gave "matches" the same 0.05 band as a miss of H2, so an interval too wide to tell is Unresolved rather than a match. -->
+**The rule.** The ceiling *matches* the anchor if the 95% Welch interval[^welch] on the difference of seed means in removal at the spill criterion contains zero and lies within 0.05 of it on both sides (as for an accepted fitter in H2), and the Fisher test[^fisher] cannot tell its count over the criterion at matched removal apart from the anchored count; then the advantage of placing the concept is that no search is needed. The ceiling *falls short* if the interval lies wholly above zero; then the control holds the op in a way no rank-1 edit removes cleanly, which is the stronger claim for the anchor. Any other result (the interval wholly below zero, an interval that contains zero but reaches further than 0.05, or a count the Fisher test does tell apart) would be outside the plan, and the verdict would be Unresolved.
+<!-- REVIEW: H3 was split in two at the paper round before the freeze. As one hypothesis, its verdict sat on the clause that changes the post least (the ceiling beats the fitters), and the comparison with the anchor, which decides the framing, carried none. Verify: S1 names both outcomes and the Findings show which held. A second review made the comparison with the anchor an S section, since it predicts nothing, and gave "matches" the same 0.05 band as an accepted fitter in H2, so an interval too wide to tell is Unresolved rather than a match. -->
 
 /// admonition | TODO
 The two measures for the optimized direction beside the anchor, per run, with the interval and the Fisher p.
@@ -230,14 +234,14 @@ The two measures for the optimized direction beside the anchor, per run, with th
 r"""
 ## The fitters find a placed concept (H4)
 
-**What we expect.** In short: on the anchored runs, where training placed the op on e₁, each standard fitter removes about as much as the edit along e₁ does, within the same spill limit. A fitter that cannot do that where the concept is known to be is no fair stand-in for its method on the controls.
+**What we expect.** If we fit on the anchored runs, where training placed the op on e₁, then each standard fitter removes about as much as the edit along e₁ does, within the same spill limit. A fitter that cannot do that where the concept is known to be is no fair stand-in for its method on the controls.
 
-The rule. Restricted to fits on the pooled positions or at the example answers, a fitter passes if its removal at the spill criterion on the anchored runs is no more than 0.1 below what the edit along e₁ removes at full dose on the same runs (seed means), and misses otherwise. A fitter that finds e₁ but has to stop short of it to stay within the criterion, as INLP may when its extra directions cost spill, misses. On the anchored runs the fitter takes its permuted-label baseline, and the edit along e₁ keeps its published one. The query `=` is left out: the clean alignment there is near zero in the anchored runs (the mid-block-edit experiment), so a fit at that site is not expected to find e₁.
+**The rule.** Restricted to fits on the pooled positions or at the example answers, a fitter is accepted if its removal at the spill criterion on the anchored runs is no more than 0.1 below what the edit along e₁ removes at full dose on the same runs (seed means), and rejected otherwise. A fitter that finds e₁ but has to stop short of it to stay within the criterion, as INLP may when its extra directions cost spill, is rejected. H4 passes if every standard fitter is accepted, misses if every one is rejected, and is partial otherwise. On the anchored runs the fitter takes its permuted-label baseline, and the edit along e₁ keeps its published one. The query `=` is left out: the clean alignment there is near zero in the anchored runs (the mid-block-edit experiment), so a fit at that site is not expected to find e₁.
 
 Beside the verdict, and not part of it, we report how close each fitted direction is to e₁: the cosine with e₁ at each of slices 1 to 3, for the target and site of the selected configuration (the seed mean of its absolute value; for INLP, the largest cosine between e₁ and the span).
 <!-- REVIEW: the first draft also gated H4 on a cosine of 0.9 with e₁. The paper round asked whether that assumes every `difference` context sits fully on e₁; it does not, and the low-runs experiment found part of the evidence off e₁ in every run, so a fitted direction can remove the op while pointing partly elsewhere. H4 now gates on removal within the spill criterion, which is what the fitter is used for, and reports the cosine. Verify: the TODO below still shows the cosine. -->
 
-The rule for a miss, frozen here: a fitter that misses H4 is left out of the verdicts of H1, H2, H3, and S1, its rows stay in the tables marked as such, and the report names it as a method the comparison could not fairly score. A fitter that cannot remove a placed concept would likely do badly on the controls too, so leaving it out leans toward the fitters, which is the cautious direction for a claim about the anchor.
+The rule for a rejected fitter, frozen here: a fitter rejected under H4 is left out of the verdicts of H1, H2, H3, and S1, its rows stay in the tables of every section, greyed out, and the report names it as a method the comparison could not fairly score. A fitter that cannot remove a placed concept would likely do badly on the controls too, so leaving it out leans toward the fitters, which is the cautious direction for a claim about the anchor.
 
 /// admonition | TODO
 Cosine with e₁ per slice and per run, per fitter; removal at the spill criterion on the anchored runs against the edit along e₁.
@@ -252,7 +256,7 @@ r"""
 At the configuration each method selects for removal at the spill criterion, we run the scoring suite of fixed-effects. Grading is the share of the way to the target null removed in each bin of the posterior on `difference`, with the gain on the contexts of other ops by bin. Landing is how far the edit moves the answers toward the target null in total variation, and how far it moves them from the control toward the sans-diff model. Confusion matrices of what the edited model gives on `difference` contexts show where the answers go.
 
 /// admonition | TODO
-Grading by posterior bin per method beside the anchor; landing on both scales; confusion matrices per method.
+Grading by posterior bin per method beside the anchor; landing on both scales; confusion matrices per method. Lay the confusion matrices out in three groups of subfigures within one figure, wrapping to the page width: the references (control, target null, sans-diff model), the anchor (clean and edited), and the methods (one per selected configuration: difference in means, probe, LEACE, INLP, the optimized direction).
 ///
 """
 
@@ -287,7 +291,7 @@ r"""
 
 LEACE promises that no linear probe can read the concept after its edit, and the anchor promises nothing about that. So a fresh ridge probe for the binary target is fitted on the edited states of the test set, with cross-validation over contexts, per slice and per method. The evidence for the op can be recomputed from the operand colors (the block1-edit experiment). So a method may leave the op readable even where the answer no longer uses it. A probe that still finds the op does not mean the edit failed to remove it from the answer, and a probe that finds nothing does not bound what the edit writes.
 
-We report it because it is the measure the erasure literature uses, and the one on which the anchor may come off worse. We expect LEACE to bring the probe near chance at the slices it edits, since that is what it is built to do, and the anchored edit and the projections to leave the op readable well above chance, since the evidence can be recomputed and part of it lies off any one direction. If the projections also bring the probe near chance, the op is held along fewer directions than that suggests.
+We report it because it is the measure the erasure literature uses, and the one on which the anchor may come off worse. We expect LEACE to bring the probe near chance at the slices it edits, since that is what it is built to do, and the anchored edit and the projections to leave the op readable well above chance, since the evidence can be recomputed and part of it lies off any one direction (the low-runs experiment). If the projections also bring the probe near chance, the op is held along fewer directions than that suggests.
 
 /// admonition | TODO
 Probe accuracy (or R²) on the edited states per slice, per method, with chance marked.
@@ -319,7 +323,7 @@ r"""
 r"""
 ## Method
 
-**The fits.** Difference in means takes the binary target only. The ridge penalty is fixed at 0.01, the value ex-2.2.1 used; it is added to the unnormalized Gram matrix of the fit states, so with this many states it barely regularizes. LEACE takes a small ridge on the covariance, since the stream is unit-norm and its covariance is close to rank-deficient. INLP fits the ridge probe, projects its direction out of the fit states, and repeats. When several slices are edited, each gets its own fit. The anchor uses e₁ at every slice, but a fitted direction of the control can differ from slice to slice. With sequential refit, the fit at slice ℓ is made on the fit set as it arrives under the edits at the slices before ℓ, which keeps an oblique eraser on the states it will see (ex-2.2.1 found it extrapolates poorly off them). Mean ablation replaces the coefficient with its mean over the fit contexts of the other ops.
+**The fits.** Difference in means takes the binary target only. The ridge penalty is fixed at 0.01, the value ex-2.2.1 used; it is added to the unnormalized Gram matrix of the fit states, so with this many states it barely regularizes. That is fine here: with 280,000 states in 64 dimensions a least-squares probe has little room to overfit, and the penalty is there to keep the solve stable where the covariance is nearly flat. A strong penalty would turn the probe toward the difference in means, which the grid has already. LEACE takes a small ridge on the covariance, since the stream is unit-norm and its covariance is close to rank-deficient. INLP fits the ridge probe, projects its direction out of the fit states, and repeats. When several slices are edited, each gets its own fit. The anchor uses e₁ at every slice, but a fitted direction of the control can differ from slice to slice. With sequential refit, the fit at slice ℓ is made on the fit set as it arrives under the edits at the slices before ℓ, which keeps an oblique eraser on the states it will see (ex-2.2.1 found it extrapolates poorly off them). Mean ablation replaces the coefficient with its mean over the fit contexts of the other ops.
 
 **The optimized direction.** A unit vector per edited slice, initialized at the difference in means and fitted by Adam for a few hundred steps on the fit set. The loss is the KL divergence[^kl] from the target null to the edited answers on `difference` contexts, plus a weight times the KL divergence from the clean answers to the edited ones on the other contexts, at full dose. The weight takes four values, and the dose and slice sets are crossed as for the others. Its configurations join the frontier like any other.
 
@@ -329,9 +333,9 @@ r"""
 
 **The baseline.** On the tuning set, the median over fifteen coordinate axes other than e₁, drawn once with a fixed seed before the run and shared by every run. On the test set, fifteen permuted fits per configuration, at the bracketing configurations of each point. LEACE is homogeneous in its covariance vector, so a permuted fit is a full-strength oblique erasure along a reference direction. The coordinate-axis median applies the same operator form (slices, positions, dose, replacement) along each of the 63 axes other than e₁; it does not depend on the fitter, so it is computed once per form.
 
-**Comparisons.** Each method against the anchor as two samples of eight runs: the difference of seed means with a 95% Welch t interval, and Fisher's exact test for counts of runs over the criterion.
+**Comparisons.** Each method against the anchor as two samples of eight runs: the difference of seed means with a 95% Welch t interval[^welch], and Fisher's exact test[^fisher] for counts of runs over the criterion.
 
-**Smoke test.** Before the full run, the pipeline runs end to end on two stored runs outside the comparison: the control of ex-2.2.23 at seed 704 and the `falloff` run at the same seed. It checks H4 on the anchored run, so that a fitter that can't find a placed concept shows up before the full run. It also shows where a probe for the op scores best on the control, and its timing gives the cost of the full run.
+**Smoke test.** Before the full run, the whole pipeline runs end to end on two stored runs outside the comparison: the control of ex-2.2.23 at seed 704 and the `falloff` run at the same seed. Every stage runs: the fits for every method and factor, both baselines, the selection rule, the test scoring, the label ladder, the optimized direction, the measures of E2 to E6, and the tables, figures, and print of this report, with the one pair standing in for the eight (an interval over one run a side means nothing, but the code that computes it runs). The grid is thinned so that each level of each factor is visited at least once, and each stage is timed per pass, which gives the cost of the full run. So a fault anywhere shows up before the costly part. The smoke test also gives two early readings: H4 on the anchored run, so that a fitter that can't find a placed concept shows up before the full run, and where a probe for the op scores best on the control.
 
 /// admonition | Open decision
 Whether the control holds the evidence for the op at the example answers, as the anchored model does, is not known. The block1-edit experiment found that the control gathers the operand colors at each example answer in block 1 as the anchored runs do, but it fitted no probe for the op on a control. The smoke test fits one at every role and slice of the control at seed 704; if it scores best at a role other than the example answers or the query `=`, that role joins the sites fitted before the freeze.
