@@ -176,7 +176,7 @@ Spill at matched removal per run, per fitter, with the anchor at full dose besid
 r"""
 ## Removal at the spill criterion (H2)
 
-**What we expect.** Kept within the criterion, each standard fitter removes less than the anchor. We will look at the difference of seed means between the anchored removal (at full dose, or where its own dose curve crosses the criterion if it spills past it) and the removal at the criterion of each fitter, with a 95% Welch t interval. A fitter passes if the interval lies above zero, and misses if it does not. H2 passes if every fitter that passes H4 passes, is partial if some do, and misses if none do. A small edge for a fitter would not count against the anchor: every run writes the evidence for the op partly off e₁, so the edit along e₁ leaves a few hundredths behind, and a fitted direction can take in both parts. With eight runs a side, gaps under about 0.05 are hard to see, so a miss with a narrow gap says the two are close, and a miss with a wide interval says the seeds could not tell.
+**What we expect.** Kept within the criterion, each standard fitter removes less than the anchor. We will look at the difference of seed means between the anchored removal (at full dose, or where its own dose curve crosses the criterion if it spills past it) and the removal at the criterion of each fitter, with a 95% Welch t interval. A fitter passes if the interval lies above zero, and misses if it does not. H2 passes if every fitter that passes H4 passes, is partial if some do, and misses if none do. A small edge for a fitter would not count against the anchor: every run writes the evidence for the op partly off e₁ (the low-runs experiment), so the edit along e₁ leaves a few hundredths behind, and a fitted direction can take in both parts. With eight runs a side, gaps under about 0.05 are hard to see, so a miss with a narrow gap says the two are close, and a miss with a wide interval says the seeds could not tell.
 
 /// admonition | TODO
 Removal at the criterion per run, per fitter and for the anchor, with seed means. Table: the difference of seed means and its interval per fitter.
@@ -346,6 +346,12 @@ r"""
 
 [sans-diff model](/docs/m2/filtered-corpus/report.py)
 :   A model trained with no loss on `difference` comes 0.58 of the way from the control to the target null, against 0.50 for the edited recipe of record, and misses in the same kind of way.
+
+[fixed-labels](/docs/m2/fixed-labels/report.py)
+:   Holding one label draw fixed for the run, as a real labelled set would be, keeps the anchor at every rate tried, but a few runs end with the edit removing much less of the op.
+
+[low-runs](/docs/m2/low-runs/report.py)
+:   In every run the evidence that an example fits `difference` lies partly on e₁ and partly off it, and the edit along e₁ never touches the off-axis part.
 
 [ex-2.2.21](/docs/m2/ex-2.2.21/report.py)
 :   The 14,000 held-out contexts, 2,000 per op, that every D2.2 score is taken on.
