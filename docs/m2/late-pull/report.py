@@ -126,7 +126,9 @@ MARK = {"whole": "o", "late": "^", "late-clean": "s"}
 # What the report calls each arm. The `late` arms were renamed `deep` after training, since "late" read as a time in
 # training; the stored labels keep the names they were trained under.
 NAME = {"whole": "whole", "late": "deep", "late-clean": "deep-clean"}
-SCHED_INK = {"anchor": light_dark("#333", "#ddd"), "anti": light_dark("#b4531f", "#dd8f5f")}
+# Inks are (light, dark) pairs, resolved with `light_dark` where a figure draws: it picks by the theme active when
+# it is called, so a value resolved at import would give the dark render the light ink.
+SCHED_INK = {"anchor": ("#333", "#ddd"), "anti": ("#b4531f", "#dd8f5f")}
 
 
 def schedule_of(arm: str) -> dict:
@@ -138,10 +140,19 @@ def schedule_of(arm: str) -> dict:
 def draw_schedule(ax: plt.Axes, sched: dict, label: bool = False) -> None:
     """A strip of the two term weights under an epoch chart: the anchor weight solid, the anti weight dashed."""
     ax.plot(
-        sched["epoch"], sched["anchor"], color=SCHED_INK["anchor"], lw=1.1, label="anchor weight" if label else None
+        sched["epoch"],
+        sched["anchor"],
+        color=light_dark(*SCHED_INK["anchor"]),
+        lw=1.1,
+        label="anchor weight" if label else None,
     )
     ax.plot(
-        sched["epoch"], sched["anti"], color=SCHED_INK["anti"], lw=1.1, ls="--", label="anti weight" if label else None
+        sched["epoch"],
+        sched["anti"],
+        color=light_dark(*SCHED_INK["anti"]),
+        lw=1.1,
+        ls="--",
+        label="anti weight" if label else None,
     )
     ax.set_ylim(0, 0.27)
     ax.set_yticks([0, 0.1, 0.2])
@@ -149,14 +160,11 @@ def draw_schedule(ax: plt.Axes, sched: dict, label: bool = False) -> None:
 
 
 SLICE_INK = [
-    light_dark(c, d)
-    for c, d in (
-        ("#999", "#777"),
-        ("#e08e0b", "#f5b950"),
-        ("#1f6fb2", "#7ab8f5"),
-        ("#6c4fa3", "#b9a2e8"),
-        ("#2a9d8f", "#7fd8c8"),
-    )
+    ("#999", "#777"),
+    ("#e08e0b", "#f5b950"),
+    ("#1f6fb2", "#7ab8f5"),
+    ("#6c4fa3", "#b9a2e8"),
+    ("#2a9d8f", "#7fd8c8"),
 ]
 SLICE_MARK = ["o", "D", "^", "s", "v"]
 SLICE_NAME = ["emb", "block 1", "block 2", "block 3", "block 4"]
@@ -543,10 +551,17 @@ def alpha_draw(data: dict, alt_text: str) -> str:
                 ax.axhline(0, color=light_dark("#aaa", "#555"), lw=0.5, zorder=0)
                 for s, name in enumerate(SLICE_NAME):
                     for r in panel["runs"]:
-                        ax.plot(r["epoch"], r[key][s], color=SLICE_INK[s], lw=0.3, alpha=0.5, zorder=2)
+                        ax.plot(r["epoch"], r[key][s], color=light_dark(*SLICE_INK[s]), lw=0.3, alpha=0.5, zorder=2)
                     mean = np.mean([r[key][s] for r in panel["runs"]], axis=0)
                     ax.plot(
-                        ep, mean, color=SLICE_INK[s], lw=1.4, marker=SLICE_MARK[s], markevery=12, ms=3.5, label=name
+                        ep,
+                        mean,
+                        color=light_dark(*SLICE_INK[s]),
+                        lw=1.4,
+                        marker=SLICE_MARK[s],
+                        markevery=12,
+                        ms=3.5,
+                        label=name,
                     )
                 if row == 0:
                     ax.set_title(NAME[panel["arm"]], fontsize=8)
@@ -583,7 +598,7 @@ On `deep` the embedding also drifts onto e₁ in the second half of training, by
 
 # %%
 
-HOLD_INK = [light_dark(c, d) for c, d in (("#8fbbe0", "#4f7fa8"), ("#2f7bbf", "#7ab8f5"), ("#0b3c73", "#cfe6ff"))]
+HOLD_INK = [("#8fbbe0", "#4f7fa8"), ("#2f7bbf", "#7ab8f5"), ("#0b3c73", "#cfe6ff")]
 HOLD_MARK = ["o", "^", "s"]
 HELD_SLOPE = {h: mean_range(slope(r["emb_axis_colors"]) for r in runs_of(held("late", h))) for h in HOLDS}
 HELD_WITHIN = {
@@ -673,13 +688,13 @@ def hold_draw(data: dict, alt_text: str) -> str:
             ax.axhline(0, color=light_dark("#aaa", "#555"), lw=0.5, zorder=0)
             for i, runs in enumerate(panel["holds"]):
                 for r in runs:
-                    ax.plot(r["epoch"], r["y"], color=HOLD_INK[i], lw=0.3, alpha=0.6, zorder=2)
+                    ax.plot(r["epoch"], r["y"], color=light_dark(*HOLD_INK[i]), lw=0.3, alpha=0.6, zorder=2)
                 ep = np.asarray(runs[0]["epoch"])
                 mean = np.mean([r["y"] for r in runs], axis=0)
                 ax.plot(
                     ep,
                     mean,
-                    color=HOLD_INK[i],
+                    color=light_dark(*HOLD_INK[i]),
                     lw=1.5,
                     marker=HOLD_MARK[i],
                     markevery=10,
@@ -691,9 +706,11 @@ def hold_draw(data: dict, alt_text: str) -> str:
             ax.set_ylabel(panel["ylabel"], fontsize=8)
             sax = axes[1, col]
             first = data["schedules"][0]
-            sax.plot(first["epoch"], first["anchor"], color=SCHED_INK["anchor"], lw=1.1, label="anchor weight")
+            sax.plot(
+                first["epoch"], first["anchor"], color=light_dark(*SCHED_INK["anchor"]), lw=1.1, label="anchor weight"
+            )
             for i, sched in enumerate(data["schedules"]):
-                sax.plot(sched["epoch"], sched["anti"], color=HOLD_INK[i], lw=1.1, ls="--")
+                sax.plot(sched["epoch"], sched["anti"], color=light_dark(*HOLD_INK[i]), lw=1.1, ls="--")
             sax.set_ylim(0, 0.27)
             sax.set_yticks([0, 0.1, 0.2])
             sax.tick_params(labelsize=7)

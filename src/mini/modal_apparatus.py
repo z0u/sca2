@@ -39,7 +39,7 @@ from mini.modal_volume import ModalVolume
 from mini.progress import ProgressMessage, progress_context
 from mini.progress_display import RichProgressDisplay
 from mini.requirements import project_packages, uv_freeze
-from mini.runs import data_root
+from mini.runs import experiments_root
 from mini.store import (
     PROFILE_ENV,
     PUBLISH_REPO_ENV,
@@ -301,6 +301,16 @@ class ModalMemoStore(MemoStore):
                 continue
         return "(no logs)"
 
+    def sysmetrics(self, key: str) -> list[dict[str, Any]]:
+        from mini._sysmetrics import read_rows
+
+        try:
+            return read_rows(
+                self._read_volume_bytes(f"_memo/{key}/{self.sysmetrics_path(key, self._gen(key)).name}").decode()
+            )
+        except FileNotFoundError, modal.exception.NotFoundError:
+            return []
+
     def result_artifacts(self, key: str) -> list[str] | None:
         gen = self._gen(key)
         name = f"result-{gen}.artifacts.json" if gen else "result.artifacts.json"
@@ -400,6 +410,7 @@ def _modal_task_entry(
     import modal as _modal
 
     from mini._taskworker import execute_task
+    from mini.compile_cache import ModalBackend
     from mini.memo import MemoStore
     from mini.modal_apparatus import WORKER_STORE_CACHE, ModalRecordStore
     from mini.store import store_for
@@ -428,6 +439,7 @@ def _modal_task_entry(
         experiment=volume_name,
         watchdog_s=watchdog_s,
         watchdog_grace_s=watchdog_grace_s,
+        compile_backend=lambda: ModalBackend.from_names(modal_environment()),
     )
 
 
@@ -592,9 +604,9 @@ class ModalApparatus(Apparatus[ModalVolume]):
         With a bucket configured *and* a token available, that's the shared HF bucket the worker wrote to — so artifacts read back the same everywhere, no Volume needed. Otherwise it's a read-through over this experiment's Modal Volume, warm-caching into a local checkout (``.mini/store-cache/<app>``). The token gate mirrors ``_hf_store_secret``: with no token the worker writes to the Volume, so the client must read from there too (not an empty bucket).
         """
         if store_bucket() and _hf_token():
-            return store_for(data_root() / "store")
+            return store_for(experiments_root() / "store")
         assert self.app.name  # guaranteed by __init__ (a named App is required)
-        cache = LocalStore(data_root() / "store-cache" / self.app.name)
+        cache = LocalStore(experiments_root() / "store-cache" / self.app.name)
         return ModalVolumeStore(self.volume, cache)
 
     def _memo_worker(self, fn: Callable) -> modal.Function:

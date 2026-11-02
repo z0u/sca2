@@ -192,14 +192,16 @@ LOSS_RATE_BOUND = 1 - 0.05 ** (1 / len(COUNT_SEEDS))  # one-sided 95% upper boun
 
 # --- Figures ---------------------------------------------------------------------------------------------------
 
-RULE = light_dark("#333", "#ddd")
-ZERO = light_dark("#aaa", "#555")
-GHOST = light_dark("#bbb", "#555")
+# Inks are (light, dark) pairs, resolved with `light_dark` where a figure draws: it picks by the theme active when
+# it is called, so a value resolved at import would give the dark render the light ink.
+RULE = ("#333", "#ddd")
+ZERO = ("#aaa", "#555")
+GHOST = ("#bbb", "#555")
 INK = {
-    FALLOFF: light_dark("#a6611a", "#dfc27d"),
-    STEP: light_dark("#1b7837", "#a6dba0"),
-    FIXED: light_dark("#08306b", "#c6dbef"),
-    NEW: light_dark("#7570b3", "#bcbddc"),
+    FALLOFF: ("#a6611a", "#dfc27d"),
+    STEP: ("#1b7837", "#a6dba0"),
+    FIXED: ("#08306b", "#c6dbef"),
+    NEW: ("#7570b3", "#bcbddc"),
 }
 MARKER = {FALLOFF: "v", STEP: "^", FIXED: "s", NEW: "D"}
 
@@ -264,8 +266,8 @@ def end_draw(data: dict, alt_text: str) -> str:
         rng = np.random.default_rng(0)
         for ax, key in zip(axes, ("removal", "spill", "task"), strict=True):
             for i, n in enumerate(names):
-                _dots(ax, i, data[key][n], INK[n], MARKER[n], rng)
-            ax.axvline(len(names) - 1.5, color=GHOST, lw=0.5, ls=":", zorder=0)
+                _dots(ax, i, data[key][n], light_dark(*INK[n]), MARKER[n], rng)
+            ax.axvline(len(names) - 1.5, color=light_dark(*GHOST), lw=0.5, ls=":", zorder=0)
             ax.set_xticks(range(len(names)), [tex(data["shown"][n]) for n in names], rotation=40, ha="right", fontsize=6)  # fmt: skip
             ax.set_xlim(-0.6, len(names) - 0.4)
             ax.tick_params(labelsize=7)
@@ -273,8 +275,8 @@ def end_draw(data: dict, alt_text: str) -> str:
         axes[1].set_title("spill ↓", fontsize=8)
         axes[2].set_title("task change ↑", fontsize=8)
         for ax, y, below in ((axes[1], data["criterion"], False), (axes[2], data["task_gate"], True)):
-            ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
-            ax.axhline(y, color=RULE, lw=0.7, ls="--", zorder=1)
+            ax.axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
+            ax.axhline(y, color=light_dark(*RULE), lw=0.7, ls="--", zorder=1)
             lo, hi = ax.get_ylim()
             if below:
                 lo = min(lo, y - 0.005)
@@ -372,11 +374,11 @@ def along_draw(data: dict, alt_text: str) -> str:
         for s in data["seeds"]:
             on = s in dark
             kw = dict(marker=dark[s], ms=2.8, lw=1.1, alpha=1.0, zorder=3, label=f"seed {s}") if on else dict(lw=0.5, alpha=0.6, zorder=2)  # fmt: skip
-            color = INK[NEW] if on else GHOST
+            color = light_dark(*INK[NEW]) if on else light_dark(*GHOST)
             axes[0].plot(ep, data["spill"][s], color=color, **kw)
             axes[1].plot(ep, data["clean"][s], color=color, **{k: v for k, v in kw.items() if k != "label"})
-        axes[0].axhline(0, color=ZERO, lw=0.5, zorder=0)
-        axes[0].axhline(data["criterion"], color=RULE, lw=0.7, ls="--", zorder=1)
+        axes[0].axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
+        axes[0].axhline(data["criterion"], color=light_dark(*RULE), lw=0.7, ls="--", zorder=1)
         lo, hi = axes[0].get_ylim()
         hatch(axes[0], data["criterion"], hi)
         axes[0].set_ylim(lo, hi)
@@ -384,12 +386,12 @@ def along_draw(data: dict, alt_text: str) -> str:
         axes[0].legend(fontsize=6, frameon=False, loc="upper right")
         axes[1].set_ylabel(f"clean, {data['op']}", fontsize=7)
         e, tau, anti = (np.asarray(v) for v in data["sched"])
-        axes[2].plot(e, tau, color=INK[NEW], lw=1.0)
+        axes[2].plot(e, tau, color=light_dark(*INK[NEW]), lw=1.0)
         axes[2].set_yscale("log")
         axes[2].set_yticks([0.025, 0.05, 0.1], ["0.025", "0.05", "0.1"])
         axes[2].minorticks_off()
         axes[2].set_ylabel("$\\tau_\\ell$", fontsize=7)
-        axes[3].plot(e, anti, color=RULE, lw=1.0)
+        axes[3].plot(e, anti, color=light_dark(*RULE), lw=1.0)
         axes[3].set_ylabel("$\\lambda_{\\bar s}$", fontsize=7)
         axes[3].set_xlabel("epoch", fontsize=7)
         for ax in axes:
@@ -437,11 +439,13 @@ def count_draw(data: dict, alt_text: str) -> str:
         jit = {n: rng.uniform(-0.1, 0.1, len(data["window"][n])) for n in names}
         v = np.array([data["window"][n] for n in names])
         for j in range(v.shape[1]):
-            ax.plot([i + jit[n][j] for i, n in enumerate(names)], v[:, j], color=GHOST, lw=0.3, zorder=1)
+            ax.plot([i + jit[n][j] for i, n in enumerate(names)], v[:, j], color=light_dark(*GHOST), lw=0.3, zorder=1)
         for i, n in enumerate(names):
-            ax.plot(i + jit[n], data["window"][n], MARKER[n], ms=3, color=INK[n], alpha=0.8, mew=0, zorder=3)
+            ax.plot(
+                i + jit[n], data["window"][n], MARKER[n], ms=3, color=light_dark(*INK[n]), alpha=0.8, mew=0, zorder=3
+            )
         for y in (data["lost_max"], data["kept_min"]):
-            ax.axhline(y, color=RULE, lw=0.7, ls="--", zorder=0)
+            ax.axhline(y, color=light_dark(*RULE), lw=0.7, ls="--", zorder=0)
         hatch(ax, 0.0, data["lost_max"])
         ax.set_ylim(0.0, max(v.max() + 0.03, 0.65))
         ax.set_xticks(range(len(names)), [tex(data["shown"][n]) for n in names], fontsize=7)

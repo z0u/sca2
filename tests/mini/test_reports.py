@@ -472,6 +472,12 @@ def test_chip_styles_are_inlined_once_for_both_chips():
     assert out.count("data-mini-chip-css") == 1
 
 
+def test_set_provenance_names_the_gpus():
+    out = set_provenance(_EXPORT_HTML, {"shared/curves": {**_PRODUCER, "gpus": ["NVIDIA A10G", "NVIDIA L4"]}})
+    assert "on NVIDIA A10G, NVIDIA L4" in out
+    assert " on " not in set_provenance(_EXPORT_HTML, {"shared/curves": _PRODUCER}).split("data-mini-provenance")[-1]
+
+
 def test_set_provenance_is_noop_without_attributable_producers():
     assert set_provenance(_EXPORT_HTML, {}) == _EXPORT_HTML
     assert set_provenance(_EXPORT_HTML, {"shared/anon": None}) == _EXPORT_HTML

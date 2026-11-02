@@ -275,18 +275,20 @@ def table_html(head: list[str], rows: list[list[str]], caption: str) -> str:
     return figure_html(table, caption=caption, class_="report-figure")
 
 
-INK = {FALLOFF: light_dark("#2a9d8f", "#7fd8c8"), SOFT: light_dark("#e08e0b", "#f5b950")}
+# Inks are (light, dark) pairs, resolved with `light_dark` where a figure draws: it picks by the theme active when
+# it is called, so a value resolved at import would give the dark render the light ink.
+INK = {FALLOFF: ("#2a9d8f", "#7fd8c8"), SOFT: ("#e08e0b", "#f5b950")}
 MARK = {FALLOFF: "D", SOFT: "v"}
 EXP_INK = {
-    "split-anti-seeds": light_dark("#2a9d8f", "#7fd8c8"),
-    "anchor-ramp": light_dark("#0b3c73", "#9fcbff"),
-    "soft-pool": light_dark("#c0392b", "#ff8a76"),
+    "split-anti-seeds": ("#2a9d8f", "#7fd8c8"),
+    "anchor-ramp": ("#0b3c73", "#9fcbff"),
+    "soft-pool": ("#c0392b", "#ff8a76"),
 }
 EXP_MARK = {"split-anti-seeds": "D", "anchor-ramp": "s", "soft-pool": "^"}
-GHOST = light_dark("#bbb", "#555")
-RULE = light_dark("#333", "#ddd")
-ZERO = light_dark("#aaa", "#555")
-BAND = light_dark("#ececec", "#262626")
+GHOST = ("#bbb", "#555")
+RULE = ("#333", "#ddd")
+ZERO = ("#aaa", "#555")
+BAND = ("#ececec", "#262626")
 
 # --- E1: the call on the stored runs -----------------------------------------------------------------------------
 
@@ -320,10 +322,10 @@ def calib_draw(data: dict, alt_text: str) -> str:
     )
     def _plot() -> plt.Figure:
         fig, ax = plt.subplots(figsize=(5.2, 3.2), layout="constrained")
-        ax.axvspan(data["lost_hi"], data["kept_lo"], color=BAND, lw=0, zorder=0)
-        ax.axvline(data["cut"], color=RULE, lw=0.8, ls="--", zorder=1)
-        ax.axhline(LOST_BELOW, color=RULE, lw=0.8, ls=":", zorder=1)
-        ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
+        ax.axvspan(data["lost_hi"], data["kept_lo"], color=light_dark(*BAND), lw=0, zorder=0)
+        ax.axvline(data["cut"], color=light_dark(*RULE), lw=0.8, ls="--", zorder=1)
+        ax.axhline(LOST_BELOW, color=light_dark(*RULE), lw=0.8, ls=":", zorder=1)
+        ax.axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
         for name in EXP_INK:
             rs = [r for r in data["runs"] if r["experiment"] == name]
             ax.scatter(
@@ -332,7 +334,7 @@ def calib_draw(data: dict, alt_text: str) -> str:
                 marker=EXP_MARK[name],
                 s=16,
                 facecolor="none",
-                edgecolor=EXP_INK[name],
+                edgecolor=light_dark(*EXP_INK[name]),
                 lw=0.9,
                 label=name,
                 zorder=2,
@@ -460,22 +462,22 @@ def screen_draw(data: dict, alt_text: str) -> str:
         )  # fmt: skip
         for col, arm in enumerate(arms):
             ax, wax, tax = axes[:, col]
-            ink = INK[arm["arm"]]
-            ax.axvspan(*data["window"], color=BAND, lw=0, zorder=0)
-            ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
+            ink = light_dark(*INK[arm["arm"]])
+            ax.axvspan(*data["window"], color=light_dark(*BAND), lw=0, zorder=0)
+            ax.axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
             for other in arms:
                 if other is not arm:
                     for r in other["runs"]:
-                        ax.plot(r["epoch"], r["answers"], color=GHOST, lw=0.4, alpha=0.4, zorder=1)
+                        ax.plot(r["epoch"], r["answers"], color=light_dark(*GHOST), lw=0.4, alpha=0.4, zorder=1)
             for r in arm["runs"]:
                 ax.plot(r["epoch"], r["answers"], color=ink, lw=0.6, alpha=0.8, ls="--" if r["lost"] else "-",
                         zorder=2)  # fmt: skip
             for y in (data["lost_max"], data["kept_min"]):
-                ax.axhline(y, color=RULE, lw=0.7, ls="--", zorder=3)
+                ax.axhline(y, color=light_dark(*RULE), lw=0.7, ls="--", zorder=3)
             ax.set_title(arm["name"], fontsize=8)
             ax.set_ylim(-0.1, 0.8)
             sch = arm["schedule"]
-            wax.plot(sch["epoch"], sch["weight"], color=RULE, lw=1.0)
+            wax.plot(sch["epoch"], sch["weight"], color=light_dark(*RULE), lw=1.0)
             wax.set_ylim(0, 0.12)
             wax.set_yticks([0, 0.1])
             tax.plot(sch["epoch"], sch["tau"], color=ink, lw=1.1)
@@ -521,12 +523,12 @@ def dots_panel(arms: list[dict], key: str) -> tuple[plt.Figure, plt.Axes]:
     fig, ax = plt.subplots(figsize=(2.9, 2.8), layout="constrained")
     rng = np.random.default_rng(0)
     for i, arm in enumerate(arms):
-        ink, mk = INK[arm["arm"]], MARK[arm["arm"]]
+        ink, mk = light_dark(*INK[arm["arm"]]), MARK[arm["arm"]]
         v = np.asarray(arm[key], float)
         v = v[np.isfinite(v)]
         ax.plot([i, i], [v.min(), v.max()], color=ink, lw=2.5, alpha=0.25, solid_capstyle="butt", zorder=1)
         ax.scatter(i + rng.uniform(-0.18, 0.18, len(v)), v, s=8, color=ink, alpha=0.5, lw=0, zorder=2, clip_on=False)
-        ax.scatter([i], [v.mean()], marker=mk, s=40, color=ink, edgecolor=RULE, lw=0.6, zorder=3)
+        ax.scatter([i], [v.mean()], marker=mk, s=40, color=ink, edgecolor=light_dark(*RULE), lw=0.6, zorder=3)
     ax.set_xticks(range(len(arms)), [a["name"] for a in arms], fontsize=7)
     ax.set_xlim(-0.6, len(arms) - 0.4)
     ax.tick_params(labelsize=7)
@@ -545,7 +547,7 @@ def settle_draw(data: dict, alt_window: str, alt_rise: str) -> str:
     def _window() -> plt.Figure:
         fig, ax = dots_panel(data["arms"], "window")
         for y in (data["lost_max"], data["kept_min"]):
-            ax.axhline(y, color=RULE, lw=0.7, ls="--", zorder=0)
+            ax.axhline(y, color=light_dark(*RULE), lw=0.7, ls="--", zorder=0)
         ax.set_ylabel(f"window mean, epochs {ex.WINDOW[0]}–{ex.WINDOW[1]}", fontsize=8)
         ax.set_ylim(0, 0.7)
         return fig
@@ -690,23 +692,30 @@ def finished_draw(data: dict, alt_text: str) -> str:
         fig, (ax, wax, nax) = plt.subplots(
             3, 1, figsize=(5.6, 3.8), layout="constrained", sharex=True, height_ratios=[3, 0.8, 0.8]
         )
-        ax.axvspan(*data["window"], color=BAND, lw=0, zorder=0)
-        ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
+        ax.axvspan(*data["window"], color=light_dark(*BAND), lw=0, zorder=0)
+        ax.axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
         for g in data["ghosts"]:
-            ax.plot(g["epoch"], g["answers"], color=GHOST, lw=0.5, alpha=0.6, zorder=1)
+            ax.plot(g["epoch"], g["answers"], color=light_dark(*GHOST), lw=0.5, alpha=0.6, zorder=1)
         for r in data["runs"]:
-            ax.plot(r["epoch"], r["answers"], color=INK[r["arm"]], lw=0.9, ls="--" if r["lost"] else "-", zorder=2)
+            ax.plot(
+                r["epoch"],
+                r["answers"],
+                color=light_dark(*INK[r["arm"]]),
+                lw=0.9,
+                ls="--" if r["lost"] else "-",
+                zorder=2,
+            )
         for a, name in data["names"].items():
-            ax.plot([], [], color=INK[a], lw=0.9, label=name)
+            ax.plot([], [], color=light_dark(*INK[a]), lw=0.9, label=name)
         ax.legend(fontsize=7, frameon=False, loc="lower right")
         ax.set_ylim(-0.1, 0.8)
         ax.set_ylabel(f"α, example\nanswers, slice {SL}", fontsize=8)
         sch = data["schedule"]
-        wax.plot(sch["epoch"], sch["weight"], color=RULE, lw=1.0)
+        wax.plot(sch["epoch"], sch["weight"], color=light_dark(*RULE), lw=1.0)
         wax.set_ylim(0, 0.12)
         wax.set_yticks([0, 0.1])
         wax.set_ylabel("$\\lambda_a$", fontsize=8)
-        nax.plot(sch["epoch"], sch["anti"], color=RULE, lw=1.0)
+        nax.plot(sch["epoch"], sch["anti"], color=light_dark(*RULE), lw=1.0)
         nax.set_ylim(0, 0.28)
         nax.set_yticks([0, 0.2])
         nax.set_ylabel("$\\lambda_{\\bar s}$", fontsize=8)

@@ -151,14 +151,16 @@ def table_html(head: list[str], rows: list[list[str]], caption: str) -> str:
     return figure_html(table, caption=caption, class_="report-figure")
 
 
-RULE = light_dark("#333", "#ddd")
-ZERO = light_dark("#aaa", "#555")
-GHOST = light_dark("#bbb", "#555")
+# Inks are (light, dark) pairs, resolved with `light_dark` where a figure draws: it picks by the theme active when
+# it is called, so a value resolved at import would give the dark render the light ink.
+RULE = ("#333", "#ddd")
+ZERO = ("#aaa", "#555")
+GHOST = ("#bbb", "#555")
 INK = {
-    CONTROL: light_dark("#666", "#bbb"),
-    FIXED: light_dark("#08306b", "#c6dbef"),
-    SANS: light_dark("#b35806", "#fdb863"),
-    DROPPED: light_dark("#8e6bb0", "#c4a6e3"),
+    CONTROL: ("#666", "#bbb"),
+    FIXED: ("#08306b", "#c6dbef"),
+    SANS: ("#b35806", "#fdb863"),
+    DROPPED: ("#8e6bb0", "#c4a6e3"),
 }
 MARKER = {CONTROL: "o", FIXED: "s", SANS: "D", DROPPED: "^"}
 SHOWN = {CONTROL: "control", FIXED: "τ_ℓ fixed, edited", SANS: "sans-diff", DROPPED: "dropped"}
@@ -520,7 +522,7 @@ def along_draw(data: dict, alt_text: str) -> str:
             for k in (CONTROL, FIXED, SANS):
                 for i, s in enumerate(data["seeds"]):
                     shown = "τ_ℓ fixed" if k == FIXED else SHOWN[k]  # clean pass in these two panels
-                    ax.plot(ep, data[key][k][s], color=INK[k], lw=0.6, alpha=0.7, label=tex(shown) if i == 0 else None)  # fmt: skip
+                    ax.plot(ep, data[key][k][s], color=light_dark(*INK[k]), lw=0.6, alpha=0.7, label=tex(shown) if i == 0 else None)  # fmt: skip
             ax.set_ylim(0, 0.8)
             ax.tick_params(labelsize=6.5)
             ax.set_xlabel("epoch", fontsize=7)
@@ -529,27 +531,31 @@ def along_draw(data: dict, alt_text: str) -> str:
         ax = axes[2]
         kept = np.asarray(data["kept"])
         for s in data["seeds"]:
-            ax.plot(kept, data["sans_d"][s], color=INK[SANS], marker=MARKER[SANS], ms=1.8, lw=0.7, alpha=0.8)
-            ax.plot(kept, data["fixed_d"][s], color=INK[FIXED], marker=MARKER[FIXED], ms=1.8, lw=0.7, alpha=0.8)
-            ax.plot(kept, data["sans_o"][s], color=INK[SANS], lw=0.6, ls="--", alpha=0.6)
-            ax.plot(kept, data["fixed_o"][s], color=INK[FIXED], lw=0.6, ls="--", alpha=0.6)
+            ax.plot(
+                kept, data["sans_d"][s], color=light_dark(*INK[SANS]), marker=MARKER[SANS], ms=1.8, lw=0.7, alpha=0.8
+            )
+            ax.plot(
+                kept, data["fixed_d"][s], color=light_dark(*INK[FIXED]), marker=MARKER[FIXED], ms=1.8, lw=0.7, alpha=0.8
+            )
+            ax.plot(kept, data["sans_o"][s], color=light_dark(*INK[SANS]), lw=0.6, ls="--", alpha=0.6)
+            ax.plot(kept, data["fixed_o"][s], color=light_dark(*INK[FIXED]), lw=0.6, ls="--", alpha=0.6)
         ax.set_ylim(0, 0.8)
         ax.set_title("distance from the target null ↓", fontsize=8)
         ax.tick_params(labelsize=6.5, labelbottom=False)
         for s in data["seeds"]:
-            under.plot(ep, data["alpha"][s], color=INK[FIXED], lw=0.5, alpha=0.6)
+            under.plot(ep, data["alpha"][s], color=light_dark(*INK[FIXED]), lw=0.5, alpha=0.6)
         under.set_ylim(0, None)
         under.set_ylabel("α", fontsize=7)
         under.set_xlabel("epoch", fontsize=7)
         under.tick_params(labelsize=6)
         twin = under.twinx()
-        twin.plot(ep, data["weight"], color=RULE, lw=0.8, ls="--", label="$\\lambda_a$")
-        twin.plot(ep, data["anti_weight"], color=RULE, lw=0.8, ls=":", label="anti")
+        twin.plot(ep, data["weight"], color=light_dark(*RULE), lw=0.8, ls="--", label="$\\lambda_a$")
+        twin.plot(ep, data["anti_weight"], color=light_dark(*RULE), lw=0.8, ls=":", label="anti")
         twin.set_ylim(0, 0.3)
         twin.set_ylabel("weight", fontsize=7)
         twin.tick_params(labelsize=6)
         twin.legend(fontsize=5.5, frameon=False, loc="lower left", ncols=2)
-        handles = [Line2D([], [], color=INK[k], lw=1.6) for k in (CONTROL, FIXED, SANS)]
+        handles = [Line2D([], [], color=light_dark(*INK[k]), lw=1.6) for k in (CONTROL, FIXED, SANS)]
         labels = [tex("τ_ℓ fixed" if k == FIXED else SHOWN[k]) for k in (CONTROL, FIXED, SANS)]
         fig.legend(handles, labels, loc="outside upper center", ncols=len(labels), frameon=False, fontsize=7)
         return fig
@@ -602,9 +608,9 @@ def close_draw(data: dict, alt_text: str) -> str:
         ax = axes[0]
         cols = data["columns"]
         for i, k in enumerate(cols):
-            dots(ax, i, data["to_null"][k], INK[k], MARKER[k], JIT)
-        ax.axhline(data["bayes_d"], color=RULE, lw=0.7, ls="--", zorder=1)
-        ax.axhline(data["own_o"], color=INK[SANS], lw=0.7, ls=":", zorder=1)
+            dots(ax, i, data["to_null"][k], light_dark(*INK[k]), MARKER[k], JIT)
+        ax.axhline(data["bayes_d"], color=light_dark(*RULE), lw=0.7, ls="--", zorder=1)
+        ax.axhline(data["own_o"], color=light_dark(*INK[SANS]), lw=0.7, ls=":", zorder=1)
         ax.set_xticks(range(len(cols)), [tex(SHOWN[k]).replace(", ", ",\n") for k in cols], fontsize=6.5)
         ax.set_xlim(-0.6, len(cols) - 0.4)
         ax.set_ylim(0, 1.0)
@@ -613,13 +619,13 @@ def close_draw(data: dict, alt_text: str) -> str:
         ax = axes[1]
         x = np.arange(len(data["bins"]))
         u = np.asarray(data["unedited"])
-        ax.plot(x, u.mean(0), color=INK[FIXED], lw=0.9, ls="--", marker=MARKER[FIXED], ms=4, mfc="none",
+        ax.plot(x, u.mean(0), color=light_dark(*INK[FIXED]), lw=0.9, ls="--", marker=MARKER[FIXED], ms=4, mfc="none",
                 label=tex("τ_ℓ fixed, unedited"))  # fmt: skip
         for k in (FIXED, SANS):
             v = np.asarray(data["by_bin"][k])
             for row in v:
-                ax.plot(x, row, color=INK[k], lw=0.4, alpha=0.6)
-            ax.plot(x, v.mean(0), color=INK[k], lw=1.4, marker=MARKER[k], ms=4, label=tex(SHOWN[k]))
+                ax.plot(x, row, color=light_dark(*INK[k]), lw=0.4, alpha=0.6)
+            ax.plot(x, v.mean(0), color=light_dark(*INK[k]), lw=1.4, marker=MARKER[k], ms=4, label=tex(SHOWN[k]))
         ax.set_xticks(x, data["bins"], fontsize=6.5)
         ax.set_xlabel("posterior on difference", fontsize=7)
         ax.tick_params(labelsize=6.5)
@@ -692,9 +698,9 @@ def same_draw(data: dict, alt_text: str) -> str:
                 ("fixed-fixed", "edited vs\nedited", FIXED, "s"), ("sans-dropped", "sans-diff vs\ndropped", DROPPED, "^")]  # fmt: skip
         jit = np.random.default_rng(1).uniform(-0.15, 0.15, 64)
         for i, (k, _, ink, m) in enumerate(cols):
-            dots(ax, i, data["between"][k], INK[ink], m, jit)
+            dots(ax, i, data["between"][k], light_dark(*INK[ink]), m, jit)
         for k in (SANS, FIXED):
-            ax.axhline(data["to_null"][k], color=INK[k], lw=0.7, ls=":", zorder=1)
+            ax.axhline(data["to_null"][k], color=light_dark(*INK[k]), lw=0.7, ls=":", zorder=1)
         ax.set_xticks(range(len(cols)), [c[1] for c in cols], fontsize=6.5)
         ax.set_xlim(-0.6, len(cols) - 0.4)
         ax.set_ylim(0, 0.55)
@@ -897,10 +903,12 @@ def other_draw(data: dict, alt_change: str, alt_gain: str) -> str:
     def _change() -> plt.Figure:
         fig, ax = plt.subplots(figsize=(3.5, 2.6), layout="constrained")
         for i, (v, c) in enumerate(zip(data["change"], data["control_spread"], strict=True)):
-            ax.add_patch(Rectangle((i - 0.3, min(c)), 0.6, max(c) - min(c), color=GHOST, alpha=0.5, lw=0, zorder=1))
-            dots(ax, i, v, INK[SANS], MARKER[SANS], JIT)
-        ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
-        ax.axhline(data["gate"], color=RULE, lw=0.7, ls="--", zorder=0)
+            ax.add_patch(
+                Rectangle((i - 0.3, min(c)), 0.6, max(c) - min(c), color=light_dark(*GHOST), alpha=0.5, lw=0, zorder=1)
+            )
+            dots(ax, i, v, light_dark(*INK[SANS]), MARKER[SANS], JIT)
+        ax.axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
+        ax.axhline(data["gate"], color=light_dark(*RULE), lw=0.7, ls="--", zorder=0)
         ax.set_ylim(data["gate"] - 0.01, None)
         ax.set_xticks(range(len(data["ops"])), data["ops"], rotation=40, ha="right", fontsize=6.5)
         ax.set_ylabel("task, sans-diff less control", fontsize=7)
@@ -919,13 +927,13 @@ def other_draw(data: dict, alt_change: str, alt_gain: str) -> str:
     def _gain() -> plt.Figure:
         fig, ax = plt.subplots(figsize=(3.1, 2.6), layout="constrained")
         x = np.arange(len(data["bins"]))
-        ax.plot(x, data["null"], color=RULE, lw=0.9, ls="--", marker="_", ms=8, label="target null")
+        ax.plot(x, data["null"], color=light_dark(*RULE), lw=0.9, ls="--", marker="_", ms=8, label="target null")
         for k, key in ((SANS, "sans"), (FIXED, "edit")):
             v = np.asarray(data[key])
             for row in v:
-                ax.plot(x, row, color=INK[k], lw=0.4, alpha=0.6)
-            ax.plot(x, v.mean(0), color=INK[k], lw=1.4, marker=MARKER[k], ms=4, label=tex(SHOWN[k]))
-        ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
+                ax.plot(x, row, color=light_dark(*INK[k]), lw=0.4, alpha=0.6)
+            ax.plot(x, v.mean(0), color=light_dark(*INK[k]), lw=1.4, marker=MARKER[k], ms=4, label=tex(SHOWN[k]))
+        ax.axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
         ax.set_xticks(x, data["bins"], fontsize=6.5)
         ax.set_xlabel("posterior on difference", fontsize=7)
         ax.set_ylabel("gain in task score", fontsize=7)

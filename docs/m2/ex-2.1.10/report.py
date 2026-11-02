@@ -660,10 +660,12 @@ Both groups weight the same 5832 probe lines by the one-slot-only probabilities 
 """
 
 span_x = np.arange(ex.SPAN)
+# Inks are (light, dark) pairs, resolved with `light_dark` where a figure draws: it picks by the theme active when
+# it is called, so a value resolved at import would give the dark render the light ink.
 GROUP_INK = {
-    "either-t100": light_dark("#1f6fb4", "#5fa8dd"),
-    "either-t500": light_dark("#7fb3d8", "#4f7ea6"),
-    "either-t2500": light_dark("#9ab5c8", "#41586b"),
+    "either-t100": ("#1f6fb4", "#5fa8dd"),
+    "either-t500": ("#7fb3d8", "#4f7ea6"),
+    "either-t2500": ("#9ab5c8", "#41586b"),
 }
 GROUP_ALT = {
     "either-t100": """
@@ -699,7 +701,7 @@ def profile_draw(
     def plot() -> plt.Figure:
         from matplotlib.layout_engine import ConstrainedLayoutEngine
 
-        ink = GROUP_INK[cond]
+        ink = light_dark(*GROUP_INK[cond])
         read_ink = light_dark("#555", "#aaa")
         hair = light_dark("#00000055", "#ffffff55")
         gate = light_dark("#555", "#bbb")

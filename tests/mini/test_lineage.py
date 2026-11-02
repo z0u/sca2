@@ -140,9 +140,21 @@ def test_merge_run_lineage_preserves_upstreams_across_a_wake():
     assert merged["upstreams"] == [{"experiment": "a"}]  # a wake that didn't re-resolve deps keeps them
 
 
+def test_merge_run_lineage_keeps_every_gpu_seen():
+    """Task records expire, so a later wake may no longer see the cards earlier tasks ran on."""
+    prev = lineage.merge_run_lineage(None, {"captured_at": "T1", "captured_at_epoch": 1.0, "gpus": ["NVIDIA L4"]})
+    merged = lineage.merge_run_lineage(prev, {"captured_at": "T2", "captured_at_epoch": 2.0, "gpus": ["NVIDIA A10G"]})
+    assert merged["gpus"] == ["NVIDIA A10G", "NVIDIA L4"]
+    assert "gpus" not in lineage.merge_run_lineage(None, {"captured_at": "T1", "captured_at_epoch": 1.0})
+
+
 def test_upstream_snapshot_pulls_a_compact_trace():
     meta = {
-        "lineage": {"git": {"sha": "abc123", "describe": "v1-dirty", "dirty": True}, "first_captured_at": "T0"},
+        "lineage": {
+            "git": {"sha": "abc123", "describe": "v1-dirty", "dirty": True},
+            "first_captured_at": "T0",
+            "gpus": ["NVIDIA A10G", "NVIDIA L4"],
+        },
         "modal_app_ids": ["ap-1", "ap-2"],
     }
     snap = lineage.upstream_snapshot("prep", meta)
@@ -152,6 +164,7 @@ def test_upstream_snapshot_pulls_a_compact_trace():
         "git_describe": "v1-dirty",
         "git_dirty": True,
         "run_at": "T0",
+        "gpus": ["NVIDIA A10G", "NVIDIA L4"],
         "modal_app_ids": ["ap-1", "ap-2"],
     }
 

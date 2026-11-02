@@ -129,14 +129,16 @@ def table_html(head: list[str], rows: list[list[str]], caption: str) -> str:
     return figure_html(table, caption=caption, class_="report-figure")
 
 
+# Inks are (light, dark) pairs, resolved with `light_dark` where a figure draws: it picks by the theme active when
+# it is called, so a value resolved at import would give the dark render the light ink.
 INK = {
-    "hold0.2": light_dark("#0b3c73", "#cfe6ff"),
-    "hold0.1": light_dark("#6fa3d6", "#5f8fbf"),
-    "split-anti": light_dark("#c0392b", "#ff8a76"),
-    "falloff": light_dark("#2a9d8f", "#7fd8c8"),
+    "hold0.2": ("#0b3c73", "#cfe6ff"),
+    "hold0.1": ("#6fa3d6", "#5f8fbf"),
+    "split-anti": ("#c0392b", "#ff8a76"),
+    "falloff": ("#2a9d8f", "#7fd8c8"),
 }
 MARK = {"hold0.2": "s", "hold0.1": "o", "split-anti": "^", "falloff": "D"}
-GHOST = light_dark("#bbb", "#555")
+GHOST = ("#bbb", "#555")
 SLICE_TICK = ["emb", "1", "2", "3", "4"]
 
 # --- Summaries the prose and the verdicts quote -----------------------------------------------------------------
@@ -301,12 +303,12 @@ def dose_draw(data: dict, alt_text: str) -> str:
                     if other is arm:
                         continue
                     for r in other["runs"]:
-                        ax.plot(data["doses"], r[key], color=GHOST, lw=0.4, alpha=0.5, zorder=1)
+                        ax.plot(data["doses"], r[key], color=light_dark(*GHOST), lw=0.4, alpha=0.5, zorder=1)
                 a = arm["arm"]
                 for r in arm["runs"]:
-                    ax.plot(data["doses"], r[key], color=INK[a], lw=0.6, alpha=0.8, zorder=2)
+                    ax.plot(data["doses"], r[key], color=light_dark(*INK[a]), lw=0.6, alpha=0.8, zorder=2)
                 mean = np.mean([r[key] for r in arm["runs"]], axis=0)
-                ax.plot(data["doses"], mean, color=INK[a], lw=1.7, marker=MARK[a], ms=4.5, zorder=3)
+                ax.plot(data["doses"], mean, color=light_dark(*INK[a]), lw=1.7, marker=MARK[a], ms=4.5, zorder=3)
                 if row == 0:
                     ax.set_title(arm["name"], fontsize=8)
                 else:
@@ -465,7 +467,7 @@ def pair_draw(data: dict, alt_text: str) -> str:
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(1, 2, figsize=(5.6, 2.7), layout="constrained")
-        ink = INK[FALLOFF]
+        ink = light_dark(*INK[FALLOFF])
         for ax, key in zip(axes, ("removal", "spill"), strict=True):
             x, y = np.array(data[key][SPLIT]), np.array(data[key][FALLOFF])
             lo, hi = (0.7, 0.95) if key == "removal" else (-0.015, 0.05)
@@ -542,18 +544,18 @@ def depth_draw(data: dict, alt_text: str) -> str:
             for arm in data["arms"]:
                 a = arm["arm"]
                 for r in arm[key]:
-                    ax.plot(x, r, color=INK[a], lw=0.5, alpha=0.6, zorder=2)
+                    ax.plot(x, r, color=light_dark(*INK[a]), lw=0.5, alpha=0.6, zorder=2)
                 ax.plot(
                     x,
                     np.mean(arm[key], axis=0),
-                    color=INK[a],
+                    color=light_dark(*INK[a]),
                     lw=1.6,
                     marker=MARK[a],
                     ms=4.5,
                     zorder=3,
                     label=arm["name"],
                 )
-                wax.plot(x, arm["holds"], color=INK[a], lw=1.2, marker=MARK[a], ms=3.5)
+                wax.plot(x, arm["holds"], color=light_dark(*INK[a]), lw=1.2, marker=MARK[a], ms=3.5)
             ax.set_ylim(-0.05, 0.8)
             wax.set_ylim(0, 0.24)
             wax.set_yticks([0, 0.1, 0.2])
@@ -647,7 +649,15 @@ def slices_draw(data: dict, alt_text: str) -> str:
             ax.axhline(0, color=light_dark("#aaa", "#555"), lw=0.5, zorder=0)
             for i, arm in enumerate(data["arms"]):
                 a, v = arm["arm"], np.array(arm[key])
-                ax.plot([i, i], [v.min(), v.max()], color=INK[a], lw=4, alpha=0.2, solid_capstyle="round", zorder=1)
+                ax.plot(
+                    [i, i],
+                    [v.min(), v.max()],
+                    color=light_dark(*INK[a]),
+                    lw=4,
+                    alpha=0.2,
+                    solid_capstyle="round",
+                    zorder=1,
+                )
                 jit = i + rng.uniform(-0.15, 0.15, len(v))
                 for s, xj, yj in zip(data["seeds"], jit, v, strict=True):
                     short = s in data["late_short"]
@@ -657,11 +667,11 @@ def slices_draw(data: dict, alt_text: str) -> str:
                         s=12,
                         marker="o",
                         zorder=2,
-                        facecolor="none" if short else INK[a],
-                        edgecolor=INK[a],
+                        facecolor="none" if short else light_dark(*INK[a]),
+                        edgecolor=light_dark(*INK[a]),
                         alpha=1 if short else 0.55,
                     )
-                ax.scatter(i, v.mean(), s=36, marker=MARK[a], color=INK[a], zorder=3)
+                ax.scatter(i, v.mean(), s=36, marker=MARK[a], color=light_dark(*INK[a]), zorder=3)
             ax.set_xticks(range(len(data["arms"])), [arm["name"] for arm in data["arms"]], fontsize=7, rotation=20)
             ax.set_title(title, fontsize=8)
             ax.tick_params(labelsize=7)

@@ -36,7 +36,7 @@ from mini.local_volume import LocalVolume
 from mini.memo import MemoStore
 from mini.progress import ProgressMessage, progress_context
 from mini.progress_display import RichProgressDisplay
-from mini.runs import RunState, data_root, spawn_taskworker
+from mini.runs import RunState, experiments_root, spawn_taskworker
 from mini.store import Store, project_store, store_context, store_for, store_root_for
 from mini.volume import data_dir_context
 
@@ -65,7 +65,7 @@ class LocalApparatus(Apparatus[LocalVolume]):
         self.watchdog_grace_s: float | None = None
         self.env: dict[str, str] = {}
         self._before_hooks: list[Callable[[], Any]] = []
-        self._volume: LocalVolume | None = LocalVolume(Path(data_dir) if data_dir else data_root() / name)
+        self._volume: LocalVolume | None = LocalVolume(Path(data_dir) if data_dir else experiments_root() / name)
 
     def __str__(self) -> str:
         return f'Local apparatus "{self.name}"'

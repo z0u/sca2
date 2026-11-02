@@ -194,10 +194,18 @@ class NGPT(LanguageModel):
         seg = jnp.cumsum(closes, axis=-1) - closes
         return causal & (seg[:, :, None] == seg[:, None, :])
 
+    def embed(self, idx: Int[Array, "B T"]) -> Float[Array, "B T C"]:
+        """Token embeddings, projected onto the unit hypersphere.
+
+        The lookup is a product with a one-hot matrix rather than an index into the table. At full precision it selects the same values as `wte[idx]`, bit for bit, but its gradient is a matrix product where the index's was a scatter-add, which the GPU determinism flags run serially (`todo/eng/scatter-free-training-step.md`). The embedding gradient sums the same terms in another order, so weights trained this way differ in the last bits from weights trained with the index.
+        """
+        wte = self.transformer.wte
+        one_hot = jax.nn.one_hot(idx, wte.shape[0], dtype=wte.dtype)
+        return normalize(jnp.matmul(one_hot, wte, precision=jax.lax.Precision.HIGHEST))
+
     def __call__(self, idx: Int[Array, "B T"], *, key: PRNGKeyArray | None = None):
-        # Token embeddings, projected onto the unit hypersphere. (The key is
-        # unused: nGPT is dropout-free — the hypersphere constraint regularizes.)
-        x: Float[Array, "B T C"] = normalize(self.transformer.wte[idx])
+        # (The key is unused: nGPT is dropout-free — the hypersphere constraint regularizes.)
+        x: Float[Array, "B T C"] = self.embed(idx)
 
         # Gradient-checkpoint each block: the backward pass recomputes
         # activations instead of storing every layer's O(T²) attention maps.
@@ -216,7 +224,7 @@ class NGPT(LanguageModel):
 
         The probing/anchoring readout for the M2 experiments. Mirrors ``__call__`` without gradient checkpointing — intended for small eval batches, not the training path.
         """
-        x = normalize(self.transformer.wte[idx])
+        x = self.embed(idx)
         states = [x]
         allowed = self.attention_mask(idx)
         for block in self.transformer.blocks:
@@ -229,7 +237,7 @@ class NGPT(LanguageModel):
 
         What a training step needs when the loss reads the stream directly, as concept anchoring does (`sca.anchoring`): running ``__call__`` and ``residual_stream`` separately would forward twice. Blocks stay gradient-checkpointed, as in ``__call__``.
         """
-        x = normalize(self.transformer.wte[idx])
+        x = self.embed(idx)
         states = [x]
         enc = self.transformer.rotary_enc
         allowed = self.attention_mask(idx)

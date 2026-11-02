@@ -1,0 +1,10 @@
+{
+  "about": "Queries with the place `./go find` should rank in its top five. Each case comes from a search that was tried or a recorded miss (scripts/find.py, --log-report); `path` may carry `:line`. tests/test_find_cases.py checks them against the repo.",
+  "cases": [
+    {"query": "separator latch", "path": "docs/m2/spill-by-position/report.py"},
+    {"query": "why did we drop the determinism flags", "path": "eng/determinism.md"},
+    {"query": "late spill anneal", "path": "docs/m2/late-spill-scout/report.py"},
+    {"query": "embedding lean lightness", "path": "docs/m2/embedding-lean/report.py"},
+    {"query": "residual stream geometry RSA", "path": "docs/m2/geometry-rsa/report.py"}
+  ]
+}

@@ -147,17 +147,19 @@ def table_html(head: list[str], rows: list[list[str]], caption: str) -> str:
     return figure_html(table, caption=caption, class_="report-figure")
 
 
+# Inks are (light, dark) pairs, resolved with `light_dark` where a figure draws: it picks by the theme active when
+# it is called, so a value resolved at import would give the dark render the light ink.
 INK = {
-    BASE: light_dark("#2a9d8f", "#7fd8c8"),
-    STEP_SOFT: light_dark("#e08e0b", "#f5b950"),
-    RAMP: light_dark("#0b3c73", "#9fcbff"),
-    RAMP_SOFT: light_dark("#c0392b", "#ff8a76"),
-    POOL_SOFT: light_dark("#6c4fa3", "#b9a2e8"),
+    BASE: ("#2a9d8f", "#7fd8c8"),
+    STEP_SOFT: ("#e08e0b", "#f5b950"),
+    RAMP: ("#0b3c73", "#9fcbff"),
+    RAMP_SOFT: ("#c0392b", "#ff8a76"),
+    POOL_SOFT: ("#6c4fa3", "#b9a2e8"),
 }
 MARK = {BASE: "D", STEP_SOFT: "v", RAMP: "s", RAMP_SOFT: "^", POOL_SOFT: "o"}
-GHOST = light_dark("#bbb", "#555")
-RULE = light_dark("#333", "#ddd")
-ZERO = light_dark("#aaa", "#555")
+GHOST = ("#bbb", "#555")
+RULE = ("#333", "#ddd")
+ZERO = ("#aaa", "#555")
 SLICE_TICK = ["emb", "1", "2", "3", "4"]
 
 # --- Summaries the prose quotes -------------------------------------------------------------------------------
@@ -232,20 +234,28 @@ def dose_draw(data: dict, alt_text: str) -> str:
         for row, key in enumerate(("removal", "spill")):
             for col, arm in enumerate(arms):
                 ax = axes[row, col]
-                ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
+                ax.axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
                 for other in arms:
                     if other is not arm:
                         for r in other["runs"]:
-                            ax.plot(data["doses"], r[key], color=GHOST, lw=0.4, alpha=0.5, zorder=1)
+                            ax.plot(data["doses"], r[key], color=light_dark(*GHOST), lw=0.4, alpha=0.5, zorder=1)
                 a = arm["arm"]
                 for r, lost in zip(arm["runs"], arm["lost"], strict=True):
-                    ax.plot(data["doses"], r[key], color=INK[a], lw=0.7, alpha=0.8, ls="--" if lost else "-", zorder=2)
+                    ax.plot(
+                        data["doses"],
+                        r[key],
+                        color=light_dark(*INK[a]),
+                        lw=0.7,
+                        alpha=0.8,
+                        ls="--" if lost else "-",
+                        zorder=2,
+                    )
                 mean = np.mean([r[key] for r in arm["runs"]], axis=0)
-                ax.plot(data["doses"], mean, color=INK[a], lw=1.7, marker=MARK[a], ms=4.5, zorder=3)
+                ax.plot(data["doses"], mean, color=light_dark(*INK[a]), lw=1.7, marker=MARK[a], ms=4.5, zorder=3)
                 if row == 0:
                     ax.set_title(arm["name"], fontsize=7)
                 else:
-                    ax.axhline(CRITERION, color=RULE, lw=0.9, ls="--", zorder=1)
+                    ax.axhline(CRITERION, color=light_dark(*RULE), lw=0.9, ls="--", zorder=1)
                     ax.set_xlabel("dose", fontsize=8)
                 ax.set_xticks(data["doses"], [f"{g:g}" for g in data["doses"]], fontsize=6)
                 ax.tick_params(labelsize=7)
@@ -388,13 +398,13 @@ def track_draw(data: dict, alt_text: str) -> str:
         )
         for col, arm in enumerate(arms):
             ax, qax, wax, tax = axes[:, col]
-            ink = INK[arm["arm"]]
+            ink = light_dark(*INK[arm["arm"]])
             for a_ in (ax, qax):
-                a_.axhline(0, color=ZERO, lw=0.5, zorder=0)
+                a_.axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
             for other in arms:
                 if other is not arm:
                     for r in other["runs"]:
-                        ax.plot(r["epoch"], r["answers"], color=GHOST, lw=0.4, alpha=0.4, zorder=1)
+                        ax.plot(r["epoch"], r["answers"], color=light_dark(*GHOST), lw=0.4, alpha=0.4, zorder=1)
             for r in arm["runs"]:
                 ls = "--" if r["lost"] else "-"
                 ax.plot(r["epoch"], r["answers"], color=ink, lw=0.8, ls=ls, zorder=2)
@@ -403,7 +413,7 @@ def track_draw(data: dict, alt_text: str) -> str:
             ax.set_ylim(-0.05, 0.8)
             qax.set_ylim(-0.05, 1.05)
             sch = arm["schedule"]
-            wax.plot(sch["epoch"], sch["weight"], color=RULE, lw=1.0)
+            wax.plot(sch["epoch"], sch["weight"], color=light_dark(*RULE), lw=1.0)
             wax.set_ylim(0, 0.12)
             wax.set_yticks([0, 0.1])
             tax.plot(sch["epoch"], sch["tau"], color=ink, lw=1.1)
@@ -468,21 +478,21 @@ def depth_draw(data: dict, alt_text: str) -> str:
         x = np.arange(len(SLICE_TICK))
         for col, key in enumerate(("anchored", "other")):
             ax, pax, aax = axes[:, col]
-            ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
+            ax.axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
             for arm in data["arms"]:
                 a = arm["arm"]
                 ax.plot(
                     x,
                     np.mean(arm[key], axis=0),
-                    color=INK[a],
+                    color=light_dark(*INK[a]),
                     lw=1.4,
                     marker=MARK[a],
                     ms=4,
                     zorder=3,
                     label=arm["name"],
                 )
-                pax.plot(x, arm["pull"], color=INK[a], lw=1.1, marker=MARK[a], ms=3)
-            aax.plot(x, data["anti"], color=RULE, lw=1.1, marker=".", ms=4)
+                pax.plot(x, arm["pull"], color=light_dark(*INK[a]), lw=1.1, marker=MARK[a], ms=3)
+            aax.plot(x, data["anti"], color=light_dark(*RULE), lw=1.1, marker=".", ms=4)
             ax.set_ylim(-0.03, 0.75 if key == "anchored" else 0.25)
             pax.set_ylim(-0.05, 1.2)
             pax.set_yticks([0, 1])
@@ -618,12 +628,12 @@ def transient_draw(data: dict, alt_text: str) -> str:
         axes = left.subplots(2, len(arms), sharex=True, sharey="row", height_ratios=[3, 0.8], squeeze=False)
         for col, arm in enumerate(arms):
             ax, tax = axes[:, col]
-            ink = INK[arm["arm"]]
-            ax.axvspan(w0, w1, color=GHOST, alpha=0.15, lw=0, zorder=0)
+            ink = light_dark(*INK[arm["arm"]])
+            ax.axvspan(w0, w1, color=light_dark(*GHOST), alpha=0.15, lw=0, zorder=0)
             for other in arms:
                 if other is not arm:
                     for r in other["runs"]:
-                        ax.plot(r["epoch"], r["alpha"], color=GHOST, lw=0.4, alpha=0.4, zorder=1)
+                        ax.plot(r["epoch"], r["alpha"], color=light_dark(*GHOST), lw=0.4, alpha=0.4, zorder=1)
             for r in arm["runs"]:
                 ax.plot(r["epoch"], r["alpha"], color=ink, lw=0.6, alpha=0.8, zorder=2)
             ep = np.asarray(arm["runs"][0]["epoch"])
@@ -645,13 +655,13 @@ def transient_draw(data: dict, alt_text: str) -> str:
         axes[0, 0].set_ylabel("α, other ops", fontsize=8)
         axes[1, 0].set_ylabel("$\\tau_p$", fontsize=8)
         sax = right.subplots()
-        sax.axhline(data["criterion"], color=RULE, lw=0.8, ls="--", zorder=1)
-        sax.axhline(0, color=ZERO, lw=0.5, zorder=0)
+        sax.axhline(data["criterion"], color=light_dark(*RULE), lw=0.8, ls="--", zorder=1)
+        sax.axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
         for arm in arms:
             sax.scatter(
                 [r["peak"] for r in arm["runs"]],
                 [r["spill"] for r in arm["runs"]],
-                color=INK[arm["arm"]],
+                color=light_dark(*INK[arm["arm"]]),
                 marker=MARK[arm["arm"]],
                 s=16,
                 label=arm["name"],

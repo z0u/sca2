@@ -6,9 +6,12 @@ A reader reviews a report on paper, rounds apart, and from the second round on w
 The export is of the results the store holds now: a report reads its results through refs that a re-run overwrites, so after a re-run the baseline's numbers are today's and a line whose number changed with it gets no bar. The reader's marks are about the prose, so this is accepted. The checkout shares this project's ``.mini/store``, its cache, and the weave cache (symlinks), so nothing is downloaded or woven twice.
 
 A baseline lands at ``.mini/review/<sha>/<key>/`` and is kept, so the next print against the same ref reuses it (nothing prunes them; ``rm -r .mini/review`` when they pile up). A report that did not exist at *ref* has none, and its print carries no marks.
+
+A Markdown draft with no commit to name can be marked against an earlier copy of itself instead (``--since FILE``, :func:`export_file`).
 """
 
 import argparse
+import hashlib
 import os
 import shutil
 import subprocess
@@ -83,9 +86,6 @@ def render_md_at(sha: str, page: Path) -> None:
 
     A Markdown page has no cells and reads no results, so there is nothing for a checkout to run: its old text goes through today's weave (:mod:`mini.lit`), and the two pages differ only where the text does.
     """
-    from mini.lit.document import Runner, parse
-    from mini.lit.render import compose
-
     rel = page.resolve().relative_to(ROOT).as_posix()
     dest = baseline_dir(sha, export_key(page))
     if (dest / "index.html").is_file():
@@ -96,10 +96,37 @@ def render_md_at(sha: str, page: Path) -> None:
     except subprocess.CalledProcessError:
         print(f"  baseline {rel} @ {sha[:7]}: not in that commit, so its print is unmarked")
         return
+    _weave_md(page, text, dest)
+    print(f"  baseline {rel} @ {sha[:7]} -> {dest.relative_to(ROOT)}")
+
+
+def _weave_md(page: Path, text: str, dest: Path) -> None:
+    """Weave *text* as Markdown page *page* through today's code, into ``dest/index.html``."""
+    from mini.lit.document import Runner, parse
+    from mini.lit.render import compose
+
     html, _ = compose(Runner(page).weave(parse(page, text)))
     dest.mkdir(parents=True, exist_ok=True)
     (dest / "index.html").write_text(html, "utf-8")
-    print(f"  baseline {rel} @ {sha[:7]} -> {dest.relative_to(ROOT)}")
+
+
+def file_slot(earlier: Path) -> str:
+    """The name a baseline made from file *earlier* is kept under, where a commit id would name one made from a ref: a digest of the file, so two prints against the same earlier version share a directory."""
+    return "file-" + hashlib.sha256(earlier.read_bytes()).hexdigest()[:16]
+
+
+def export_file(earlier: Path, page: Path) -> Path:
+    """Weave *earlier*, an earlier copy of Markdown *page*, into :func:`baseline_dir` as the baseline its print is marked against, and return the directory.
+
+    For a draft with no commit to name: an agent keeps numbered copies (``draft-1.md``, ``draft-2.md``) and prints the second ``--since`` the first. The copy is woven by today's code as if it were *page*, so the two pages differ only where the text does. It is woven afresh each time (no reuse, unlike a ref's baseline), since a file can change under the same name. Its images are not bundled here; the caller does that, as it does for the current page.
+
+    A literate report has no such option. It lives in the repo and is edited in place, so the round last reviewed is a commit (``HEAD`` for uncommitted edits), and its baseline is an export from a checkout of that commit (:func:`export_at`).
+    """
+    dest = baseline_dir(file_slot(earlier), export_key(page))
+    shutil.rmtree(dest, ignore_errors=True)
+    _weave_md(page, earlier.read_text("utf-8"), dest)
+    print(f"  baseline {earlier} -> {dest}")
+    return dest
 
 
 def main() -> None:

@@ -27,6 +27,8 @@ __all__ = [
     "compute_env",
     "data_root",
     "describe_numerics_drift",
+    "experiments_root",
+    "gpu_name",
     "in_declared_phase",
     "installed_numerics",
     "is_queued",
@@ -54,6 +56,17 @@ def data_root() -> Path:
     return cwd / ".mini"
 
 
+def experiments_root() -> Path:
+    """Where local experiment state lives for the active storage profile: one ``<name>/`` per experiment.
+
+    That is :func:`data_root` under the base configuration, and ``<data_root>/profiles/<profile>/`` under ``MINI_PROFILE``. A local run keeps its memo records in its experiment directory, so without the split a run made under one profile would read as already done under another: every task skips, nothing reaches that profile's bucket, and the report then finds nothing published. Modal keeps the two apart with the profile's Environment; this is the local counterpart. The local fallback store (``store/``) sits beside the experiments (:func:`~mini.store.store_root_for`), so it splits the same way.
+    """
+    from mini.store import active_profile
+
+    root = data_root()
+    return root if (profile := active_profile()) is None else root / "profiles" / profile
+
+
 # Env var naming a directory for the caches that are safe to share between checkouts (the weave cache
 # and the bucket's warm cache: both content-keyed, both written through a rename). Unset → `data_root()`.
 CACHE_DIR_ENV = "MINI_CACHE_DIR"
@@ -68,7 +81,7 @@ def cache_root() -> Path:
 
 
 def _gpus() -> tuple[str | None, int]:
-    """Best-effort GPU model + count, dependency-free. NVIDIA exposes a per-GPU info file on Linux; we don't import torch/jax just to name the card."""
+    """Best-effort GPU model + count, dependency-free. NVIDIA exposes a per-GPU info file on Linux, with ``nvidia-smi`` as the fallback where a sandbox hides it; we don't import torch/jax just to name the card."""
     model, count = None, 0
     for info in sorted(Path("/proc/driver/nvidia/gpus").glob("*/information")):
         count += 1
@@ -80,7 +93,29 @@ def _gpus() -> tuple[str | None, int]:
                     model = line.split(":", 1)[1].strip()
         except OSError:
             continue
-    return model, count
+    if count:
+        return model, count
+    # gVisor (Modal) has /proc/driver/nvidia but leaves `gpus/` empty; nvidia-smi still works there.
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        ).stdout
+    except OSError, subprocess.SubprocessError:
+        return None, 0
+    names = [line.strip() for line in out.splitlines() if line.strip()]
+    return (names[0] if names else None), len(names)
+
+
+def gpu_name() -> str | None:
+    """The model of the GPU this process runs on, or ``None`` without one.
+
+    For a task that returns its card in its result: task records expire, so a report that tabulates the mix of cards per condition reads it from the results.
+    """
+    return _gpus()[0]
 
 
 def _mem_total_gb() -> float | None:
@@ -112,7 +147,9 @@ _MODAL_ENV_KEYS = {
 # that agree on code and inputs can still disagree on results across a change
 # here. Read from the worker's own environment rather than from what the client
 # asked for, so a setting that failed to arrive shows up as absent.
-_NUMERICS_ENV_KEYS = ("XLA_FLAGS",)
+# `MINI_COMPILE_CACHE` names the shared compilation cache a worker loads its
+# compiled programs from (`mini.compile_cache`), which pins the autotuner's picks.
+_NUMERICS_ENV_KEYS = ("XLA_FLAGS", "MINI_COMPILE_CACHE")
 
 # Packages whose *version* changes what a task computes. They are invisible to the
 # memo — `mini.memo._is_project_file` excludes site-packages, so no library source

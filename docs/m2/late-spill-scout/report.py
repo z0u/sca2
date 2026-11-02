@@ -171,14 +171,16 @@ def alpha_answers(arm: str, cond: str, seed: int, slice_: int = 3) -> tuple[np.n
 
 # --- Figures ---------------------------------------------------------------------------------------------------
 
-RULE = light_dark("#333", "#ddd")
-ZERO = light_dark("#aaa", "#555")
-GHOST = light_dark("#bbb", "#555")
+# Inks are (light, dark) pairs, resolved with `light_dark` where a figure draws: it picks by the theme active when
+# it is called, so a value resolved at import would give the dark render the light ink.
+RULE = ("#333", "#ddd")
+ZERO = ("#aaa", "#555")
+GHOST = ("#bbb", "#555")
 ARM_INK = {
-    "base": light_dark("#08306b", "#c6dbef"),
-    "anti-late": light_dark("#d95f02", "#fdae6b"),
-    "anti-held": light_dark("#a6611a", "#dfc27d"),
-    "lt-late": light_dark("#7570b3", "#bcbddc"),
+    "base": ("#08306b", "#c6dbef"),
+    "anti-late": ("#d95f02", "#fdae6b"),
+    "anti-held": ("#a6611a", "#dfc27d"),
+    "lt-late": ("#7570b3", "#bcbddc"),
 }
 ARM_MARKER = {"base": "s", "anti-late": "^", "anti-held": "v", "lt-late": "D"}
 
@@ -255,21 +257,29 @@ def along_draw(data: dict, alt_text: str) -> str:
             for i in range(n_spill):
                 ax = axes[i, j]
                 for g in ghosts:
-                    ax.plot(ep, data["spill"][i][g], color=GHOST, lw=0.6, zorder=1)
-                ax.plot(ep, data["spill"][i][a], color=ARM_INK[a], marker=ARM_MARKER[a], ms=2.5, lw=1.0, zorder=3)
-                ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
-                ax.axhline(data["criterion"], color=RULE, lw=0.7, ls="--", zorder=0)
+                    ax.plot(ep, data["spill"][i][g], color=light_dark(*GHOST), lw=0.6, zorder=1)
+                ax.plot(
+                    ep,
+                    data["spill"][i][a],
+                    color=light_dark(*ARM_INK[a]),
+                    marker=ARM_MARKER[a],
+                    ms=2.5,
+                    lw=1.0,
+                    zorder=3,
+                )
+                ax.axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
+                ax.axhline(data["criterion"], color=light_dark(*RULE), lw=0.7, ls="--", zorder=0)
             for row, key in ((n_spill, "anti"), (n_spill + 1, "tau")):
                 for g in ghosts:
-                    axes[row, j].plot(*data[key][g], color=GHOST, lw=0.6, zorder=1)
-                axes[row, j].plot(*data[key][a], color=ARM_INK[a], lw=1.0, zorder=3)
+                    axes[row, j].plot(*data[key][g], color=light_dark(*GHOST), lw=0.6, zorder=1)
+                axes[row, j].plot(*data[key][a], color=light_dark(*ARM_INK[a]), lw=1.0, zorder=3)
             axes[-1, j].set_yscale("log")
             axes[-1, j].set_yticks([0.025, 0.05, 0.1], ["0.025", "0.05", "0.1"])
             axes[-1, j].minorticks_off()
             axes[-1, j].set_xlabel("epoch", fontsize=7)
-            axes[0, j].set_title(tex(data["shown"][a]), fontsize=8, color=ARM_INK[a])
+            axes[0, j].set_title(tex(data["shown"][a]), fontsize=8, color=light_dark(*ARM_INK[a]))
             for ax in axes[:, j]:
-                ax.axvline(data["stop"], color=RULE, lw=0.6, ls=":", zorder=0)
+                ax.axvline(data["stop"], color=light_dark(*RULE), lw=0.6, ls=":", zorder=0)
                 ax.tick_params(labelsize=6)
         for i, label in enumerate(data["rows"]):
             axes[i, 0].set_ylabel(tex(label), fontsize=7)
@@ -320,10 +330,10 @@ def end_draw(data: dict, alt_text: str) -> str:
         rng = np.random.default_rng(0)
         for ax, key in zip(axes, ("removal", "spill", "task"), strict=True):
             for i, a in enumerate(names):
-                _dots(ax, i, data[key][a], ARM_INK[a], ARM_MARKER[a], rng)
+                _dots(ax, i, data[key][a], light_dark(*ARM_INK[a]), ARM_MARKER[a], rng)
                 if key in data["by40"]:
                     v = data["by40"][key][a]
-                    ax.plot([i + 0.3] * len(v), v, ARM_MARKER[a], ms=3.5, mfc="none", mec=ARM_INK[a], mew=0.8, zorder=4)  # fmt: skip
+                    ax.plot([i + 0.3] * len(v), v, ARM_MARKER[a], ms=3.5, mfc="none", mec=light_dark(*ARM_INK[a]), mew=0.8, zorder=4)  # fmt: skip
             ax.set_xticks(range(len(names)), [tex(SHOWN[a]) for a in names], rotation=40, ha="right", fontsize=6)
             ax.set_xlim(-0.6, len(names) - 0.3)
             ax.tick_params(labelsize=7)
@@ -331,8 +341,8 @@ def end_draw(data: dict, alt_text: str) -> str:
         axes[1].set_title("spill ↓", fontsize=8)
         axes[2].set_title("task change ↑", fontsize=8)
         for ax, y, below in ((axes[1], data["criterion"], False), (axes[2], data["task_gate"], True)):
-            ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
-            ax.axhline(y, color=RULE, lw=0.7, ls="--", zorder=1)
+            ax.axhline(0, color=light_dark(*ZERO), lw=0.5, zorder=0)
+            ax.axhline(y, color=light_dark(*RULE), lw=0.7, ls="--", zorder=1)
             lo, hi = ax.get_ylim()
             if below:
                 lo = min(lo, y - 0.005)
@@ -380,9 +390,9 @@ def alpha_draw(data: dict, alt_text: str) -> str:
         ep = np.asarray(data["epochs"])
         for a in data["names"]:
             for v in data["seeds"][a]:
-                ax.plot(ep, v, color=ARM_INK[a], lw=0.3, alpha=0.35, zorder=1)
-            ax.plot(ep, data["mean"][a], color=ARM_INK[a], lw=1.3, label=tex(SHOWN[a]), zorder=2)
-        ax.axvline(data["stop"], color=RULE, lw=0.6, ls=":", zorder=0)
+                ax.plot(ep, v, color=light_dark(*ARM_INK[a]), lw=0.3, alpha=0.35, zorder=1)
+            ax.plot(ep, data["mean"][a], color=light_dark(*ARM_INK[a]), lw=1.3, label=tex(SHOWN[a]), zorder=2)
+        ax.axvline(data["stop"], color=light_dark(*RULE), lw=0.6, ls=":", zorder=0)
         ax.set_xlim(data["stop"] - 8, ep[-1] + 8)
         ax.set_ylim(0.45, 0.7)
         ax.set_xlabel("epoch", fontsize=7)

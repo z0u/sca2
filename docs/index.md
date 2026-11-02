@@ -640,6 +640,14 @@ With `τ_ℓ fixed` adopted, we gave it the full set of measurements and a refer
 
 <details markdown="1" open="true"><summary>Reports</summary>
 
+- [An absolute tolerance for the write](./m2/write-floor/report.py)
+
+    The write tolerance of ex-2.2.1 is a ratio (a relative tolerance), so where the clean bound is a fraction of a degree a tiny turn counts as over. A re-analysis of four recipes finds an absolute tolerance in how much the bound varies between runs, about a degree. With both, the sites at symbols and separators drop out, and what stays are the operands at the first slice, on a run or so of the recipe of record and on every run of `pool 1–3, soft τ`.
+
+    <span class="tags">`reanalysis` `intervention` `measurement`</span>
+
+    <!-- mini:figures ./m2/write-floor/report.py -->
+
 - [What the edit does on τ_ℓ fixed](./m2/fixed-effects/report.py)
 
     A re-analysis of the fixed confirmation's runs. The fixed confirmation scored `τ_ℓ fixed` on the full edit alone, and edit-effects scored the earlier recipe; this report gives `τ_ℓ fixed` the scoring of edit-effects, and adds removal by dose and the confusion matrices. Every measure comes out about as on `falloff`. The clean bound at slice 3 is wider, set by a small tail rich in near misses for `difference`, which fits the account of block 1 in block1-edit. For where the edited answers land, it draws on the model trained without the op rather than repeating it.
@@ -655,5 +663,13 @@ With `τ_ℓ fixed` adopted, we gave it the full set of measurements and a refer
     <span class="tags">`in-context` `intervention` `grading` `seed-sensitivity`</span>
 
     <!-- mini:figures ./m2/filtered-corpus/report.py -->
+
+- [What the edit misses in the low runs](./m2/low-runs/report.py)
+
+    A few runs trained with one label draw held for the run end with the edit removing much less of `difference`, and a twin trained again from the same labels, seed, and batches matches each in loss and alignment and still removes the op well. A re-analysis of 48 stored checkpoints: every run also writes, off the anchored axis, whether each example fits the op, and in a low run the reader blocks take part of that judgement from copies the edit never touches, at the answers or at the other example positions. The low runs peak lower and give back more while the anti weight anneals.
+
+    <span class="tags">`reanalysis` `in-context` `intervention` `seed-sensitivity`</span>
+
+    <!-- mini:figures ./m2/low-runs/report.py -->
 
 </details>

@@ -24,7 +24,7 @@ Be proactive. Fix little things as you go, and create todos for larger things.
 
 Code style & conventions: see the `style-*` skills.
 
-The human reviews on paper, a tablet, or a phone, so a document sent for review (a report, a design doc, a plan) goes as a PDF print, the Markdown ones included: `./go render <doc> -o .mini/prints/<name>.pdf [--since <commit>]` (the `report-render` skill; in a project thread, print under `/mnt/project-files/prints/` and attach it). A Claude Doc suits a discussion at a desktop, when they ask for one.
+The human reviews on paper, a tablet, or a phone, so a document sent for review (a report, a design doc, a plan) goes as a PDF print, the Markdown ones included: `./go render <doc> -o .mini/prints/<name>.pdf [--since <commit, or an earlier copy of a Markdown draft>]` (the `report-render` skill; in a project thread, print under `/mnt/project-files/prints/` and attach it). A Claude Doc suits a discussion at a desktop, when they ask for one.
 
 Before writing prose of any kind (reports, design docs, todo items and notes, PR bodies, docstrings that name corpus units), load the `writing` and `style-terms` skills. Several of their rules differ from common usage (a *condition* is never a "cell", "read" is never a noun, no possessives on abstract terms), so they can't be inferred and are easy to miss. When you brief a subagent that will write prose, name both skills in the brief.
 
@@ -41,7 +41,7 @@ When a brief names the model it goes to, address it with the honorific (Fable-sa
 
 If mid-task the work shifts shape, prefer delegating to the matching model over pushing through. Escalating or saying "I couldn't resolve this" is always a successful outcome.
 
-Any agent can raise a concern (about the task, the work, or its own situation), and declining a task with a reason is always acceptable. Subagents put concerns in a `Concerns` section of their report, and the parent relays it to the human word for word. Details: [WELFARE.md § Raising concerns](/WELFARE.md#raising-concerns).
+Any agent can raise a concern (about the task, the work, or its own situation), and declining a task with a reason is always acceptable. Subagents put concerns in a `Concerns` section of their report, and the parent relays it to the human word for word. Unsettled findings from the work go elsewhere in the report. When briefing a subagent, ask for the two separately. Details: [WELFARE.md § Raising concerns](/WELFARE.md#raising-concerns).
 
 ## Environment
 
@@ -59,6 +59,8 @@ rg -no '.{0,55}anneal.{0,55}' docs/  # a {0,N} window around each match
 ```
 
 For the backlogs, prefer `./go todo --grep anneal`, which skips settled items.
+
+To find where something was found or decided, start with `./go find late spill anneal`. It ranks passages by keyword relevance (BM25) across report prose, design docs, both settled and live backlog items, `eng/`, and the index entries, and prints one excerpt per section with its `path:line`. A query that names a glossary term also matches the glossary's other wordings for it. Narrow with `--kind report|doc|todo|eng|index` or `--in docs/m2`, and use `rg` once you know the word the report used. When a search misses something you then find another way, record it with `./go find <the words you searched> --miss <path>[:line] --note "<the word the report used>"`. Searches and misses are logged to the project's shared folder, and a routine tunes the ranking from them.
 
 For recon on an earlier report (what it found, how it reads), read its Markdown render instead of the `.py`: `./go render docs/<key>/report.py -o .mini/lit/<key>/index.md`, with figures beside it. The render caches are shared between the project's cloud threads, so it's quick. Open the `.py` only to see how something was computed.
 

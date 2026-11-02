@@ -84,6 +84,8 @@ Auth: `./go auth` logs into Hugging Face (a fine-grained token with read+write t
 
 The artifact store holds bytes *you* produce. Upstream weights and datasets pulled via `from_pretrained`/`hf_hub_download` are a different tier: a disposable read accelerator. On Modal, every remote function mounts a shared `mini-hf-cache` Volume with `HF_HOME` pointing at it, so a multi-stage pipeline downloads a model once instead of once per container. Nothing to configure, nothing in your code changes, and deleting that Volume only costs re-downloads. Locally there's no such tier — `~/.cache/huggingface` already persists.
 
+The compilation cache is the other workspace-wide tier, and it is not disposable in the same way. With `MINI_COMPILE_CACHE` set, workers keep JAX's compiled programs on a `mini-compile-cache` Volume (locally `.mini/compile-cache/`), and since the program holds the autotuner's picks, a run reproduces bit for bit only while its programs are there. Deleting the Volume costs a compile per program and a new set of picks: the next runs land on slightly different weights, and their records show a new `compile_cache.digest`. Claims on first compiles live in a `mini-compile-cache-claims` Dict and are safe to lose. Neither is touched by `mini gc`. See [eng/determinism.md](/eng/determinism.md).
+
 ## Publishing to the web
 
 `publish(art, path)` is the store's outward-facing verb: it exposes a blob at a named, extensioned path and returns a URL (the extension drives the served `Content-Type`). It's deliberately separate from `put`, so persisting a result never publishes it as a side effect.
@@ -126,6 +128,8 @@ modal-environment = "dev"
 Under a profile, the three profile keys (the two storage names and `modal-environment`) come from the profile table alone. A key the table leaves out is unset, never inherited from the base, so a half-filled profile behaves like a project without that key (local store, single-bucket publishing, or Modal's default Environment) rather than reaching production. The other `[tool.mini]` keys (`app`, `env`, `region`) are inherited.
 
 `MINI_STORE_BUCKET`, `MINI_PUBLISH_REPO` and `MODAL_ENVIRONMENT` still override everything. `mini.local.toml` overlays a profile table the way it overlays the base keys. `mini run --app modal` forwards `MINI_PROFILE` along with the resolved names, so a worker follows its driver. A profile name that no file defines warns once and yields no pair. `./go auth --check` prints the active profile beside the bucket.
+
+Local experiment state is kept apart the same way. Under a profile, a local run keeps its memo records and volume under `.mini/profiles/<profile>/<name>/` rather than `.mini/<name>/`, and the local fallback store sits beside them. So `mini ls`, `mini status` and `mini gc` see only the active profile, and an experiment first run under `dev` starts from nothing on production rather than reading as done.
 
 Under a profile, `./go publish` writes its pins to a gitignored `.mini/publish.<profile>.lock` rather than to `publish.lock`. That leaves `publish.lock` as the production record that the site and CI read. `./go preview` reads the lock of the active profile. Nothing in a profile is meant to reach production, so there is no promotion step: a dev pair starts empty and can be emptied.
 
