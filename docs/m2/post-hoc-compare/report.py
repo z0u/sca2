@@ -62,6 +62,9 @@ No new run is trained. The anchored runs are the eight `τ_ℓ fixed` runs of th
 Anchored
 :   The full edit along e₁, as published in fixed-effects. Nothing is refitted or retuned.
 
+Anchored, fixed labels
+:   The same recipe trained on one 1/50 label draw held for the whole run, at the same seeds (the fixed-labels experiment), under the same edit. It is a robustness row beside the main table, from its stored scores; the hypotheses judge the anchored arm above, whose labels are drawn again at each visit, as one pass over a large corpus would draw them.
+
 Difference in means
 :   The unit vector from the mean state of the other contexts to the mean state of `difference` contexts. The direction most steering work uses.
 
