@@ -4,8 +4,10 @@ Sidenotes and glossary notes: what a footnote or a defined term says, placed nex
 A python-markdown extension (:class:`NotesExtension`) that rewrites the converted tree, so the Markdown stays plain and the woven ``index.md`` is unchanged. Two things become notes:
 
 - **Footnotes.** Each footnote reference gets a copy of its footnote's text right after it, as a ``<span class="sidenote">``. The list at the end of the document stays, with each item that has a sidenote marked ``sidenoted`` and its number pinned (``value``), so the stylesheet can hide it where the sidenote shows and the remaining items keep their numbers.
-- **Defined terms.** The first use of a defined term in each ``h2`` section is wrapped in a ``<dfn class="term">`` and followed by the definition, as a ``<span class="sidenote glossnote">``. Definitions come from the definition lists in the document itself (:func:`local_terms`: a ``## Glossary``, and equally a ``## Measurements`` or a ``## References`` naming other experiments), which win, and then from a shared dictionary (:func:`load_glossary`, ``docs/glossary.md``); see :func:`dl_terms` for the syntax. A term is matched case-insensitively as a whole word, with a plural ``s``/``es``, in running prose and link text: not in code, headings, tables, captions, math, or the definition lists themselves. A link that holds a term is wrapped whole, and its note follows the link rather than sitting inside it. ``[text](term:key)`` marks a use the matcher would miss (other wording, or a term the dictionary keeps off auto-matching).
+- **Defined terms.** The first use of a defined term in each ``h2`` section is wrapped in a ``<dfn class="term">`` and followed by the definition, as a ``<span class="sidenote glossnote">``. Definitions come from the definition lists in the document itself (:func:`local_terms`: a ``## Glossary``, and equally a ``## Measurements`` or a ``## References`` naming other experiments), which win, and then from a shared dictionary (:func:`load_glossary`, ``docs/glossary.md``); see :func:`dl_terms` for the syntax. A term is matched case-insensitively as a whole word, with a plural ``s``/``es``, in running prose and link text: not in code, headings, tables, captions, math, or the definition lists themselves. In a link, the ``dfn`` wraps the term's words inside the link, and the note follows the link rather than sitting inside it (a term inside the link's own markup, such as code, makes the whole link the ``dfn``). ``[text](term:key)`` marks a use the matcher would miss (other wording, or a term the dictionary keeps off auto-matching).
 - **Cited works.** A term whose name is a link (:attr:`Term.work`: another experiment, from a ``## References`` list) is the title of a work, so each use of it is a ``<cite>``, its first use in a section (inside the ``dfn``) and every later one, which has no note. In a link, the ``cite`` holds the name alone (``<a>the <cite>recipe-compare</cite> experiment</a>``), unless the link text has markup of its own.
+
+Each marked term ends in a ring, ``<span class="term-ring">``, which the stylesheet draws as a small raised circle. The ring sits in a ``term-end`` span with the term's last word, and a stop right after the note (``removal.``) goes in a ``term-keep`` span with the term and its note, so that a line never starts with the ring or the stop.
 
 Where a note goes is the stylesheet's call (``lit.css``): in the margin on a wide screen and on paper, and on hover or focus of its marker on a narrow screen. A note whose marker sits where a margin float cannot reach (a table cell, a caption, a heading) is marked ``popover`` and only ever shows on hover; its footnote keeps its place in the list, so paper still has it. The floats stack rather than overlap because each one clears the one before it (``clear: right``).
 
@@ -78,7 +80,7 @@ _BLOCK_TAG_RE = re.compile(r"<(?:p|ul|ol|table|pre|div|dl|blockquote|figure)\b",
 def dl_terms(markdown_text: str) -> dict[str, Term]:
     """The terms that the definition lists in *markdown_text* define, in Markdown syntax or as a raw ``<dl>``.
 
-    Each definition (``<dd>``) belongs to the terms (``<dt>``) above it: the first is the name, and any others are aliases. A term may also name several wordings, split on commas (``Red line, non-red line``), and a parenthesised one is an alias (``ᾱ (containment)``). A term with the class ``manual`` (``Band {.manual}``) is only marked where written as ``[text](term:band)``, which suits a term that is also an everyday word. A term written with markup keeps it in its note, so a linked name (``[recipe-compare](/docs/m2/recipe-compare/report.py)``) links from the margin too. A definition with block content other than paragraphs is skipped, since a note is inline markup::
+    Each definition (``<dd>``) belongs to the terms (``<dt>``) above it: the first is the name, and any others are aliases. A name is matched whole, so ``Selection rule (frozen)`` is never a use of "frozen", and ``Anchored, fixed labels`` never one of "anchored". Other wordings that should not show in the list go in a ``data-forms`` attribute, split on semicolons (``ᾱ (containment) {data-forms="ᾱ; containment"}``, or ``<dt data-forms="…">``). A term with the class ``manual`` (``Band {.manual}``) is only marked where written as ``[text](term:band)``, which suits a term that is also an everyday word. A term written with markup keeps it in its note, so a linked name (``[recipe-compare](/docs/m2/recipe-compare/report.py)``) links from the margin too. A definition with block content other than paragraphs is skipped, since a note is inline markup::
 
         Expected exact match
         EEM
@@ -100,9 +102,10 @@ def dl_terms(markdown_text: str) -> dict[str, Term]:
             continue
         (attrs, label), *others = dts
         name = _plain(label)
-        # "Red line, non-red line": the whole is the name, and each part is a form of its own.
-        parts = [f.strip() for f in re.split(r",|\(|\)", name) if f.strip()]
-        aliases = (*(parts if len(parts) > 1 else ()), *(_plain(n) for _, n in others))
+        # The whole entry is the name: "Selection rule (frozen)" is not a use of "frozen".
+        forms = re.search(r'\bdata-forms="([^"]*)"', attrs)
+        also = [f.strip() for f in html.unescape(forms[1]).split(";")] if forms else []
+        aliases = (*(f for f in also if f), *(_plain(n) for _, n in others))
         auto = not re.search(r'class="[^"]*\bmanual\b', attrs)
         t = Term(name, definition, aliases, auto, label if "<" in label else "")
         terms.setdefault(t.key, t)
@@ -394,7 +397,30 @@ class _NotesTree(Treeprocessor):
             last.tail = self._scan_text(el, last, last.tail, scan, seen)
 
     def _link(self, parent: etree.Element, a: etree.Element, scan: _Scanner, seen: set[str]) -> etree.Element:
-        """Wrap link *a* in a ``dfn`` if its text holds the first use of a term, so the note follows the link instead of sitting in it; returns what the rest of the text follows."""
+        """Mark the first use of a term in the text of link *a*: the word gets its marker inside the link, and the note follows the link instead of sitting in it; returns what the rest of the text follows."""
+        children = list(a)
+        for i, text in enumerate([a.text, *(c.tail for c in children)]):
+            if not text or isinstance(text, markdown.util.AtomicString) or (m := scan.first(text, seen)) is None:
+                continue
+            word = text[m.start : m.end]
+            if i:
+                children[i - 1].tail = text[: m.start]
+            else:
+                a.text = text[: m.start]
+            el = etree.Element("cite" if m.again else "dfn", {} if m.again else {"class": "term"})
+            if m.again:
+                el.text = word
+            elif m.term.work:
+                etree.SubElement(el, "cite").text = word
+            else:
+                el.text = word
+            el.tail = text[m.end :]
+            a.insert(i, el)
+            if m.again:
+                return a
+            seen.add(m.term.key)
+            return self._annotate(parent, el, m.term, after=a)
+        # The use is inside the link's own markup (code, emphasis): the link is the marked word.
         m = scan.first("".join(a.itertext()), seen)
         if m is None:
             return a
@@ -433,14 +459,21 @@ class _NotesTree(Treeprocessor):
             etree.SubElement(dfn, "cite").text = word
         else:
             dfn.text = word
+        dfn.tail = rest
         parent.insert(idx, dfn)
-        note = self._annotate(parent, dfn, m.term)
+        last = self._annotate(parent, dfn, m.term)
         # The rest of the string follows the note, and may hold another term's first use.
-        note.tail = self._scan_text(parent, note, rest, scan, seen)
+        last.tail = self._scan_text(parent, last, last.tail, scan, seen)
         return text[: m.start]
 
-    def _annotate(self, parent: etree.Element, dfn: etree.Element, term: Term) -> etree.Element:
-        dfn.set("tabindex", "0")
+    def _annotate(
+        self, parent: etree.Element, dfn: etree.Element, term: Term, after: etree.Element | None = None
+    ) -> etree.Element:
+        """Give *dfn* its marker and place the term's note after it in *parent*, or after *after* (a link that holds *dfn*); returns what the rest of the text follows."""
+        if after is None:
+            dfn.set("tabindex", "0")  # a link that holds the term takes the focus itself
+        _ring(dfn)
+        anchor = after if after is not None else dfn
         note = etree.Element("span", {"class": "sidenote glossnote", "role": "note", "tabindex": "-1"})
         name = etree.SubElement(note, "span", {"class": "glossnote-term"})
         name.text = self.stash.store(term.label) if term.label else term.name
@@ -451,11 +484,74 @@ class _NotesTree(Treeprocessor):
         etree.SubElement(note, "span", {"class": "gloss"}).text = self.stash.store(lead)
         if rest.strip():
             etree.SubElement(note, "span", {"class": "more"}).text = self.stash.store(rest)
-        idx = list(parent).index(dfn)
-        note.tail = dfn.tail
-        dfn.tail = None
+        idx = list(parent).index(anchor)
+        note.tail = anchor.tail
+        anchor.tail = None
         parent.insert(idx + 1, note)
+        return _keep_with_stop(parent, anchor, note)
+
+
+# The marker: a small raised ring after the term, drawn by the stylesheet (docs/report.css).
+_RING_CLASS = "term-ring"
+# The last word of a term with its ring, which a line must not break between.
+_END_CLASS = "term-end"
+# A term (or the link that holds it), its note, and the stop after them, which a line must not break between.
+_KEEP_CLASS = "term-keep"
+_LAST_WORD_RE = re.compile(r"(\S+)(\s*)$")
+_STOP_AFTER_RE = re.compile(r"[.,;:!?)\]}\u2019\u201d'\"\u2026]+")
+
+
+def _ring(dfn: etree.Element) -> None:
+    """Put the ring after the last word in *dfn*, with that word, so that a line cannot break between them."""
+    ring = etree.Element("span", {"class": _RING_CLASS, "aria-hidden": "true"})
+    end = etree.Element("span", {"class": _END_CLASS})
+    end.append(ring)
+    if not _end_last_word(dfn, end):
+        dfn.append(ring)
+
+
+def _end_last_word(el: etree.Element, end: etree.Element) -> bool:
+    """Move the last word of the text under *el* into *end* (which already holds the ring) in place; False when there is no word."""
+    for child in reversed(list(el)):
+        if (m := _LAST_WORD_RE.search(child.tail or "")) is not None:
+            text = child.tail or ""
+            child.tail = text[: m.start()]
+            end.text, end.tail = m[1], m[2]
+            el.insert(list(el).index(child) + 1, end)
+            return True
+        if child.tag in {"code", "kbd", "samp"} or _classes(child) & {"arithmatex"}:
+            # Markup that is a word of its own: it goes in with the ring as it is.
+            idx = list(el).index(child)
+            el.remove(child)
+            end.insert(0, child)
+            end.tail, child.tail = child.tail, None
+            el.insert(idx, end)
+            return True
+        if _end_last_word(child, end):
+            return True
+    if (m := _LAST_WORD_RE.search(el.text or "")) is not None:
+        text = el.text or ""
+        el.text = text[: m.start()]
+        end.text, end.tail = m[1], m[2]
+        el.insert(0, end)
+        return True
+    return False
+
+
+def _keep_with_stop(parent: etree.Element, anchor: etree.Element, note: etree.Element) -> etree.Element:
+    """When punctuation follows the note with no space (``removal.``), keep it with *anchor* and the note on one line; returns what the rest of the text follows."""
+    tail = note.tail or ""
+    stop = _STOP_AFTER_RE.match(tail)
+    if stop is None:
         return note
+    keep = etree.Element("span", {"class": _KEEP_CLASS})
+    idx = list(parent).index(anchor)
+    parent.remove(anchor)
+    parent.remove(note)
+    keep.extend([anchor, note])
+    note.tail, keep.tail = stop[0], tail[stop.end() :]
+    parent.insert(idx, keep)
+    return keep
 
 
 def _cite(el: etree.Element, m: _Match | None = None) -> None:

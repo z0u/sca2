@@ -1674,7 +1674,7 @@ Terms follow [ex-2.2.16](/docs/m2/ex-2.2.16/report.py#glossary); these are the o
 <dd>The cosine between a state and e₁, the anchored axis, per position and slice. Cosine similarity compares direction only: 1 when two vectors point the same way, 0 when they are perpendicular.</dd>
 <dt>Op margin</dt>
 <dd>How far the contexts of the anchored op sit along e₁ beyond the rest. At each slice, take the mean alignment over <code>{ex.ANCHORED_OP}</code> contexts less the mean over all contexts, <code>{ex.ANCHORED_OP}</code> included, at the role where that gap is largest; then average over slices. The anchor term optimizes this quantity, so it checks that the pull landed.</dd>
-<dt>Expected exact match (EEM)</dt>
+<dt data-forms="Expected exact match; EEM">Expected exact match (EEM)</dt>
 <dd>The probability mass the model puts on the colors the query answer can be under the true op, weighted by how often the op gives each, averaged over held-out contexts. The task measurement.</dd>
 <dt>Bayes ceiling and floor</dt>
 <dd>The expected exact match of a predictor that holds the posterior over ops given the examples, and of one that ignores the examples.</dd>

@@ -773,13 +773,13 @@ The crop policy starts as `{ex.CROP_POLICY}`, which pulls only labelled lines wh
 <dd>The same predictor with no evidence: uniform over ops, so its answer distribution is the op-marginal. It is what a model that ignores the examples can score.</dd>
 <dt>Skill score</dt>
 <dd>Where a score sits between the floor (0) and the ceiling (1): (score − floor) / (ceiling − floor).</dd>
-<dt>Expected exact match (EEM)</dt>
+<dt data-forms="Expected exact match; EEM">Expected exact match (EEM)</dt>
 <dd>The probability mass the model puts on the colors the answer of the query can be under the true op, weighted by how often the op gives each, per context, then averaged over held-out contexts. The task metric of every report since ex-2.2.9; the ceiling and the floor are in the same units.</dd>
 <dt>KL divergence</dt>
 <dd>How far one distribution is from another, in nats: KL(q ‖ p) = Σ<sub>y</sub> q(y) log(q(y) / p(y)), zero when they agree. Here q is the Bayes predictive on a query and p the model's answer distribution, and the mean over contexts is the model's excess loss over a calibrated one, so 0.05 nats is a twentieth of a nat of loss the model could still shed. The <a href="#the-calibration-check">calibration check</a> gives reference values.</dd>
 <dt>Alignment</dt>
 <dd>The cosine between a state and e₁, the anchored axis: 1 when the state points along the axis, 0 when perpendicular. Measured per position and slice.</dd>
-<dt>Lean (ᾱ)</dt>
+<dt data-forms="Lean; ᾱ">Lean (ᾱ)</dt>
 <dd>The mean alignment at a role over the held-out contexts of every op: a leak toward the anchor at a site that carries no evidence about the op. The <em>first-operand lean</em> is ᾱ at the first token of a context, at the last block; the <em>trailing-fragment lean</em> is ᾱ over every position, at the last block, of a context cut to start partway through, fed on its own. Both from ex-2.2.15.</dd>
 <dt>Op margin</dt>
 <dd>How far the contexts of the anchored op sit along e₁ beyond the rest: per slice, the mean alignment over the contexts of the anchored op minus the mean over the contexts of all eleven ops, at the role where that gap is largest, averaged over slices. The quantity the anchor term optimizes, so it checks that the pull landed. The statistic of ex-2.2.14, with roles running over the whole context.</dd>

@@ -40,7 +40,7 @@ Ridge probe
 LEACE
 :   Least-squares concept erasure ([Belrose et al., 2023](https://arxiv.org/abs/2306.03819)): the smallest affine edit, in the covariance-whitened norm, after which no linear probe can read the target. It removes the covariance direction while reading along a whitened one, so it is oblique, and `sca.intervention.Subspace` already carries that split.
 
-Iterated probe (INLP)
+Iterated probe (INLP) {data-forms="Iterated probe; INLP"}
 :   The ridge probe fitted, projected out, and fitted again on what is left, for a rank of 2, 4 or 8. It answers the objection that a concept the model holds across several directions can't be removed along one.
 
 Optimized direction
@@ -168,16 +168,16 @@ Activation steering (adding a vector) is not a removal and has no dose axis that
 
 Preregistered, with few hypotheses and the rest exploratory. A methods comparison for the post is a claim that has to stand without the reader trusting how we chose to look at the data, and the frozen selection rule is what makes the tuning fair rather than ours to adjust. Each hypothesis names its contrary case and what that case would mean.
 
-H1, spill at matched removal
+H1, spill at matched removal {data-forms="H1"}
 :   Where the frontier of each standard fitter crosses the seed mean of the anchored removal (or at its least-spill end, if the whole frontier removes more), the fitter (difference in means, probe, LEACE, INLP) spills past the criterion on most runs, by Fisher's test against the count for the anchor. A run of a method (one seed) whose frontier never reaches that removal counts as not matched, which is the stronger shortfall, and is recorded as such. Contrary: a fitter matches the anchor on both, and the post says that a searched direction serves as well as a placed one on this model.
 
-H2, removal at the spill criterion
+H2, removal at the spill criterion {data-forms="H2"}
 :   Where its frontier crosses the spill criterion, each standard fitter removes less than the anchor, with the 95% Welch interval on the difference of seed means clear of zero. Contrary as for H1.
 
-H3, the ceiling
+H3, the ceiling {data-forms="H3"}
 :   The optimized direction comes closer to the anchor than any standard fitter on both measures. If it matches the anchor, the advantage of placing the concept is that no search is needed, and the post is framed that way; if it falls short too, the geometry of the control holds the op in a way no rank-1 edit removes cleanly, which is the stronger claim.
 
-H4, the fitters work where the concept is placed
+H4, the fitters work where the concept is placed {data-forms="H4"}
 :   On the anchored model, each standard fitter fitted on the pooled positions or on the example answers finds e₁ at slices 1 to 3 (cosine at least 0.9 at the selected configuration, on the seed mean over the eight runs, with the runs listed) and removes within 0.1 of what e₁ removes. The evidence for the op sits on e₁ at the example answers; at the query `=` the clean alignment is near zero (the mid-block-edit experiment), so a fit at that site is not expected to find it and is not held to this. Contrary: a fitter fails where the concept is linearly there. The rule, frozen here: a fitter that fails H4 is left out of the verdicts of H1 to H3, its rows stay in the tables marked as such, and the post names it as a method the comparison could not fairly score.
 
 E1 to E6

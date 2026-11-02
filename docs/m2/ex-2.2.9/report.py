@@ -1854,7 +1854,7 @@ rf"""
 ## Glossary
 
 <dl>
-<dt>Red line, non-red line</dt>
+<dt data-forms="Red line; non-red line">Red line, non-red line</dt>
 <dd>A line is <em>red</em> when its redder operand has redness at least 0.8, and <em>non-red</em> when neither operand is above 0.2. Redness is r·(1 − g/2 − b/2) on the unit scale. The redness of the redder operand is the line's <em>dose</em>.</dd>
 <dt>Removal lines</dt>
 <dd>The red lines on which the true answer would move a long way if the red operand had no red in it (its R channel set to zero). These are the lines where losing <em>red</em> has to show; on the others the op does not need it. On <code>mix</code> every red line is a removal line; on the other ops at least {low:.0%} of them are, and the count per op is in the method.</dd>
@@ -1864,7 +1864,7 @@ rf"""
 <dd>The task score we measure. With drawn answers, the correct answer to a line is spread over two or more colors, so a single exact-match check would penalise a model for a right answer. Instead we take the chance that an answer drawn from the model agrees with one drawn from the true distribution. Its ceiling is that same chance for the true distribution against itself (Σq²), which is below 1 on the ops that round.</dd>
 <dt>m_line</dt>
 <dd>How far <em>red</em> is pushed onto the axis: at the reddest position in the span, the label-weighted mean alignment minus the unweighted mean, averaged over slices. Ex-2.1.10's margin, read on the <code>mix</code> lines.</dd>
-<dt>ᾱ (containment)</dt>
+<dt data-forms="ᾱ; containment">ᾱ (containment)</dt>
 <dd>The mean alignment with the axis over all 216 colors at op1. High when colors that are not red drift onto the axis at that position.</dd>
 <dt>Lead</dt>
 <dd>On the red lines, the largest share of the pull that any one position receives at the embedding slice. High when the pull is concentrated on one token rather than spread over the span.</dd>
