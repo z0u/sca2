@@ -53,7 +53,7 @@ jobs:
       - name: Install uv
         # Full-version pin, not a floating major — see lint-check.yml for why, and
         # bump both workflows together.
-        uses: astral-sh/setup-uv@v10.2.0
+        uses: astral-sh/setup-uv@v10.3.3
 
       - name: Sync the environment
         # The build runs in each checkout's own environment (see the deploy script), so

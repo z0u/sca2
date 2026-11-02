@@ -37,7 +37,7 @@ jobs:
         # chain the pin can't see, so upstream's contract is now "name the release".
         # The cost is that this one doesn't drift forward on its own; bumping it is a
         # manual edit here and in site.yml.
-        uses: astral-sh/setup-uv@v10.2.0
+        uses: astral-sh/setup-uv@v10.3.3
 
       - name: Install dependencies
         id: install
