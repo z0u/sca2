@@ -1174,7 +1174,7 @@ def smoke(ctx: Ctx) -> dict:
     return run(ctx, smoke=True)
 
 
-STAGE = "smoke"
+STAGE = "main"
 """Which entry point `experiment` runs: the smoke test until its cost is approved, then the full run."""
 
 COMPUTE = {
