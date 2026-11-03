@@ -15,6 +15,7 @@ import http.server
 import logging
 import os
 import hashlib
+import html as html_lib
 import re
 import shutil
 import socketserver
@@ -23,6 +24,7 @@ import threading
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Generator
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -35,6 +37,7 @@ __all__ = [
     "wait_for_figures",
     "wait_for_diagrams",
     "route_remote",
+    "prefetch_remote",
     "ink_extents",
     "normalize_pdf",
     "padded_height",
@@ -205,14 +208,36 @@ def _fetch(url: str, headers: dict[str, str]) -> tuple[str, bytes]:
 Fetch = Callable[[str, dict[str, str]], tuple[str, bytes]]
 
 
-def route_remote(page: Any, *, cache: Path | None = None, fetch: Fetch | None = None) -> None:
+def _cached(root: Path, url: str, headers: dict[str, str], fetch: Fetch) -> tuple[str, bytes]:
+    """*url*'s (content type, body) from the cache under *root*, fetched into it first when absent; a failed fetch raises."""
+    key = hashlib.sha256(url.encode()).hexdigest()
+    body, kind = root / key, root / (key + ".type")
+    if body.exists():
+        return kind.read_text(), body.read_bytes()
+    content_type, data = fetch(url, headers)
+    root.mkdir(parents=True, exist_ok=True)
+    # The type first and the body last, by rename: a body on disk always has its type
+    # beside it, even after a fetch that was interrupted or ran in another thread.
+    kind.write_text(content_type)
+    tmp = root / f"{key}.{threading.get_ident()}.part"
+    tmp.write_bytes(data)
+    tmp.replace(body)
+    return content_type, data
+
+
+_FETCH_ERRORS = (urllib.error.URLError, OSError, ValueError)
+
+
+def route_remote(
+    page: Any, *, cache: Path | None = None, fetch: Fetch | None = None, unreachable: set[str] | None = None
+) -> None:
     """Serve *page*'s ``https://`` requests from a cache that Python fills, rather than the browser's own network.
 
-    The page's stylesheet links KaTeX and the fonts from CDNs. A headless Chromium in a proxied sandbox rejects the proxy's certificate and gets neither, so the math printed as its source; Python trusts the certificate (``SSL_CERT_FILE``), so it fetches instead, once per URL, into :func:`cache_dir`. The request's own headers go along, since Google Fonts picks the font format by user agent. A fetch that fails is aborted, with one warning per host, and the print goes on without it: the PDF is a convenience beside the page. Once a host has failed, its later requests are aborted without a fetch, so a page that pulls a whole frontend from one CDN waits out one timeout rather than one per file.
+    The page's stylesheet links KaTeX and the fonts from CDNs. A headless Chromium in a proxied sandbox rejects the proxy's certificate and gets neither, so the math printed as its source; Python trusts the certificate (``SSL_CERT_FILE``), so it fetches instead, once per URL, into :func:`cache_dir`. The request's own headers go along, since Google Fonts picks the font format by user agent. A fetch that fails is aborted, with one warning per host, and the print goes on without it: the PDF is a convenience beside the page. Once a host has failed, its later requests are aborted without a fetch, so a page that pulls a whole frontend from one CDN waits out one timeout rather than one per file. *unreachable* seeds that set with hosts already known to have failed (by :func:`prefetch_remote`, which has warned about them).
     """
     root = cache if cache is not None else cache_dir()
     fetch = fetch or _fetch
-    unreachable: set[str] = set()
+    unreachable = set(unreachable or ())
 
     def handle(route: Any) -> None:
         req = route.request
@@ -223,22 +248,52 @@ def route_remote(page: Any, *, cache: Path | None = None, fetch: Fetch | None = 
         if host in unreachable:
             route.abort()
             return
-        key = hashlib.sha256(req.url.encode()).hexdigest()
-        body, kind = root / key, root / (key + ".type")
-        if not body.exists():
-            try:
-                content_type, data = fetch(req.url, {k: v for k, v in req.headers.items() if k.lower() != "host"})
-            except (urllib.error.URLError, OSError, ValueError) as e:
-                unreachable.add(host)
-                log.warning("print: %s unreachable (%s); printing without it", host, e)
-                route.abort()
-                return
-            root.mkdir(parents=True, exist_ok=True)
-            body.write_bytes(data)
-            kind.write_text(content_type)
-        route.fulfill(status=200, content_type=kind.read_text(), body=body.read_bytes())
+        try:
+            content_type, data = _cached(
+                root, req.url, {k: v for k, v in req.headers.items() if k.lower() != "host"}, fetch
+            )
+        except _FETCH_ERRORS as e:
+            unreachable.add(host)
+            log.warning("print: %s unreachable (%s); printing without it", host, e)
+            route.abort()
+            return
+        route.fulfill(status=200, content_type=content_type, body=data)
 
     page.route(re.compile(r"^https://"), handle)
+
+
+# An <img>'s absolute https source, in either quoting.
+_IMG_SRC = re.compile(r"""<img\b[^>]*?\bsrc=(["'])(https://[^"']+)\1""", re.IGNORECASE)
+
+
+def prefetch_remote(
+    page_html: str, *, cache: Path | None = None, fetch: Fetch | None = None, workers: int = 8
+) -> set[str]:
+    """Fetch the ``https://`` images that *page_html* names into :func:`route_remote`'s cache, several at once; returns the hosts that failed.
+
+    :func:`route_remote` fetches inside the browser's route handler, one request at a time, so a report whose twenty figures sit on a CDN pays twenty round trips in series before its ``load`` event. Fetched here first, every figure is on disk by the time the page asks for it. The images are all of a printable page's figures: it defers none, and a themed figure's hidden variant is fetched by the browser too. A failure is warned about once per host and otherwise left to the print, which goes on without the image; pass the returned hosts to :func:`route_remote` so the page does not wait on them a second time.
+    """
+    root = cache if cache is not None else cache_dir()
+    fetch = fetch or _fetch
+    urls = list(dict.fromkeys(html_lib.unescape(m.group(2)) for m in _IMG_SRC.finditer(page_html)))
+    if not urls:
+        return set()
+
+    def one(url: str) -> tuple[str, Exception | None]:
+        try:
+            _cached(root, url, {}, fetch)
+        except _FETCH_ERRORS as e:
+            return url, e
+        return url, None
+
+    failed: dict[str, Exception] = {}
+    with ThreadPoolExecutor(max_workers=min(workers, len(urls))) as pool:
+        for url, err in pool.map(one, urls):
+            if err is not None:
+                failed.setdefault(url.split("/")[2], err)
+    for host, err in failed.items():
+        log.warning("print: %s unreachable (%s); printing without it", host, err)
+    return set(failed)
 
 
 def print_page(page: Any, out: Path, *, settle: float = 3.0, fit: bool = True) -> Path:
@@ -403,7 +458,7 @@ def _inline_dests(pdf: Any) -> None:
 def wait_for_figures(page: Any, timeout: float) -> list[str]:
     """Wait up to *timeout* seconds for *page*'s ``load`` event, which fires once every image has arrived; returns the URLs of the images still missing.
 
-    A report's figures are its subresources, and in the site build they come from a CDN through :func:`route_remote`'s one-at-a-time fetch, so a figure-heavy report on a slow link can take a while. The wait is bounded and never raises: what has not arrived by the deadline is named in a warning and the print goes on without it, the same trade the rest of the print makes (a PDF is a convenience beside the page). An image that failed outright counts as arrived, since :func:`route_remote` has already warned about its host.
+    A report's figures are its subresources, and in the site build they come from a CDN through :func:`route_remote`'s cache, which :func:`prefetch_remote` fills before the page loads, so a figure-heavy report on a slow link can still take a while. The wait is bounded and never raises: what has not arrived by the deadline is named in a warning and the print goes on without it, the same trade the rest of the print makes (a PDF is a convenience beside the page). An image that failed outright counts as arrived, since :func:`route_remote` has already warned about its host.
     """
     from playwright.sync_api import Error as PlaywrightError
 
@@ -458,6 +513,7 @@ def print_bundle(
     except ImportError:
         log.warning("report PDF skipped: playwright is not installed (uv sync --all-groups)")
         return None
+    page_html = html if html is not None else (bundle / "index.html" if bundle.is_dir() else bundle).read_text("utf-8")
     with served_bundle(bundle, html=html) as url, sync_playwright() as pw:
         try:
             browser = pw.chromium.launch(executable_path=chromium_path())
@@ -472,7 +528,7 @@ def print_bundle(
             # A bare headless Chromium in a locale-less container reports no
             # navigator.language; pin one so nothing on the page has to guess.
             page = browser.new_page(viewport={"width": 1100, "height": 1400}, locale="en-US")
-            route_remote(page)
+            route_remote(page, unreachable=prefetch_remote(page_html))
             page.emulate_media(color_scheme="light")  # before load, so a diagram's script picks its light theme
             try:
                 # The page comes from loopback, so it is quick; its figures may not be,

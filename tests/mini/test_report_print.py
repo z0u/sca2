@@ -89,7 +89,8 @@ def test_print_bundle_prints_a_page_whose_figure_never_arrives(chromium, tmp_pat
     bundle = tmp_path / "bundle"
     bundle.mkdir()
     (bundle / "index.html").write_text(_FIGURED)
-    monkeypatch.setattr(report_print, "route_remote", lambda page: page.route(re.compile(r"^https://"), _never))
+    monkeypatch.setattr(report_print, "prefetch_remote", lambda html: set())
+    monkeypatch.setattr(report_print, "route_remote", lambda page, **_: page.route(re.compile(r"^https://"), _never))
     out = report_print.print_bundle(bundle, tmp_path / "report.pdf", figures=0.3, settle=0)
     assert out == tmp_path / "report.pdf" and out.is_file()
     assert "printing without them: https://cdn.test/never.png" in caplog.text
@@ -100,7 +101,7 @@ def test_print_bundle_skips_a_page_that_never_arrives(chromium, tmp_path: Path, 
     bundle = tmp_path / "bundle"
     bundle.mkdir()
     (bundle / "index.html").write_text(_PAGE)
-    monkeypatch.setattr(report_print, "route_remote", lambda page: page.route("**/index.html", _never))
+    monkeypatch.setattr(report_print, "route_remote", lambda page, **_: page.route("**/index.html", _never))
     assert report_print.print_bundle(bundle, tmp_path / "report.pdf", timeout=0.3, settle=0) is None
     assert not (tmp_path / "report.pdf").exists()
     assert "report PDF skipped: no main.lit on the page after 0s" in caplog.text
@@ -216,6 +217,49 @@ def test_route_remote_prints_on_when_a_fetch_fails(browser, tmp_path: Path, capl
     assert page.locator("body").inner_text() == "hi"
     assert "cdn.test unreachable" in caplog.text
     assert not list(tmp_path.iterdir())
+
+
+def test_prefetch_remote_fills_the_cache_the_page_reads(browser, tmp_path: Path):
+    """A report's figures are fetched before the page loads, several at once, so the route handler finds each one on disk."""
+    import threading
+
+    calls, started = [], threading.Barrier(2, timeout=5)
+
+    def fetch(url, headers):
+        calls.append(url)
+        started.wait()  # both fetches are in flight together, or this times out
+        return "image/svg+xml", b'<svg xmlns="http://www.w3.org/2000/svg" width="7" height="5"/>'
+
+    html = (
+        '<main><img src="https://cdn.test/a.svg?x=1&amp;y=2"><img alt="" src="https://cdn.test/b.svg">'
+        '<img src="https://cdn.test/a.svg?x=1&amp;y=2"><img src="_assets/local.png"></main>'
+    )
+    assert report_print.prefetch_remote(html, cache=tmp_path, fetch=fetch) == set()
+    assert sorted(calls) == ["https://cdn.test/a.svg?x=1&y=2", "https://cdn.test/b.svg"]
+
+    def no_fetch(url, headers):
+        raise AssertionError(f"fetched {url} again")
+
+    page = browser.new_page()
+    report_print.route_remote(page, cache=tmp_path, fetch=no_fetch)
+    page.set_content(html.replace('<img src="_assets/local.png">', ""))
+    page.wait_for_load_state("load")
+    assert page.evaluate("[...document.images].map(i => i.naturalWidth)") == [7, 7, 7]
+    page.close()
+
+
+def test_prefetch_remote_names_a_failed_host_once(tmp_path: Path, caplog):
+    """A host that fails is warned about once and handed back, so the route handler does not wait on it again."""
+
+    def fetch(url, headers):
+        if "down.test" in url:
+            raise OSError("no route to host")
+        return "image/png", b"png"
+
+    html = "".join(f'<img src="https://{h}/{i}.png">' for h in ("down.test", "up.test") for i in range(3))
+    assert report_print.prefetch_remote(html, cache=tmp_path, fetch=fetch) == {"down.test"}
+    assert caplog.text.count("down.test unreachable") == 1
+    assert len([p for p in tmp_path.iterdir() if p.suffix != ".type"]) == 3  # up.test's, and no partial files
 
 
 _WIDE_TABLE = (

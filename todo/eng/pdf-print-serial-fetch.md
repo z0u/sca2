@@ -1,7 +1,8 @@
 ---
-status: open
+status: done
 tags: [publishing, tooling, reports]
 opened: 2026-09-21
+closed: 2026-11-03
 ---
 # A site build that reprints every PDF fetches figures one at a time
 
@@ -12,3 +13,4 @@ The remaining speed-up is to warm the cache before `goto`: scan the printable HT
 ## Notes
 
 - 2026-09-21: previews now borrow production's PDFs (`MINI_PDF_MEMO` takes a path list; `PdfMemo.fallbacks`), which was the second option here. The open question it raised, a report new in the PR, is resolved by accepting a dangling link in that preview's PDF until merge.
+- 2026-11-03, tech debt: done as described. `print_bundle` now calls `prefetch_remote` on the page before `goto`: it fetches the page's `https://` image sources into the same cache with up to eight threads, warns once per host that fails, and hands those hosts to `route_remote`, which aborts their requests without fetching again. The cache now writes a body by rename after its type file, so a body on disk always has its type beside it. `print_stamp` hashes the module, so the next site build reprints every PDF once. I didn't time a full reprint on a runner.
