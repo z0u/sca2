@@ -10,6 +10,7 @@ from sca.model import build_model
 from sca.posthoc import (
     Moments,
     SliceEdit,
+    color_probs_at,
     dim_fit,
     inlp_fit,
     leace_fit,
@@ -125,3 +126,16 @@ def test_the_search_lowers_its_loss():
     assert np.mean(losses[-5:]) < np.mean(losses[:5])
     np.testing.assert_allclose(np.linalg.norm(v[1]), 1.0, atol=1e-5)
     np.testing.assert_allclose(v[[0, 2]], 0.0)
+
+
+def test_color_probs_on_the_device_match_the_softmax_on_the_host():
+    m = model()
+    tokens = np.asarray(jr.randint(jr.PRNGKey(6), (20, 12), 0, 64))
+    edit = SliceEdit.build(
+        {1: Subspace.direction(np.random.default_rng(7).normal(size=WIDTH))}, 3, WIDTH, 1.0, np.ones(12)
+    )
+    color_ids = np.arange(10, 20)
+    lg = sliced_logits_at(m, tokens, edit, 9).astype(np.float64)
+    ref = np.exp(lg - lg.max(1, keepdims=True))
+    ref = (ref / ref.sum(1, keepdims=True))[:, color_ids]
+    np.testing.assert_allclose(color_probs_at(m, tokens, edit, 9, color_ids, batch_size=8), ref, rtol=1e-5, atol=1e-7)

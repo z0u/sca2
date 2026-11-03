@@ -113,7 +113,7 @@ Each method then gets a grid over how it is fitted, where it acts, and how much 
 | Factor | Levels |
 | --- | --- |
 | Target | binary (the generating op); graded (the posterior on `difference`), for the probe, LEACE, and the optimized direction |
-| Sites fitted | every position of a context, pooled; the example answers; the query `=` |
+| Sites fitted | every position of a context, pooled; the example answers; the query `=`; the query operands |
 | Slices edited | each slice alone; slices 1 to 3; every slice |
 | Sequential refit | off (every fit on the clean states); or, when several slices are edited, on (the fit at each slice made on the states as they arrive under the edits before it) |
 | Positions edited | every position; or the sites fitted |
@@ -121,7 +121,7 @@ Each method then gets a grid over how it is fitted, where it acts, and how much 
 | Replacement | zero (the projection); or the mean coefficient over the contexts of the other ops (mean ablation) |
 | Rank | 2, 4, or 8, for INLP, on the binary target |
 
-The fits at the example answers and the query `=` use role labels a real corpus does not have. So they are generous diagnostics rather than candidate recipes, and the tables mark which sites each selected configuration used.
+The fits at the example answers, the query `=`, and the query operands use role labels a real corpus does not have. So they are generous diagnostics rather than candidate recipes, and the tables mark which sites each selected configuration used.
 
 The anchor gets no grid. Its one configuration is the published edit, which was reached through some thirty experiments at other seeds. The fitters arrive with their own literatures behind them, and get a per-run grid on top.
 
@@ -329,7 +329,7 @@ r"""
 
 [^kl]: KL divergence: how far one probability distribution is from another, zero when they match.
 
-**Grid size.** About 360 configurations for difference in means, 720 for the probe and for LEACE, and about 1,080 for INLP, counting doses; each is one scoring pass, reading the logits at the query `=` (which predicts the answer) only. The whole grid is scored on the tuning set, and again on the test set for the figure of E1, where nothing is chosen. A fit is made once per (target, site, slice, refit) and reused across doses and positions.
+**Grid size.** About 500 configurations for difference in means, 1,000 for the probe and for LEACE, 1,500 for INLP, and 450 for the optimized direction, counting doses; each is one scoring pass, reading the logits at the query `=` (which predicts the answer) only. The whole grid is scored on the tuning set, and again on the test set for the figure of E1, where nothing is chosen. A fit is made once per (target, site, slice, refit) and reused across doses and positions.
 
 **The baseline.** On the tuning set, the median over fifteen coordinate axes other than e₁, drawn once with a fixed seed before the run and shared by every run. On the test set, fifteen permuted fits per configuration, at the bracketing configurations of each point. LEACE is homogeneous in its covariance vector, so a permuted fit is a full-strength oblique erasure along a reference direction. The coordinate-axis median applies the same operator form (slices, positions, dose, replacement) along each of the 63 axes other than e₁; it does not depend on the fitter, so it is computed once per form.
 
@@ -337,9 +337,7 @@ r"""
 
 **Smoke test.** Before the full run, the whole pipeline runs end to end on two stored runs outside the comparison: the control of ex-2.2.23 at seed 704 and the `falloff` run at the same seed. Every stage runs: the fits for every method and factor, both baselines, the selection rule, the test scoring, the label ladder, the optimized direction, the measures of E2 to E6, and the tables, figures, and print of this report, with the one pair standing in for the eight (an interval over one run a side means nothing, but the code that computes it runs). The grid is thinned so that each level of each factor is visited at least once, and each stage is timed per pass, which gives the cost of the full run. So a fault anywhere shows up before the costly part. The smoke test also gives two early readings: H4 on the anchored run, so that a fitter that can't find a placed concept shows up before the full run, and where a probe for the op scores best on the control.
 
-/// admonition | Open decision
-Whether the control holds the evidence for the op at the example answers, as the anchored model does, is not known. The block1-edit experiment found that the control gathers the operand colors at each example answer in block 1 as the anchored runs do, but it fitted no probe for the op on a control. The smoke test fits one at every role and slice of the control at seed 704; if it scores best at a role other than the example answers or the query `=`, that role joins the sites fitted before the freeze.
-///
+**The query operands join the sites.** Before the freeze, whether the control holds the evidence for the op at the example answers, as the anchored model does, was not known: the block1-edit experiment found that the control gathers the operand colors at each example answer in block 1, but it fitted no probe for the op on a control. The smoke test fitted one at every role and slice of the control at seed 704. It scored best at the two operands of the query (an area under the ROC curve of 0.95 at slice 3), above the query `=` (0.92) and the example answers (0.83). The query answer scored higher still (0.99), but it comes after the `=` that predicts the scored answer, so an edit there cannot change it, and it was left out. So the query operands joined the sites fitted, as the plan said they would.
 
 **Details fixed with the code.** A sequential refit makes the fit at each slice under the full-dose edits at the slices before it, at every position, with zero replacement, and is reused across the doses, positions, and replacements scored with it; mean ablation under a refit uses the mean state of the other ops as it arrives under those edits. A permuted fit takes no sequential refit: it reuses the clean permuted fit at each slice, since a direction with no concept in it barely changes the states the next fit sees. The optimized direction acts at every position; its keep weight takes the values 0.3, 1, 3, and 10, and each search runs 300 Adam steps of 512 contexts at a learning rate of 0.01. With the graded target, the term toward the target null is weighted by the posterior on `difference` and the keep term by the rest. Its mean ablation is scored along the searched direction without searching again, and its permuted baseline uses five searches rather than fifteen, since each is a gradient search. E2, E4, and E5 read, for each method, the bracketing configuration of removal at the spill criterion that lies within the criterion. The label ladder of E3 leaves out the optimized direction, which reads the target null rather than labels; on the graded target an unlabelled `difference` context has a target of zero. The probe of E5 reads the query `=` and the example answers at each slice, on 7,000 test contexts split in half, and reports the area under the ROC curve. The write of E4 is measured on 2,000 test contexts of the other ops, with a role per position within an equation.
 

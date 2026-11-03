@@ -243,6 +243,29 @@ def logits_at(
     return np.concatenate([np.asarray(_logits_jit(model, b, edit, at))[:n] for _, b, n in _batches(tokens, batch_size)])
 
 
+@eqx.filter_jit
+def _color_logprobs(model: NGPT, idx: Int[Array, "B T"], edit: SliceEdit, at: int, color_ids: Int[Array, " K"]):
+    lg = _logits(model, idx, edit, at)
+    return lg[:, color_ids] - jax.nn.logsumexp(lg, axis=1, keepdims=True)
+
+
+def color_probs_at(
+    model: NGPT,
+    tokens: Int[np.ndarray, "N T"],
+    edit: SliceEdit,
+    at: int,
+    color_ids: np.ndarray,
+    batch_size: int = 16384,
+) -> Float[np.ndarray, "N K"]:
+    """The answer distribution at the color tokens under *edit*: the softmax over the whole vocabulary taken on
+    the device, so only the color columns come back (as `ex2216._color_probs` of `logits_at`, to float32
+    rounding).
+    """
+    cid = jnp.asarray(color_ids)
+    parts = [np.asarray(_color_logprobs(model, b, edit, at, cid))[:n] for _, b, n in _batches(tokens, batch_size)]
+    return np.exp(np.concatenate(parts).astype(np.float64))
+
+
 def stream_moments(
     model: NGPT,
     tokens: Int[np.ndarray, "N T"],

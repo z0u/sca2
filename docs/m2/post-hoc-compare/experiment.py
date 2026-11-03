@@ -483,6 +483,7 @@ def fit_one(checkpoint, fit_set, label: str, smoke: bool = False) -> dict:
         "fits": put(pickle.dumps(body), name=f"{NAME}-fits-{label}.pkl"),
         "seconds_per_fit_pass": pass_s,
         "n_fit_passes": n_passes,
+        "seconds_total": time.perf_counter() - t0,
         "n_fit_contexts": int(len(tokens)),
     }
 
@@ -592,9 +593,10 @@ def _load_common(checkpoint, split_path, label: str, sub: str, holdout: bool):
 
 
 def _per_op_scores(model, s: Scored, edit) -> np.ndarray:
-    from sca.posthoc import logits_at
+    from sca.posthoc import color_probs_at
 
-    return s.per_op(s.match(logits_at(model, s.tokens, edit, QUERY_EQ)))
+    p = color_probs_at(model, s.tokens, edit, QUERY_EQ, s.color_ids)
+    return s.per_op(ex2216._match(s.table, s.ctx, p))
 
 
 def axes_one(checkpoint, tune_set, fits, label: str, smoke: bool = False) -> dict:
