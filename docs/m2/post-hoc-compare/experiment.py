@@ -9,7 +9,7 @@ each run (a control of the anneal confirmation, or an anchored run of the fixed 
 2. `search_one` fits the optimized direction by gradient descent, one per target, weight, and slice set.
 3. `axes_one` scores every operator form along fifteen fixed coordinate axes on the tuning set: the baseline the
    tuning frontier is netted of.
-4. `grid_one` scores every configuration of one method on the tuning set or on the test set.
+4. `grid_one` scores every configuration of every method on the tuning set or on the test set.
 5. `select` takes the frontier on the tuning set and reads the two points of the selection rule off it.
 6. `finish_one` scores what the hypotheses and the E sections need at the selected configurations: the permuted
    fits, the median along the other 63 axes, the label ladder, the per-context arrays for grading and landing, the
@@ -664,10 +664,10 @@ def axes_one(checkpoint, tune_set, fits, label: str, smoke: bool = False) -> dic
             "axes": list(axes), "seconds_per_pass": (time.perf_counter() - t0) / max(n, 1), "n_passes": n}  # fmt: skip
 
 
-def grid_one(checkpoint, split, fits, searched: list[dict], label: str, method: str, holdout: bool,
-             smoke: bool = False) -> dict:  # fmt: skip
-    """Expected exact match per op under every configuration of *method*, on the tuning set or (with *holdout*)
-    the test set, with the clean pass and the target null.
+def grid_one(checkpoint, split, fits, searched: list[dict], label: str, holdout: bool, smoke: bool = False) -> list[dict]:  # fmt: skip
+    """Expected exact match per op under every configuration of each method (in the order of `METHODS`), on the
+    tuning set or (with *holdout*) the test set, with the clean pass and the target null. One task per run and
+    set: a task spends some 30 s starting before its first pass.
     """
     import pickle
 
@@ -675,19 +675,23 @@ def grid_one(checkpoint, split, fits, searched: list[dict], label: str, method: 
     from sca.posthoc import SliceEdit
 
     name = "test.npz" if holdout else "tune.npz"
-    model, s, workdir = _load_common(checkpoint, lambda w: get(split, w / name), label, f"grid-{method}", holdout)
+    model, s, workdir = _load_common(checkpoint, lambda w: get(split, w / name), label, "grid", holdout)
     width = model.transformer.wte.shape[1]
     with open(get(fits, workdir / "fits.pkl"), "rb") as f:
         f_ = _Fits(pickle.load(f), [r for r in searched if r["perm"] is None], width)
-    cs = smoke_grid(method) if smoke else configs(method)
     identity = SliceEdit.identity(N_SLICES, width, CONTEXT_LEN)
-    clean = _per_op_scores(model, s, identity)
+    clean = _per_op_scores(model, s, identity).tolist()
+    null = s.per_op(s.null).tolist()
     forward_s = _forward_seconds(model, s, identity)
-    t0 = time.perf_counter()
-    scores = [_per_op_scores(model, s, f_.edit(c)).tolist() for c in cs]
-    return {"label": label, "method": method, "holdout": holdout, "configs": [asdict(c) for c in cs],
-            "clean": clean.tolist(), "null": s.per_op(s.null).tolist(), "scores": scores,
-            "seconds_per_pass": (time.perf_counter() - t0) / max(len(cs), 1), "seconds_forward": forward_s}  # fmt: skip
+    out = []
+    for method in METHODS:
+        cs = smoke_grid(method) if smoke else configs(method)
+        t0 = time.perf_counter()
+        scores = [_per_op_scores(model, s, f_.edit(c)).tolist() for c in cs]
+        out.append({"label": label, "method": method, "holdout": holdout, "configs": [asdict(c) for c in cs],
+                    "clean": clean, "null": null, "scores": scores,
+                    "seconds_per_pass": (time.perf_counter() - t0) / max(len(cs), 1), "seconds_forward": forward_s})  # fmt: skip
+    return out
 
 
 def smoke_grid(method: str) -> list[Config]:
@@ -1091,10 +1095,9 @@ def run(ctx: Ctx, smoke: bool = False) -> dict:
     fitted = ctx.map(fit_one, ckpt, [sets["fit"]] * n, labels, [smoke] * n, role="fit")
 
     plan = search_plan(smoke)
-    groups = sorted({(t, sl) for t, sl, _ in plan})
-    jobs = [
-        (i, [(t, sl, w, None) for t2, sl2, w in plan if (t2, sl2) == (t, sl)]) for i in range(n) for t, sl in groups
-    ]
+    # One task per run: a task spends about 20 s starting and computing the target nulls before its first step,
+    # more than a search of 300 steps takes.
+    jobs = [(i, [(t, sl, w, None) for t, sl, w in plan]) for i in range(n)]
     found = ctx.map(
         search_group,
         [ckpt[i] for i, _ in jobs],
@@ -1107,21 +1110,20 @@ def run(ctx: Ctx, smoke: bool = False) -> dict:
     searched = [[r for (i, _), rs in zip(jobs, found, strict=True) if i == j for r in rs] for j in range(n)]
 
     axes = ctx.map(axes_one, ckpt, [sets["tune"]] * n, [f["fits"] for f in fitted], labels, [smoke] * n, role="score")
-    grid_jobs = [(i, m, h) for i in range(n) for m in METHODS for h in (False, True)]
+    grid_jobs = [(i, h) for i in range(n) for h in (False, True)]
     grids = ctx.map(
         grid_one,
-        [ckpt[i] for i, _, _ in grid_jobs],
-        [holdout if h else sets["tune"] for _, _, h in grid_jobs],
-        [fitted[i]["fits"] for i, _, _ in grid_jobs],
-        [searched[i] for i, _, _ in grid_jobs],
-        [labels[i] for i, _, _ in grid_jobs],
-        [m for _, m, _ in grid_jobs],
-        [h for *_, h in grid_jobs],
+        [ckpt[i] for i, _ in grid_jobs],
+        [holdout if h else sets["tune"] for _, h in grid_jobs],
+        [fitted[i]["fits"] for i, _ in grid_jobs],
+        [searched[i] for i, _ in grid_jobs],
+        [labels[i] for i, _ in grid_jobs],
+        [h for _, h in grid_jobs],
         [smoke] * len(grid_jobs),
         role="score",
     )
-    tune = [[g for (i, _, h), g in zip(grid_jobs, grids, strict=True) if i == j and not h] for j in range(n)]
-    test = [[g for (i, _, h), g in zip(grid_jobs, grids, strict=True) if i == j and h] for j in range(n)]
+    tune = [g for (_, h), g in zip(grid_jobs, grids, strict=True) if not h]
+    test = [g for (_, h), g in zip(grid_jobs, grids, strict=True) if h]
     selections = ctx.map(select, tune, axes, [anchored] * n, role="prep")
 
     # The permuted-label baseline of the optimized direction: a fresh search per permutation, at the configurations
@@ -1130,8 +1132,9 @@ def run(ctx: Ctx, smoke: bool = False) -> dict:
     for i in range(n):
         sel = selections[i]["optimized"]
         cs = [tune[i][METHODS.index("optimized")]["configs"][k] for k in _chosen(sel)]
-        for t, sl, w in sorted({(c["target"], tuple(c["slices"]), c["weight"]) for c in cs}):
-            perm_jobs.append((i, [(t, sl, w, p) for p in range(2 if smoke else N_PERMUTED_SEARCH)]))
+        chosen = sorted({(c["target"], tuple(c["slices"]), c["weight"]) for c in cs})
+        perms = range(2 if smoke else N_PERMUTED_SEARCH)
+        perm_jobs.append((i, [(t, sl, w, p) for t, sl, w in chosen for p in perms]))
     permuted = ctx.map(
         search_group,
         [ckpt[i] for i, _ in perm_jobs],
@@ -1179,9 +1182,11 @@ COMPUTE = {
     # 294,000 contexts sampled and their posteriors computed on the host.
     "sets": dict(cpu=4, memory=16_384, timeout=10_800),
     # Moments over the fit set at every slice and site, once clean and once per step of each sequential refit.
-    "fit": dict(gpu="L40S", cpu=4, memory=16_384, timeout=7200),
-    "search": dict(gpu="L40S", cpu=2, memory=16_384, timeout=3600),
-    "score": dict(gpu="L40S", cpu=2, memory=16_384, timeout=7200),
+    # A GPU container left idle for Modal's default minute after its task is billed for it, and no later task
+    # reuses it, so the GPU roles let go of it at once.
+    "fit": dict(gpu="L40S", cpu=4, memory=16_384, timeout=7200, scaledown_window=2),
+    "search": dict(gpu="L40S", cpu=2, memory=16_384, timeout=7200, scaledown_window=2),
+    "score": dict(gpu="L40S", cpu=2, memory=16_384, timeout=7200, scaledown_window=2),
 }
 
 experiment = Experiment(name=NAME, main=smoke if STAGE == "smoke" else main, roles=COMPUTE)
