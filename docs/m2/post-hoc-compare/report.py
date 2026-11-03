@@ -34,7 +34,7 @@ r"""
 - [The two baseline rules (E6)](#the-two-baseline-rules-e6) — <one sentence>.
 
 /// admonition | How to read this report
-This report was preregistered: the predictions, the grid, and the rule that picks a configuration from it were frozen at commit `<hash>`, before any run of this experiment. Each section opens with what we expect, and the results replaced the placeholders in place.
+This report was preregistered: the predictions, the grid, and the rule that picks a configuration from it were frozen at commit `bf73293`, before any run of this experiment. Each section opens with what we expect, and the results replaced the placeholders in place.
 
 The hypotheses are judged one fitter at a time, and then as a whole. A fitter is *accepted* when it does what the test asks of a working method (in H1 and H2, matching or beating the anchor; in H4, finding a placed concept) and *rejected* when it does not. A hypothesis as a whole *passes* or *misses*.
 ///
