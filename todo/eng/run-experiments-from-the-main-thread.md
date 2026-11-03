@@ -1,5 +1,5 @@
 ---
-status: open
+status: partial
 tags: [agents, mini]
 priority: high
 opened: 2026-10-01
@@ -18,3 +18,4 @@ The skill also has to change where it now says the opposite: `references/running
 
 **2026-10-05, ex-2.2.22** — The run stalled after its first two prep tasks, with `status` showing "DAG suspended at the last tick — re-run to advance", and nothing ran on Modal until it was noticed in review. The `experiment-monitor` agent had launched it with a plain `run`, as `running.md` says, and did not issue the next one. I advanced it by hand and told the monitor to keep doing so. A backgrounded `run -w` from the main thread would have driven it through. Raised to priority, since every multi-stage run goes through this handoff.
 
+**2026-11-03, housekeeping** — Part of this is in place: `references/running.md` (§ Delegating & scheduling a long run) now says a long wait can stay in the main session, as one background `bin/mini watch --timeout … --json` loop that runs `bin/mini run` after each settled stage. What is left: `SKILL.md` still makes delegating to `experiment-monitor` the default, the top of `running.md` still says not to pass `--watch` in an agent session, and there is no warm-up check yet.

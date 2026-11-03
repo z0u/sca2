@@ -2,7 +2,6 @@
 status: open
 tags: [D2.2, anchoring, representations, ex-2.2.23]
 opened: 2026-10-08
-priority: high
 ---
 # A map of what e₁ holds along the context
 
@@ -27,3 +26,5 @@ Split from the withdrawn ex-2.2.24 draft (its E1, H1, H3, and E3; see [PR #255](
 **2026-10-24, backlog refresh** — On the shortlist, as the one item that would bear on why editing block 1 alone removes most of the op. [Spill-timing](/docs/m2/spill-timing/report.py) E4 is a first piece of the color half of the map, on `pool 1–3, soft τ`: at the example answers of the other ops e₁ holds almost no color, and removing it barely changes how well the color can be fitted from the state. The op probe is the part still missing.
 
 **2026-10-28, block1-edit** — The [block1-edit report](/docs/m2/block1-edit/report.py) answers why editing block 1 alone removes most of the op, without the op probe: block 1 writes the evidence onto e₁ at the example answers, one later block reads it from the query `=`, and an edit works between the two. It also adds color probes by sub-step (the operand color at the operand, and the operand colors at the answer). The op probe itself is still not done; it would show whether the later blocks keep a copy of the judgement off e₁, which that report leaves open.
+
+**2026-11-03, housekeeping** — The [low-runs report](/docs/m2/low-runs/report.py) (PR #332) answers the question the 10-28 note left open. With e₁ zeroed, a linear probe on the state at an example answer still decodes whether the example fits `difference` on every run, so the evidence is written along one other direction as well as along e₁, and the reader blocks take some from each. Off the shortlist for that reason; the map itself is still not made, and it would now be a picture of a mechanism the reports already describe.
