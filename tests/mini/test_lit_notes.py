@@ -11,7 +11,7 @@ GLOSSARY = """
 <dl>
 <dt>Op margin</dt>
 <dd>The line margin, <code>m</code>.</dd>
-<dt>ᾱ (containment)</dt>
+<dt data-forms="ᾱ; containment">ᾱ (containment)</dt>
 <dd>Mean alignment.</dd>
 </dl>
 """
@@ -69,23 +69,41 @@ class TestGlossary:
         )
         assert html.count('<dfn class="term"') == 3
         assert (
-            '<dfn class="term" tabindex="0">op margins</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Op margin</span> <span class="gloss">The line margin, <code>m</code>.</span></span> and the op margin.'
+            '<dfn class="term" tabindex="0">op <span class="term-end">margins<span aria-hidden="true" class="term-ring"></span></span></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Op margin</span> <span class="gloss">The line margin, <code>m</code>.</span></span> and the op margin.'
             in html
         )
-        assert '<dfn class="term" tabindex="0">Containment</dfn>' in html
+        assert (
+            '<dfn class="term" tabindex="0"><span class="term-end">Containment<span aria-hidden="true" class="term-ring"></span></span></dfn>'
+            in html
+        )
 
     def test_code_headings_and_the_glossary_are_left_alone(self):
         html = to_html(f"## Op margin\n\n`op margin` and *[op margin](#x)*.\n{GLOSSARY}")
         assert html.count("<dfn") == 1  # the link only
 
-    def test_link_holding_a_term_is_wrapped_and_its_note_follows(self):
-        html = to_html(f"See [the op margin](#x) here, and op margin.\n{GLOSSARY}")
+    def test_term_in_a_link_is_marked_in_place_and_its_note_follows_the_link(self):
+        html = to_html(f"See [the op margin (H1)](#x) here, and op margin.\n{GLOSSARY}")
         assert html.count("<dfn") == 1
         assert (
-            '<dfn class="term" tabindex="0"><a href="#x">the op margin</a></dfn><span class="sidenote glossnote"'
+            '<a href="#x">the <dfn class="term">op <span class="term-end">margin<span aria-hidden="true" class="term-ring"></span></span></dfn> (H1)</a><span class="sidenote glossnote"'
             in html
         )
         assert "</span></span> here, and op margin." in html
+
+    def test_term_inside_markup_in_a_link_marks_the_whole_link(self):
+        html = to_html(f"See [*the op margin*](#x) here.\n{GLOSSARY}")
+        assert (
+            '<dfn class="term" tabindex="0"><a href="#x"><em>the op <span class="term-end">margin<span aria-hidden="true" class="term-ring"></span></span></em></a></dfn>'
+            in html
+        )
+
+    def test_a_stop_after_the_note_keeps_to_the_term(self):
+        html = to_html(f"Mind the op margin. Then more.\n{GLOSSARY}")
+        assert re.search(
+            r'<span class="term-keep"><dfn class="term" tabindex="0">.*?</dfn><span class="sidenote glossnote".*?</span></span>\.</span> Then more\.',
+            html,
+        )
+        assert "term-keep" not in to_html(f"Mind the op margin and more.\n{GLOSSARY}")
 
     def test_any_definition_list_defines_terms(self):
         text = (
@@ -97,9 +115,12 @@ class TestGlossary:
         assert set(terms) == {"removal", "recipe-compare"}
         assert terms["recipe-compare"].label == '<a href="/docs/m2/recipe-compare/report.py">recipe-compare</a>'
         html = to_html(text)
-        assert '<dfn class="term" tabindex="0">removal</dfn>' in html
         assert (
-            '<dfn class="term" tabindex="0"><a href="/r.py">the <cite>recipe-compare</cite> experiment</a></dfn>'
+            '<dfn class="term" tabindex="0"><span class="term-end">removal<span aria-hidden="true" class="term-ring"></span></span></dfn>'
+            in html
+        )
+        assert (
+            '<a href="/r.py">the <dfn class="term"><cite><span class="term-end">recipe-compare<span aria-hidden="true" class="term-ring"></span></span></cite></dfn> experiment</a>'
             '<span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite>'
             '<a href="/docs/m2/recipe-compare/report.py">recipe-compare</a></cite></span>' in html
         )
@@ -111,15 +132,24 @@ class TestGlossary:
         )
         assert html.count("<dfn") == 2  # the first use in each section has the note
         assert html.count("<cite>") == 6  # each use, and the name in each note
-        assert '<dfn class="term" tabindex="0"><cite>late pull</cite></dfn><span class="sidenote glossnote"' in html
-        assert ', and <a href="/l.py"><cite>late pull</cite></a>, and <cite>late pull</cite> again.' in html
-        assert '<dfn class="term" tabindex="0"><cite>Late pull</cite></dfn>' in html
+        assert (
+            '<dfn class="term" tabindex="0"><cite>late <span class="term-end">pull<span aria-hidden="true" class="term-ring"></span></span></cite></dfn><span class="sidenote glossnote"'
+            in html
+        )
+        assert ',</span> and <a href="/l.py"><cite>late pull</cite></a>, and <cite>late pull</cite> again.' in html
+        assert (
+            '<dfn class="term" tabindex="0"><cite>Late <span class="term-end">pull<span aria-hidden="true" class="term-ring"></span></span></cite></dfn>'
+            in html
+        )
 
     def test_explicit_use_of_a_cited_work(self):
         refs = "## References\n\n[late pull](/l.py)\n:   Pull on blocks 2 to 4.\n"
         html = to_html(f"The [deep run](term:late pull), then [that run](term:late pull).\n\n{refs}")
-        assert '<dfn class="term explicit" tabindex="0"><cite>deep run</cite></dfn>' in html
-        assert ", then <cite>that run</cite>." in html
+        assert (
+            '<dfn class="term explicit" tabindex="0"><cite>deep <span class="term-end">run<span aria-hidden="true" class="term-ring"></span></span></cite></dfn>'
+            in html
+        )
+        assert "</span> then <cite>that run</cite>." in html
 
     def test_math_in_a_definition_is_rendered(self):
         html = to_html("Pull here.\n\n## Glossary\n\nPull\n:   Weight $\\lambda_a$ of the pull.\n")
@@ -168,7 +198,10 @@ class TestGlossary:
         shared = {"band": Term("Band", "Precision.", auto=False)}
         html = to_html("A band here, and [the band](term:band).\n", glossary=shared)
         assert html.count("<dfn") == 1
-        assert '<dfn class="term explicit" tabindex="0">the band</dfn><span class="sidenote glossnote"' in html
+        assert (
+            '<dfn class="term explicit" tabindex="0">the <span class="term-end">band<span aria-hidden="true" class="term-ring"></span></span></dfn><span class="sidenote glossnote"'
+            in html
+        )
         assert "term:" not in html
 
     def test_load_glossary(self, tmp_path):
@@ -186,8 +219,22 @@ class TestGlossary:
         }
 
     def test_local_terms_in_markdown_syntax(self):
-        terms = local_terms("## Glossary\n\nRed line, non-red line\n:   Lines by color.\n\n## Next\n\nA\n:   B\n")
+        terms = local_terms(
+            '## Glossary\n\nRed line, non-red line {data-forms="Red line; non-red line"}\n:   Lines by color.\n\n'
+            "## Next\n\nA\n:   B\n"
+        )
         assert terms == {
             "red line, non-red line": Term("Red line, non-red line", "Lines by color.", ("Red line", "non-red line")),
             "a": Term("A", "B"),
         }
+
+    def test_an_entry_is_matched_whole(self):
+        text = (
+            "The anchored edit, a frozen rule, and the fixed labels.\n\n## Glossary\n\n"
+            "Anchored\n:   The full edit.\n\nAnchored, fixed labels\n:   Fixed draws.\n\n"
+            "Selection rule (frozen)\n:   Per run.\n"
+        )
+        assert local_terms(text)["selection rule (frozen)"].aliases == ()
+        body = to_html(text).split("<h2")[0]
+        assert body.count("<dfn") == 1
+        assert '<span class="glossnote-term">Anchored</span>' in body

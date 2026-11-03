@@ -15,19 +15,24 @@
 /* A glossary term or cited work with a note beside it (mini.lit.notes) carries a small
  * raised ring, in place of the dotted underline that pages exported before this rule
  * still bake in (hence the reset). The ring is a bordered box, so it is the same in every
- * font. */
+ * font. mini.lit.notes writes it as an element (.term-ring) beside the term's last word,
+ * so a line cannot break between the two; pages rendered before that draw it after the
+ * term instead. */
 main.lit dfn.term {
   text-decoration: none;
 }
-main.lit dfn.term::after {
-  content: "";
+main.lit .term-ring,
+main.lit dfn.term:not(:has(.term-ring))::after {
   display: inline-block;
-  width: 0.3em;
-  height: 0.3em;
-  margin-left: 0.08em;
-  border: 0.08em solid color-mix(in srgb, var(--fg) 55%, transparent);
+  width: 0.22em;
+  height: 0.22em;
+  margin-left: 0.06em;
+  border: 0.06em solid color-mix(in srgb, var(--fg) 55%, transparent);
   border-radius: 50%;
-  vertical-align: 0.55em;
+  vertical-align: 0.6em;
+}
+main.lit dfn.term:not(:has(.term-ring))::after {
+  content: "";
 }
 
 /* Colour swatch: a small square tinted via the `--sw` custom property, so each
@@ -343,10 +348,11 @@ main.lit details:not(:open) {
   .glossnote-term {
     font-weight: 700;
   }
-  /* A term with its note beside it keeps its small raised ring (lit.css), and a link
-   * in one, or one naming another experiment, takes no link underline of its own, so it
-   * does not read as a plain link. */
-  main.lit :is(dfn.term a, a:has(cite)):not(.footnote-backref) {
+  /* A term with its note beside it keeps its small raised ring (above), and a link in
+   * one, a link holding one, or one naming another experiment, takes no link underline of
+   * its own, so it does not read as a plain link (and the underline does not stop short
+   * at the ring). */
+  main.lit :is(dfn.term a, a:has(dfn.term), a:has(cite)):not(.footnote-backref) {
     text-decoration: none;
   }
 

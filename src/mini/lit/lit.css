@@ -198,6 +198,12 @@ dfn.term {
   font-style: inherit;
   cursor: help;
 }
+/* A line does not break between a term's last word and its ring, nor between the term
+ * (or the link that holds it), its note, and a stop right after them. The note and the
+ * term itself wrap as usual. */
+.term-end,
+.term-keep { white-space: nowrap; }
+.term-keep > * { white-space: normal; }
 /* A cited work (another experiment) is italic at every use; the dfn above marks the use
  * that carries its note. */
 cite { font-style: italic; }
@@ -224,7 +230,7 @@ cite { font-style: italic; }
   text-indent: 0;
   color: var(--fg);
 }
-:is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote,
+:is(sup.fnref, dfn.term, a:has(> dfn.term)):is(:hover, :focus, :focus-within) + .sidenote,
 .sidenote:is(:hover, :focus) {
   display: block;
 }
@@ -284,7 +290,7 @@ cite { font-style: italic; }
       border-bottom: 1px solid var(--border);
     }
   }
-  :is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote:not(.popover),
+  :is(sup.fnref, dfn.term, a:has(> dfn.term)):is(:hover, :focus, :focus-within) + .sidenote:not(.popover),
   .sidenote:not(.popover):is(:hover, :focus, :focus-within) {
     opacity: 1;
     z-index: 5;  /* over the notes below, which are positioned too */
