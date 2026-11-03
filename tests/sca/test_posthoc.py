@@ -14,6 +14,7 @@ from sca.posthoc import (
     inlp_fit,
     leace_fit,
     optimize_directions,
+    search_data,
     pre_post,
     ridge_fit,
     stream_moments,
@@ -120,7 +121,7 @@ def test_the_search_lowers_its_loss():
     w = (rng.random(64) < 0.5).astype(np.float32)
     init = np.zeros((3, WIDTH), np.float32)
     init[1] = rng.normal(size=WIDTH)
-    v, losses = optimize_directions(m, tokens, q_null, w, 1 - w, color_ids, (1,), 9, 1.0, init, steps=40, batch_size=32, lr=0.05)  # fmt: skip
+    v, losses = optimize_directions(m, search_data(tokens, q_null, w, 1 - w), color_ids, (1,), 9, 1.0, init, steps=40, batch_size=32, lr=0.05)  # fmt: skip
     assert np.mean(losses[-5:]) < np.mean(losses[:5])
     np.testing.assert_allclose(np.linalg.norm(v[1]), 1.0, atol=1e-5)
     np.testing.assert_allclose(v[[0, 2]], 0.0)

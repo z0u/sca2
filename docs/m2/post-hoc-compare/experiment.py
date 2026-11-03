@@ -96,7 +96,9 @@ fiftieth of them (nested draws)."""
 LADDER_SEED = 11
 DOSES = (0.25, 0.5, 0.75, 1.0)
 REPLACEMENTS = ("zero", "mean")
-SITES = ("pooled", "answers", "query =")
+SITES = ("pooled", "answers", "query =", "query operands")
+# The query operands joined the sites after the smoke test (the open decision of the preregistration): on the control
+# at 704 a probe for the op scored best there, at slices 3 and 4.
 SLICE_SETS: tuple[tuple[int, ...], ...] = (*((s,) for s in range(N_SLICES)), (1, 2, 3), tuple(range(N_SLICES)))
 INLP_RANKS = (2, 4, 8)
 RIDGE_L2 = 1e-2
@@ -144,6 +146,7 @@ def site_masks() -> np.ndarray:
     masks[0] = 1
     masks[1, list(ANSWERS)] = 1
     masks[2, QUERY_EQ] = 1
+    masks[3, [UNIT * K, UNIT * K + 2]] = 1
     return masks
 
 
@@ -484,16 +487,16 @@ def fit_one(checkpoint, fit_set, label: str, smoke: bool = False) -> dict:
     }
 
 
-def search_one(checkpoint, fit_set, fits, label: str, target: str, slices: tuple[int, ...], weight: float,
-               perm: int | None = None) -> dict:  # fmt: skip
-    """The optimized direction for one target, slice set, and weight: a unit vector per edited slice, fitted by Adam
-    on the fit set from the difference in means (clean, pooled). With *perm*, the labels are permuted across
-    contexts first (the permuted-label baseline), each context keeping its own target null.
+def search_group(checkpoint, fit_set, fits, label: str, jobs: list[tuple]) -> list[dict]:
+    """Optimized directions for one run, one per job `(target, slices, weight, perm)`: a unit vector per edited
+    slice, fitted by Adam on the fit set from the difference in means (clean, pooled). With a *perm*, the labels are
+    permuted across contexts first (the permuted-label baseline), each context keeping its own target null. The
+    jobs share one task, so the run, the fit set, and its target nulls are loaded once.
     """
     import pickle
 
     from mini.store import get
-    from sca.posthoc import optimize_directions
+    from sca.posthoc import optimize_directions, search_data
 
     workdir = get_data_dir() / NAME / "search" / label
     model, _, color_ids, tok2color = ex2216._load_run(checkpoint, workdir)
@@ -504,24 +507,28 @@ def search_one(checkpoint, fit_set, fits, label: str, target: str, slices: tuple
     with open(get(fits, workdir / "fits.pkl"), "rb") as f:
         body = pickle.load(f)
     P = ex2216._get_posterior()
-    w = cols[:, target_col(target, perm=perm)] if perm is not None else cols[:, target_col(target)]
     null_post = ex2216._target_null(P, s.table, s.ctx, s.posterior.astype(np.float64), D)
-
-    def q_null(i: np.ndarray) -> np.ndarray:
-        sub = P.Contexts(s.ctx.true_op[i], s.ctx.ex_pair[i], s.ctx.ex_color[i], s.ctx.query_pair[i])
-        return P.predictive(s.table, sub, null_post[i])
-
-    init = np.zeros((N_SLICES, width), np.float32)
-    for sl in slices:
-        init[sl] = body["fits"][("dim", "binary", "pooled", 1, COL_BINARY, sl)].basis[0]
-    t0 = time.perf_counter()
-    v, losses = optimize_directions(
-        model, s.tokens, q_null, w, 1.0 - w, color_ids, slices, QUERY_EQ, weight, init,
-        steps=SEARCH_STEPS, batch_size=SEARCH_BATCH, lr=SEARCH_LR, seed=0 if perm is None else 100 + perm,
-    )  # fmt: skip
-    return {"label": label, "target": target, "slices": list(slices), "weight": weight, "perm": perm,
-            "v": v.tolist(), "losses": losses[:: max(1, SEARCH_STEPS // 30)],
-            "seconds_per_step": (time.perf_counter() - t0) / SEARCH_STEPS}  # fmt: skip
+    q_null = np.concatenate([
+        P.predictive(s.table, P.Contexts(s.ctx.true_op[i : i + 20_000], s.ctx.ex_pair[i : i + 20_000],
+                                         s.ctx.ex_color[i : i + 20_000], s.ctx.query_pair[i : i + 20_000]),
+                     null_post[i : i + 20_000]).astype(np.float16)
+        for i in range(0, len(s.tokens), 20_000)
+    ])  # fmt: skip
+    out = []
+    for target, slices, weight, perm in jobs:
+        w = cols[:, target_col(target, perm=perm)] if perm is not None else cols[:, target_col(target)]
+        init = np.zeros((N_SLICES, width), np.float32)
+        for sl in slices:
+            init[sl] = body["fits"][("dim", "binary", "pooled", 1, COL_BINARY, sl)].basis[0]
+        t0 = time.perf_counter()
+        v, losses = optimize_directions(
+            model, search_data(s.tokens, q_null, w, 1.0 - w), color_ids, tuple(slices), QUERY_EQ, weight, init,
+            steps=SEARCH_STEPS, batch_size=SEARCH_BATCH, lr=SEARCH_LR, seed=0 if perm is None else 100 + perm,
+        )  # fmt: skip
+        out.append({"label": label, "target": target, "slices": list(slices), "weight": weight, "perm": perm,
+                    "v": v.tolist(), "losses": losses[:: max(1, SEARCH_STEPS // 30)],
+                    "seconds_per_step": (time.perf_counter() - t0) / SEARCH_STEPS})  # fmt: skip
+    return out
 
 
 # =============================================================================================
@@ -1052,19 +1059,20 @@ def run(ctx: Ctx, smoke: bool = False) -> dict:
     fitted = ctx.map(fit_one, ckpt, [sets["fit"]] * n, labels, [smoke] * n, role="fit")
 
     plan = search_plan(smoke)
-    jobs = [(i, t, sl, w) for i in range(n) for t, sl, w in plan]
+    groups = sorted({(t, sl) for t, sl, _ in plan})
+    jobs = [
+        (i, [(t, sl, w, None) for t2, sl2, w in plan if (t2, sl2) == (t, sl)]) for i in range(n) for t, sl in groups
+    ]
     found = ctx.map(
-        search_one,
-        [ckpt[i] for i, *_ in jobs],
+        search_group,
+        [ckpt[i] for i, _ in jobs],
         [sets["fit"]] * len(jobs),
-        [fitted[i]["fits"] for i, *_ in jobs],
-        [labels[i] for i, *_ in jobs],
-        [t for _, t, _, _ in jobs],
-        [sl for _, _, sl, _ in jobs],
-        [w for *_, w in jobs],
+        [fitted[i]["fits"] for i, _ in jobs],
+        [labels[i] for i, _ in jobs],
+        [js for _, js in jobs],
         role="search",
     )
-    searched = [[f for (i, *_), f in zip(jobs, found, strict=True) if i == j] for j in range(n)]
+    searched = [[r for (i, _), rs in zip(jobs, found, strict=True) if i == j for r in rs] for j in range(n)]
 
     axes = ctx.map(axes_one, ckpt, [sets["tune"]] * n, [f["fits"] for f in fitted], labels, [smoke] * n, role="score")
     grid_jobs = [(i, m, h) for i in range(n) for m in METHODS for h in (False, True)]
@@ -1090,22 +1098,19 @@ def run(ctx: Ctx, smoke: bool = False) -> dict:
     for i in range(n):
         sel = selections[i]["optimized"]
         cs = [tune[i][METHODS.index("optimized")]["configs"][k] for k in _chosen(sel)]
-        for c in {(c["target"], tuple(c["slices"]), c["weight"]) for c in cs}:
-            perm_jobs += [(i, *c, p) for p in range(2 if smoke else N_PERMUTED_SEARCH)]
+        for t, sl, w in sorted({(c["target"], tuple(c["slices"]), c["weight"]) for c in cs}):
+            perm_jobs.append((i, [(t, sl, w, p) for p in range(2 if smoke else N_PERMUTED_SEARCH)]))
     permuted = ctx.map(
-        search_one,
-        [ckpt[i] for i, *_ in perm_jobs],
+        search_group,
+        [ckpt[i] for i, _ in perm_jobs],
         [sets["fit"]] * len(perm_jobs),
-        [fitted[i]["fits"] for i, *_ in perm_jobs],
-        [labels[i] for i, *_ in perm_jobs],
-        [t for _, t, _, _, _ in perm_jobs],
-        [sl for _, _, sl, _, _ in perm_jobs],
-        [w for _, _, _, w, _ in perm_jobs],
-        [p for *_, p in perm_jobs],
+        [fitted[i]["fits"] for i, _ in perm_jobs],
+        [labels[i] for i, _ in perm_jobs],
+        [js for _, js in perm_jobs],
         role="search",
     )
-    for (i, *_), p in zip(perm_jobs, permuted, strict=True):
-        searched[i] = [*searched[i], p]
+    for (i, _), rs in zip(perm_jobs, permuted, strict=True):
+        searched[i] = [*searched[i], *rs]
 
     finished = ctx.map(
         finish_one,

@@ -16,7 +16,6 @@ of the contexts of the other ops (`with_mean`), so the coefficient is replaced b
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 
 import equinox as eqx
@@ -238,7 +237,7 @@ def _batches(tokens: np.ndarray, batch_size: int):
 
 
 def logits_at(
-    model: NGPT, tokens: Int[np.ndarray, "N T"], edit: SliceEdit, at: int, batch_size: int = 2048
+    model: NGPT, tokens: Int[np.ndarray, "N T"], edit: SliceEdit, at: int, batch_size: int = 8192
 ) -> Float[np.ndarray, "N V"]:
     """The logits at position *at* under *edit*: `sca.intervention.logits_at`, with a subspace per slice."""
     return np.concatenate([np.asarray(_logits_jit(model, b, edit, at))[:n] for _, b, n in _batches(tokens, batch_size)])
@@ -250,7 +249,7 @@ def stream_moments(
     edit: SliceEdit,
     masks: Float[np.ndarray, "S T"],
     z: Float[np.ndarray, "N Z"],
-    batch_size: int = 1024,
+    batch_size: int = 4096,
 ) -> list[list[Moments]]:
     """The moments of the states as they arrive at each slice under *edit*, at each site of *masks* (a row of
     weights over positions per site), with *z* as the targets of each context: `[slice][site]`.
@@ -326,18 +325,35 @@ def _search_loss(
 
 
 @eqx.filter_jit
-def _search_step(v, opt_state, model, idx, gamma, at, color_ids, q_null, w_null, w_keep, weight, optimizer):
-    loss, grad = jax.value_and_grad(_search_loss)(v, model, idx, gamma, at, color_ids, q_null, w_null, w_keep, weight)
+def _search_step(v, opt_state, model, data, i, gamma, at, color_ids, weight, optimizer):
+    tokens, q_null, w_null, w_keep = data
+    loss, grad = jax.value_and_grad(_search_loss)(
+        v, model, tokens[i], gamma, at, color_ids, q_null[i].astype(jnp.float32), w_null[i], w_keep[i], weight
+    )
     updates, opt_state = optimizer.update(grad, opt_state, v)
     return v + updates, opt_state, loss
 
 
-def optimize_directions(
-    model: NGPT,
+def search_data(
     tokens: Int[np.ndarray, "N T"],
-    q_null: Float[np.ndarray, "N P"] | Callable[[np.ndarray], np.ndarray],
+    q_null: Float[np.ndarray, "N P"],
     w_null: Float[np.ndarray, " N"],
     w_keep: Float[np.ndarray, " N"],
+) -> tuple:
+    """The set a search draws its batches from, placed on the device once (the target nulls in half precision), so
+    that a step moves only the indices of its batch.
+    """
+    return (
+        jnp.asarray(tokens, jnp.int32),
+        jnp.asarray(q_null, jnp.float16),
+        jnp.asarray(w_null, jnp.float32),
+        jnp.asarray(w_keep, jnp.float32),
+    )
+
+
+def optimize_directions(
+    model: NGPT,
+    data: tuple,
     color_ids: np.ndarray,
     slices: tuple[int, ...],
     at: int,
@@ -349,10 +365,10 @@ def optimize_directions(
     seed: int = 0,
 ) -> tuple[Float[np.ndarray, "L1 C"], list[float]]:
     """A unit vector per slice in *slices*, found by Adam so that the full edit along them (projection at every
-    position) moves the answers at *at* toward *q_null* where *w_null* weighs a context, and keeps them where they
-    were where *w_keep* does, with *weight* on the second term. *q_null* is an array over the contexts, or a function
-    from the indices of a batch to its rows, for a set too large to hold the target nulls of at once. Starts from
-    *init*; returns the vectors (zero rows at the slices not edited) and the loss at each step.
+    position) moves the answers at *at* toward the target null where it weighs a context, and keeps them where they
+    were where the keep weight does, with *weight* on the second term. *data* is `search_data` (the tokens, the
+    target nulls, and the two weights per context). Starts from *init*; returns the vectors (zero rows at the slices
+    not edited) and the loss at each step.
     """
     import optax
 
@@ -363,16 +379,13 @@ def optimize_directions(
     v = jnp.asarray(init, jnp.float32)
     opt_state = optimizer.init(v)
     rng = np.random.default_rng(seed)
-    args = (jnp.asarray(gamma), at, jnp.asarray(color_ids))
+    n = data[0].shape[0]
+    args = (jnp.asarray(gamma), at, jnp.asarray(color_ids), jnp.asarray(weight, jnp.float32), optimizer)
     losses = []
     for _ in range(steps):
-        i = rng.choice(len(tokens), size=batch_size, replace=False)
-        v, opt_state, loss = _search_step(
-            v, opt_state, model, jnp.asarray(tokens[i]), *args,
-            jnp.asarray(q_null(i) if callable(q_null) else q_null[i], jnp.float32), jnp.asarray(w_null[i], jnp.float32),
-            jnp.asarray(w_keep[i], jnp.float32), jnp.asarray(weight, jnp.float32), optimizer,
-        )  # fmt: skip
-        losses.append(float(loss))
+        i = jnp.asarray(rng.integers(0, n, size=batch_size))
+        v, opt_state, loss = _search_step(v, opt_state, model, data, i, *args)
+        losses.append(loss)
     out = np.array(normalize(v))
     out[[s for s in range(n_slices) if s not in slices]] = 0.0
-    return out, losses
+    return out, [float(x) for x in jax.device_get(losses)]
