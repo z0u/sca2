@@ -379,7 +379,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-We compare the anchored edit with edits along directions found after training: four standard fitters, and one direction optimized against the scoring itself. Each is fitted on a control model with every label, tuned per run on data it is never scored on, and scored the same way as the anchor. With every label, the fitters remove more of the op than the anchored edit within the same spill limit, mostly by editing the example answers, a role a real corpus does not label. Restricted to fits that need no role labels, the best of them is about level with the anchor.
+We compare the anchored edit with edits along directions found after training: four standard fitters, and one direction optimized against the scoring itself. Each is fitted on a control model with every label, tuned per run on data it is never scored on, and scored the same way as the anchor. Given role labels and a grid tuned per run, the fitters remove more of the op than the anchored edit within the same spill limit, mostly by editing the example answers, a role a real corpus does not label. Restricted to fits that need no role labels, the best of them is about level with the anchor.
 ///
 
 Placing a concept during training needs an extra training term, and it lowers the task score somewhat. This report asks whether that placement does better than searching for the concept afterwards, on the same model and with the same scoring.
@@ -390,22 +390,22 @@ Placing a concept during training needs an extra training term, and it lowers th
 r"""
 ## Findings
 
-- [The trade-off (E1)](#the-trade-off-e1) — Every standard fitter climbs past the anchored removal before it reaches the spill criterion, mostly through edits at the example answers.
+- [The trade-off (E1)](#the-trade-off-e1) — On every run but one, each standard fitter climbs past the anchored removal before it reaches the spill criterion, mostly through edits at the example answers.
 - [Spill at matched removal (H1)](#spill-at-matched-removal-h1) — **Misses**. Turned up to the anchored removal, no standard fitter spills past the criterion on more than two runs, so each is accepted.
 - [Removal at the spill criterion (H2)](#removal-at-the-spill-criterion-h2) — **Misses**. LEACE and INLP remove more than the anchor within the criterion, the probe is Unresolved, and difference in means is left out under H4; with the pooled fits alone, LEACE is about level with the anchor and the others remove less.
 - [The ceiling against the fitters (H3)](#the-ceiling-against-the-fitters-h3) — **Misses**. The optimized direction, which acts at every position, removes less than the rank-1 fitters that edit the example answers.
 - [The ceiling against the anchor (S1)](#the-ceiling-against-the-anchor-s1) — **Matches**. The optimized direction removes about as much as the anchor, and spills past the criterion on no more runs than chance would give.
-- [The fitters find a placed concept (H4)](#the-fitters-find-a-placed-concept-h4) — **Partial**. The probe, LEACE, and INLP find the placed concept; difference in means misses the gate by 0.001, through its permuted-label baseline.
+- [The fitters find a placed concept (H4)](#the-fitters-find-a-placed-concept-h4) — **Partial**. The probe, LEACE, and INLP find the placed concept; difference in means misses the gate by less than 0.001.
 - [Grading, landing, and where the answers go (E2)](#grading-landing-and-where-the-answers-go-e2) — The edits grade alike and send the answers to the same places; the fitters land a little further toward the target null than the anchor.
 - [How many labels a fitter needs (E3)](#how-many-labels-a-fitter-needs-e3) — Difference in means, LEACE, and INLP keep their removal down to a fiftieth of the labels, and the probe drops to 0.84.
 - [The write against each bound (E4)](#the-write-against-each-bound-e4) — The writes stay within their bounds apart from three sites on two runs, though most post-hoc edits act at one slice, where the write is the bound by construction.
 - [What a fresh probe can still find (E5)](#what-a-fresh-probe-can-still-find-e5) — No edit brings a fresh probe near chance, LEACE included.
-- [The two baseline rules (E6)](#the-two-baseline-rules-e6) — The two baselines disagree at configurations far past the criterion, and at the points the verdicts read no verdict changes under either one alone.
+- [The two baseline rules (E6)](#the-two-baseline-rules-e6) — The two baselines disagree at configurations far past the criterion; at the points the verdicts read, no verdict of H1 or H2 changes under either one alone, and S1 would fall short under the permuted-label rule alone.
 
 /// admonition | How to read this report
 This report was preregistered: the predictions, the grid, and the rule that picks a configuration from it were frozen at commit `bf73293`, before any run of this experiment. Each section opens with what we expect, and the results replaced the placeholders in place.
 
-The hypotheses are judged one fitter at a time, and then as a whole. A fitter is *accepted* when it does what the test asks of a working method (in H1 and H2, matching or beating the anchor; in H4, finding a placed concept) and *rejected* when it does not. A hypothesis as a whole *passes* or *misses*.
+The hypotheses are judged one fitter at a time, and then as a whole. A fitter is *accepted* when it does what the test asks of a working method (in H1 and H2, matching or beating the anchor; in H4, finding a placed concept) and *rejected* when it does not. A hypothesis as a whole *passes*, *misses*, or is *partial*; a fitter or a hypothesis the rule cannot settle is *Unresolved*.
 ///
 """
 
@@ -642,16 +642,33 @@ def e1_draw(cloud: dict, front: dict, anchor_curve: tuple, chosen: dict, a_rem: 
 E1_ALT = (
     "Six panels of removal against spill. The anchor panel shows the anchored edit at each dose as a dashed curve "
     "ending near removal 0.88 and spill zero. Each method panel shows a cloud of configurations, its frontier, and "
-    "its eight selected points; the frontiers of the fitters reach removal near 0.95 at spill below 0.02, above the "
-    "anchor, while the optimized direction stops near the anchor."
+    "its eight selected points; the selected points of the fitters sit near removal 0.95 at spill below 0.02, above "
+    "the anchor, while their frontiers of seed means cross the criterion between 0.85 and 0.95, and the optimized "
+    "direction stops near the anchor."
 )
+
+
+def _front_at_criterion(m: str) -> float:
+    """Removal where the frontier of seed means crosses the spill criterion, as the figure draws it."""
+    r, sp = CLOUD[m]
+    p = ex.read_point(r, sp, FRONT[m], CRITERION, "spill")
+    return float(sum(w * r[i] for i, w in zip(p["configs"], p["weights"], strict=True)))
+
+
+FRONT_AT = {m: _front_at_criterion(m) for m in METHODS}
+# REVIEW: the first draft said every fitter's frontier climbs past the anchored removal before the criterion, and
+# the alt text said the frontiers reach 0.95. That holds for the per-run frontiers the rule reads (every run but one
+# of the probe), not for the frontiers of seed means the figure draws, which cross the criterion below the anchor
+# for difference in means and LEACE. Verify: `FRONT_AT` against `A_REMOVAL.mean()`.
+assert all(FRONT_AT[m] > A_REMOVAL.mean() for m in ("ridge", "inlp")), FRONT_AT
+assert all(FRONT_AT[m] < A_REMOVAL.mean() for m in ("dim", "leace")), FRONT_AT
 CHOSEN = {m: (M_CONTROL[m]["removal"], M_CONTROL[m]["spill_at"]) for m in METHODS}
 E1_ACCEPTED = {m: H1[m] == "accepted" and H2[m] == "accepted" for m in METHODS}
 E1_REJECTED = {m: m in FITTERS and not H4_ACCEPTED[m] for m in METHODS}
 e1_draw(CLOUD, FRONT, ANCHOR_CURVE, CHOSEN, A_REMOVAL, A_SPILL, E1_ACCEPTED, E1_REJECTED, alt_text=E1_ALT)
 
 f"""
-Every standard fitter has a frontier that climbs past the anchored removal before it reaches the spill criterion, and on most runs the configuration it picks at the criterion removes nearly all of `{DIFF}`. Those configurations were fitted at the example answers and edit there alone, on nearly every run; the table below counts the sites. The optimized direction, which acts at every position by design, stops about where the anchor does.
+On every run but one, each standard fitter has a frontier that climbs past the anchored removal before it reaches the spill criterion, and the configuration it picks there removes nearly all of `{DIFF}`. The frontier of seed means, the line drawn in each panel, crosses the criterion lower: above the anchor for INLP and the probe, and below it for difference in means and LEACE (the caption says why the line sits under the markers). So part of the edge of the fitters is the choice of a configuration per run among about a thousand: the anchor has one configuration for every run, and one configuration shared by the eight runs would put difference in means and LEACE under the anchor at the criterion. Those configurations were fitted at the example answers and edit there alone, on nearly every run; the table below counts the sites. The optimized direction, which acts at every position by design, stops about where the anchor does.
 """
 
 # %%
@@ -882,7 +899,7 @@ h2_table(
 assert H2_VERDICT == "Misses" and H2["ridge"] == "unresolved" and H2["leace"] == H2["inlp"] == "accepted"
 
 f"""
-**{H2_VERDICT}.** LEACE and INLP remove more than the anchor within the criterion, by more than the seeds scatter, so both are accepted. The probe removes more on seven runs, but on one run it stops far short, and that run widens its interval past the band, so its verdict is Unresolved. Every resolved verdict is an acceptance, so H2 misses. Difference in means would have been accepted too, but it is left out under H4.
+**{H2_VERDICT}.** LEACE and INLP remove more than the anchor within the criterion, by more than the seeds scatter, so both are accepted. The probe removes more on seven runs, but on one run it stops far short, and that run widens its interval to run from {num(t_interval(A_REMOVAL, M_CONTROL["ridge"]["removal"])[0])} to just above zero, past the band, so its verdict is Unresolved. Every resolved verdict is an acceptance, so H2 misses. Difference in means would have been accepted too, but it is left out under H4.
 
 We expected a small edge for a fitter, since part of the evidence lies off e₁. The edge here is larger than that, and it comes mostly from where the fitters act. The rule picks the configurations fitted at the example answers, which edit those positions alone and use role labels a real corpus does not have. The table below, outside the preregistered rule, repeats the comparison with every fitter restricted to the pooled fits: the selection rule run again over that part of the grid, on the same runs, with the same baselines.
 """
@@ -983,7 +1000,7 @@ table_html(
 assert S1_VERDICT == "Matches"
 
 f"""
-**{S1_VERDICT}.** The interval on the gap in removal straddles zero and lies within 0.05 of it, and the Fisher test cannot tell the counts apart, so the best rank-1 search acting at every position does about as well as the anchor. By the frozen reading, the advantage of placing the concept is then that no search is needed. That reading takes the search as the reference, and H2 shows that fitters acting at the example answers do better still; we come back to this in the discussion.
+**{S1_VERDICT}.** The interval on the gap in removal straddles zero and lies within 0.05 of it, and the Fisher test cannot tell the counts apart, so the best rank-1 search acting at every position does about as well as the anchor. The removal here is net of the axis median, the baseline that favors the method; under the permuted-label baseline alone the optimized direction would remove far less, and the ceiling would fall short (E6). By the frozen reading, the advantage of placing the concept is then that no search is needed. That reading takes the search as the reference, and H2 shows that fitters acting at the example answers do better still; we come back to this in the discussion.
 """
 
 # %%
@@ -1042,7 +1059,9 @@ def h4_table() -> str:
         at the spill criterion (seed mean and range, net of the permuted-label baseline, and raw), and the seed mean
         of the absolute cosine with e₁ at slices 1 to 3. The edit along e₁ removes {span(A_REMOVAL)}; a fitter is
         accepted at {num(A_REMOVAL.mean() - H4_MARGIN)} or more. The cosines are for the configuration the rule chose
-        over the whole grid, which on most runs is the same site.""",
+        over the whole grid, which on most runs is the same site. For LEACE the cosine is that of its covariance
+        vector, which is the difference in means, so its row matches that of difference in means where both chose
+        the same fit.""",
     )
 
 
@@ -1428,7 +1447,7 @@ _RIDGE_LOW = _LAST["ridge"].min()
 f"""
 Difference in means, LEACE, and INLP need few labels: from every label down to a fiftieth, their removal moves by less than 0.02, so a mean or a covariance over 800 labelled contexts already points the right way. The probe is the exception. It drops to {num(_LAST["ridge"].mean())} at a fiftieth, with one run at {num(_RIDGE_LOW)} and one over the spill criterion.
 
-The anchor with fixed labels removes {num(FIXED_AT[0.02].mean())} at a fiftieth, below the three flat fitters at the same rate. So the fitters do not need more labels than the anchor here; with one fixed draw they need fewer.
+The anchor with fixed labels removes {num(FIXED_AT[0.02].mean())} at a fiftieth, below the three flat fitters at the same rate. So the label count is not what holds the fitters back, and it is not where the anchor has an edge. The fitters at a fiftieth are fitted at the example answers, so the rate is matched with the anchor and the site is not.
 """
 
 # %%
@@ -1579,9 +1598,9 @@ assert min(_Q3[n] for n in _EDITS) > 0.6 and min(_A2[n] for n in _EDITS) > 0.6
 f"""
 No edit brings the probe near chance. Clean, a probe reads the op at the query `=` of slice 3 with an AUC of {num(_Q3["clean control"])} on the control and {num(_Q3["clean anchored"])} on the anchored model. After the edits it reads {num(min(_Q3[n] for n in _EDITS))} to {num(max(_Q3[n] for n in _EDITS))} there, the anchored edit lowest. At the example answers the order turns around: the anchored edit leaves the op more readable ({num(_A2[SHOWN["anchor"]])} at slice 2) than difference in means, LEACE, or INLP ({num(min(_A2[SHOWN[m]] for m in ("dim", "leace", "inlp")))} to {num(max(_A2[SHOWN[m]] for m in ("dim", "leace", "inlp")))}), which edit there.
 
-LEACE does not do what we expected of it. At the slice and site it edits, a fresh probe still reads {num(_A2[SHOWN["leace"]])}, about what difference in means leaves. One candidate is the step after every edit that puts the state back on the sphere: rescaling a state by a length that depends on what was taken out brings some of the op back along every other direction, and the guarantee of LEACE is for the linear edit alone. We have not checked this.
+LEACE does not do what we expected of it, and we do not know why. At the slice and site it edits, mostly at full dose, a fresh probe still reads {num(_A2[SHOWN["leace"]])}, about what difference in means leaves. Three candidates fit what we see. The state goes back on the sphere after every edit, and rescaling it by a length that depends on what was taken out can bring some of the op back along every other direction, while the guarantee of LEACE is for the linear edit alone. Our LEACE takes a small ridge on a covariance that is close to rank-deficient, so it may leave low-variance directions that a fresh probe with a weak penalty can read. And on two runs it was fitted to the graded target, where the guarantee is for the posterior rather than the binary label the probe reads.
 
-<!-- REVIEW: the account of LEACE above is a guess. A check: fit the probe on the states before the return to the sphere, at one seed. Verify: worth running before the paper round? -->
+<!-- REVIEW: the first draft offered the return to the sphere as the one candidate; the claims review added the other two and asked that the paragraph not lean on any of them unchecked. A one-seed check (probe before the return to the sphere, and LEACE without the ridge) is in the backlog. Verify: fine to leave it unchecked for this report? -->
 """
 
 # %%
@@ -1691,11 +1710,18 @@ table_html(
 _PERM_COST = [M_RULE[(m, "axis")]["removal"].mean() - M_RULE[(m, "perm")]["removal"].mean() for m in FITTERS]
 _SAME = all(RULE_VERDICTS[(m, r)] == (H1[m], H2[m]) for m in FITTERS for r in ("perm", "axis"))
 _CHANGED = [(m, r) for m in FITTERS for r in ("perm", "axis") if RULE_VERDICTS[(m, r)] != (H1[m], H2[m])]
+# REVIEW: the first draft said no verdict changes under either rule alone, from a check over H1 and H2 only. S1
+# reads the axis rule for removal (the favoring rule), and under the permuted rule alone the optimized direction's
+# removal falls to 0.58 and the interval on the gap lies wholly above zero, which the frozen rule reads as "falls
+# short". Verify: `_S1_PERM_CI[0] > 0`.
+_S1_PERM = M_RULE[("optimized", "perm")]["removal"]
+_S1_PERM_CI = t_interval(A_REMOVAL, _S1_PERM)
+assert _S1_PERM_CI[0] > 0, _S1_PERM_CI
 
 f"""
 The two rules disagree a lot on single configurations and little at the points the verdicts read. At some configurations a permuted-label fit costs every op about as much as the fitted edit does, while an edit along a coordinate axis costs almost nothing. Under the permuted rule such a configuration shows little spill, under the axis rule a lot: these are the marks far below the diagonal on the right, and they spill well past the criterion under the axis rule.
 
-At the points the verdicts read, the axis rule gives the higher removal and the permuted rule the lower spill, so the favoring rule combines the two. Taken alone, the permuted rule lowers removal by {num(min(_PERM_COST))} to {num(max(_PERM_COST))} for the fitters and by {num(M_RULE[("optimized", "axis")]["removal"].mean() - M_RULE[("optimized", "perm")]["removal"].mean())} for the optimized direction, whose permuted searches remove much of the op themselves. {"No verdict changes under either rule." if _SAME else "The verdicts that change: " + ", ".join(f"{SHOWN[m]} under the {r} rule" for m, r in _CHANGED) + "."}
+At the points the verdicts read, the axis rule gives the higher removal and the permuted rule the lower spill, so the favoring rule combines the two. Taken alone, the permuted rule lowers removal by {num(min(_PERM_COST))} to {num(max(_PERM_COST))} for the fitters and by {num(M_RULE[("optimized", "axis")]["removal"].mean() - M_RULE[("optimized", "perm")]["removal"].mean())} for the optimized direction, whose permuted searches remove much of the op themselves. {"No verdict of H1 or H2 changes under either rule." if _SAME else "The verdicts of H1 and H2 that change: " + ", ".join(f"{SHOWN[m]} under the {r} rule" for m, r in _CHANGED) + "."} S1 is the exception: it reads the axis rule for removal, and under the permuted rule alone the optimized direction removes {num(_S1_PERM.mean())}, the interval on the gap lies wholly above zero ({interval(_S1_PERM_CI)}), and the ceiling would fall short of the anchor. A permuted search is no blank. Each context keeps its own target null under the permutation, so the search still pulls the `{DIFF}` contexts that land in the permuted labelled set toward the null, against the keep term on the rest, and it finds a direction that removes much of the op.
 """
 
 # %%
@@ -1727,7 +1753,7 @@ r"""
 
 **The query operands join the sites.** Before the freeze, whether the control holds the evidence for the op at the example answers, as the anchored model does, was not known: the block1-edit experiment found that the control gathers the operand colors at each example answer in block 1, but it fitted no probe for the op on a control. The smoke test fitted one at every role and slice of the control at seed 704. It scored best at the two operands of the query (an area under the ROC curve of 0.95 at slice 3), above the query `=` (0.92) and the example answers (0.83). The query answer scored higher still (0.99), but it comes after the `=` that predicts the scored answer, so an edit there cannot change it, and it was left out. So the query operands joined the sites fitted, as the plan said they would.
 
-**Details fixed with the code.** A sequential refit makes the fit at each slice under the full-dose edits at the slices before it, at every position, with zero replacement, and is reused across the doses, positions, and replacements scored with it; mean ablation under a refit uses the mean state of the other ops as it arrives under those edits. A permuted fit takes no sequential refit: it reuses the clean permuted fit at each slice, since a direction with no concept in it barely changes the states the next fit sees. The optimized direction acts at every position; its keep weight takes the values 0.3, 1, 3, and 10, and each search runs 300 Adam steps of 512 contexts at a learning rate of 0.01. With the graded target, the term toward the target null is weighted by the posterior on `difference` and the keep term by the rest. Its mean ablation is scored along the searched direction without searching again, and its permuted baseline uses five searches rather than fifteen, since each is a gradient search. E2, E4, and E5 read, for each method, the bracketing configuration of removal at the spill criterion that lies within the criterion. The label ladder of E3 leaves out the optimized direction, which reads the target null rather than labels; on the graded target an unlabelled `difference` context has a target of zero. The probe of E5 reads the query `=` and the example answers at each slice, on 7,000 test contexts split in half, and reports the area under the ROC curve. The write of E4 is measured on 2,000 test contexts of the other ops, with a role per position within an equation. The selection of H4 over the pooled fits and the example answers, and the pooled-only selection of H2, were run as a second pass after the main one, on the same tuning scores; it scored the test-set baselines of the configurations it chose that the main pass had not.
+**Details fixed with the code.** A sequential refit makes the fit at each slice under the full-dose edits at the slices before it, at every position, with zero replacement, and is reused across the doses, positions, and replacements scored with it; mean ablation under a refit uses the mean state of the other ops as it arrives under those edits. A permuted fit takes no sequential refit: it reuses the clean permuted fit at each slice, since a direction with no concept in it barely changes the states the next fit sees. The optimized direction acts at every position; its keep weight takes the values 0.3, 1, 3, and 10, and each search runs 300 Adam steps of 512 contexts at a learning rate of 0.01. With the graded target, the term toward the target null is weighted by the posterior on `difference` and the keep term by the rest. Its mean ablation is scored along the searched direction without searching again, and its permuted baseline uses five searches rather than fifteen, since each is a gradient search. A permuted search is no blank: each context keeps its own target null under the permutation, so the search still pulls the `difference` contexts among its labels toward the null, and the favoring rule takes the axis median for its removal. E2, E4, and E5 read, for each method, the bracketing configuration of removal at the spill criterion that lies within the criterion. The label ladder of E3 leaves out the optimized direction, which reads the target null rather than labels; on the graded target an unlabelled `difference` context has a target of zero. The probe of E5 reads the query `=` and the example answers at each slice, on 7,000 test contexts split in half, and reports the area under the ROC curve. The write of E4 is measured on 2,000 test contexts of the other ops, with a role per position within an equation. The selection of H4 over the pooled fits and the example answers, and the pooled-only selection of H2, were run as a second pass after the main one, on the same tuning scores; it scored the test-set baselines of the configurations it chose that the main pass had not.
 
 **Left out.** The same comparison for *red* on the D2.1 checkpoints, where ex-2.2.1 gave the fitters far less, is not run here: this report is about the inferred op.
 
