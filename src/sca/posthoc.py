@@ -18,6 +18,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import functools
+import math
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -126,6 +129,16 @@ def with_mean(sub: Subspace, mean: np.ndarray) -> Subspace:
 # --- The edit, slice by slice --------------------------------------------------------------------------------
 
 
+@functools.partial(jax.jit, static_argnums=1)
+def _unpack(flat: Float[Array, " n"], shapes: tuple[tuple[int, ...], ...]) -> tuple[Array, ...]:
+    out, i = [], 0
+    for shape in shapes:
+        n = math.prod(shape)
+        out.append(flat[i : i + n].reshape(shape))
+        i += n
+    return tuple(out)
+
+
 class SliceEdit(eqx.Module):
     """A subspace per slice, stacked: what to remove at each slice, how much (`gamma`), and at which positions.
 
@@ -158,7 +171,11 @@ class SliceEdit(eqx.Module):
             k = sub.basis.shape[0]
             assert k <= rank, f"a rank-{k} subspace in a rank-{rank} edit"
             basis[sl, :k], dual[sl, :k], mean[sl], g[sl] = sub.basis, sub.dual, sub.mean, gamma
-        return cls(*(jnp.asarray(a) for a in (basis, dual, mean, g, np.asarray(positions, np.float32))))
+        parts = (basis, dual, mean, g, np.asarray(positions, np.float32))
+        # One transfer for the whole edit: on the cloud workers each host-to-device copy costs milliseconds, and a
+        # scoring pass builds an edit per configuration.
+        flat = jax.device_put(np.concatenate([a.ravel() for a in parts]))
+        return cls(*_unpack(flat, tuple(a.shape for a in parts)))
 
     @classmethod
     def identity(cls, n_slices: int, width: int, length: int, rank: int = 1) -> SliceEdit:
@@ -225,9 +242,14 @@ def _pre_post(model: NGPT, idx: Int[Array, "B T"], edit: SliceEdit) -> tuple[Arr
 _pre_post_jit = eqx.filter_jit(_pre_post)
 
 
-def _batches(tokens: np.ndarray, batch_size: int):
-    """Fixed-size batches of *tokens*, the last padded by repeating its final row: (batch, rows that count)."""
+def _batches(tokens: np.ndarray | Array, batch_size: int):
+    """Fixed-size batches of *tokens*, the last padded by repeating its final row: (batch, rows that count).
+    Tokens already on the device that fit in one batch go as they are.
+    """
     batch_size = min(batch_size, len(tokens))
+    if isinstance(tokens, jax.Array) and batch_size == len(tokens):
+        yield 0, tokens, len(tokens)
+        return
     for i in range(0, len(tokens), batch_size):
         chunk = tokens[i : i + batch_size]
         n = len(chunk)

@@ -360,6 +360,21 @@ class Scored:
     null: np.ndarray
     color_ids: np.ndarray
 
+    def device_tokens(self):
+        """The tokens on the device, copied once per set rather than once per pass."""
+        import jax
+
+        if "_tokens" not in self.__dict__:
+            self.__dict__["_tokens"] = jax.device_put(self.tokens)
+        return self.__dict__["_tokens"]
+
+    def device_color_ids(self):
+        import jax
+
+        if "_color_ids" not in self.__dict__:
+            self.__dict__["_color_ids"] = jax.device_put(self.color_ids)
+        return self.__dict__["_color_ids"]
+
     def match(self, logits: np.ndarray) -> np.ndarray:
         return ex2216._match(self.table, self.ctx, ex2216._color_probs(logits, self.color_ids))
 
@@ -595,8 +610,21 @@ def _load_common(checkpoint, split_path, label: str, sub: str, holdout: bool):
 def _per_op_scores(model, s: Scored, edit) -> np.ndarray:
     from sca.posthoc import color_probs_at
 
-    p = color_probs_at(model, s.tokens, edit, QUERY_EQ, s.color_ids)
+    p = color_probs_at(model, s.device_tokens(), edit, QUERY_EQ, s.device_color_ids())
     return s.per_op(ex2216._match(s.table, s.ctx, p))
+
+
+def _forward_seconds(model, s: Scored, edit, n: int = 10) -> float:
+    """The device time of one forward pass over *s*, with no copies to or from the host."""
+    from sca.posthoc import _color_logprobs
+
+    tokens, cid = s.device_tokens(), s.device_color_ids()
+    _color_logprobs(model, tokens, edit, QUERY_EQ, cid).block_until_ready()
+    t0 = time.perf_counter()
+    for _ in range(n):
+        out = _color_logprobs(model, tokens, edit, QUERY_EQ, cid)
+    out.block_until_ready()
+    return (time.perf_counter() - t0) / n
 
 
 def axes_one(checkpoint, tune_set, fits, label: str, smoke: bool = False) -> dict:
@@ -652,12 +680,14 @@ def grid_one(checkpoint, split, fits, searched: list[dict], label: str, method: 
     with open(get(fits, workdir / "fits.pkl"), "rb") as f:
         f_ = _Fits(pickle.load(f), [r for r in searched if r["perm"] is None], width)
     cs = smoke_grid(method) if smoke else configs(method)
-    clean = _per_op_scores(model, s, SliceEdit.identity(N_SLICES, width, CONTEXT_LEN))
+    identity = SliceEdit.identity(N_SLICES, width, CONTEXT_LEN)
+    clean = _per_op_scores(model, s, identity)
+    forward_s = _forward_seconds(model, s, identity)
     t0 = time.perf_counter()
     scores = [_per_op_scores(model, s, f_.edit(c)).tolist() for c in cs]
     return {"label": label, "method": method, "holdout": holdout, "configs": [asdict(c) for c in cs],
             "clean": clean.tolist(), "null": s.per_op(s.null).tolist(), "scores": scores,
-            "seconds_per_pass": (time.perf_counter() - t0) / max(len(cs), 1)}  # fmt: skip
+            "seconds_per_pass": (time.perf_counter() - t0) / max(len(cs), 1), "seconds_forward": forward_s}  # fmt: skip
 
 
 def smoke_grid(method: str) -> list[Config]:
