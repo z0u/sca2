@@ -241,6 +241,10 @@ SMOKE_REF = PREFIX + "/smoke"
 # The selections over part of the grid (`RESTRICTED`), added after the full run: H4 restricts its fitters to two
 # sites, and `select` had taken the frontier over all four.
 RESTRICTED_REF = PREFIX + "/restricted"
+# What the E sections read, again at the pooled-only selections of the controls, added after the paper round on the
+# results: the like-for-like comparison of the report repeats E2–E5 with the pooled fits alone.
+POOLED_REF = PREFIX + "/pooled"
+POOLED_ARRAYS_REF = PREFIX + "/pooled-arrays/{label}"
 
 
 def runs(smoke: bool = False) -> list[dict[str, Any]]:
@@ -867,6 +871,19 @@ def publish_restricted(rows: list[dict], restricted: list[dict]) -> dict:
 # =============================================================================================
 
 
+def publish_pooled(rows: list[dict], finished: list[dict]) -> dict:
+    import json
+
+    from mini.store import put, set_ref
+
+    body = {"runs": [{"label": r["label"]} | {k: v for k, v in f.items() if k != "arrays"}
+                     for r, f in zip(rows, finished, strict=True)]}  # fmt: skip
+    set_ref(POOLED_REF, put(json.dumps(body).encode(), name=f"{NAME}-pooled.json"))
+    for r, f in zip(rows, finished, strict=True):
+        set_ref(POOLED_ARRAYS_REF.format(label=r["label"]), f["arrays"])
+    return {"runs": len(rows), "ref": POOLED_REF}
+
+
 def _chosen(sel: dict) -> list[int]:
     """The configurations a method's two points use."""
     return sorted({i for p in ("at_criterion", "at_matched") for i in sel[p]["configs"]})
@@ -1265,7 +1282,26 @@ def run(ctx: Ctx, smoke: bool = False) -> dict:
         [anchored] * n,
         role="score",
     )
-    return published | {"restricted": ctx.run(publish_restricted, rows, restricted, role="prep")}
+    out = published | {"restricted": ctx.run(publish_restricted, rows, restricted, role="prep")}
+    # E2–E5 again on the controls, at the selections over the pooled fits alone (the standard fitters; the optimized
+    # direction is always pooled, so its main selection already is one).
+    ctl = [i for i, r in enumerate(rows) if r["kind"] == "control"]
+    sels = [{m: v for m, v in restricted[i]["selections"]["pooled"].items() if m != "optimized"} for i in ctl]
+    pooled = ctx.map(
+        finish_one,
+        [ckpt[i] for i in ctl],
+        [holdout] * len(ctl),
+        [sets["fit"]] * len(ctl),
+        [fitted[i]["fits"] for i in ctl],
+        [searched[i] for i in ctl],
+        [tune[i] for i in ctl],
+        sels,
+        [labels[i] for i in ctl],
+        [False] * len(ctl),
+        [False] * len(ctl),
+        role="score",
+    )
+    return out | {"pooled": ctx.run(publish_pooled, [rows[i] for i in ctl], pooled, role="prep")}
 
 
 def main(ctx: Ctx) -> dict:

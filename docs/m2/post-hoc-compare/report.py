@@ -82,6 +82,30 @@ def fetch_all() -> tuple[dict, dict, dict, dict, dict]:
 
 
 BODY, RESTRICTED_BODY, ANCHOR_AXES, LABELS_AXES, ARRAYS = fetch_all()
+
+
+def fetch_pooled() -> tuple[dict, dict]:
+    """What E2 to E5 read at the selections over the pooled fits alone, per control run: the results, and the
+    arrays of `finish_one`, keyed by label.
+    """
+    store = project_store()
+    labels = [r["label"] for r in ex.runs() if r["kind"] == "control"]
+    arrays = {lab: ex.POOLED_ARRAYS_REF.format(label=lab) for lab in labels}
+    refs = [ex.POOLED_REF, *arrays.values()]
+    have = {r: a for r, a in store.get_refs(refs).items() if a is not None}
+    assert len(have) == len(refs), f"not published: {sorted(set(refs) - set(have))}"
+    with tempfile.TemporaryDirectory() as tmp:
+        into = Path(tmp)
+        paths = dict(zip(refs, store.get_many([(have[r], into / f"{i}") for i, r in enumerate(refs)]), strict=True))
+        body = json.loads(paths[ex.POOLED_REF].read_text())
+        arr = {}
+        for lab, ref in arrays.items():
+            with np.load(paths[ref]) as z:
+                arr[lab] = {k: z[k] for k in z.files}
+    return {r["label"]: r for r in body["runs"]}, arr
+
+
+POOLED_FINISH, POOLED_ARRAYS = fetch_pooled()
 OPS: tuple[str, ...] = tuple(BODY["design"]["ops"])
 DIFF = ex.ANCHORED_OP
 D = OPS.index(DIFF)
@@ -405,18 +429,18 @@ Placing a concept during training needs an extra training term, and it lowers th
 r"""
 ## Findings
 
-- [The trade-off (E1)](#the-trade-off-e1) — On every run but one, each standard fitter climbs past the anchored removal before it reaches the spill criterion, mostly through edits at the example answers.
+- [The trade-off (E1)](#the-trade-off-e1) — On every run but one, each standard fitter climbs past the anchored removal before it reaches the spill criterion, mostly through edits at the example answers. With a configuration chosen on the other seven runs instead, the fitters remove a little less, and on one run in eight a choice made elsewhere misses the slice where that run holds the op.
 - [Spill at matched removal (H1)](#spill-at-matched-removal-h1) — **Misses**. Turned up to the anchored removal, no standard fitter spills past the criterion on more than one run, so each is accepted.
 - [Removal at the spill criterion (H2)](#removal-at-the-spill-criterion-h2) — **Misses**. LEACE and INLP remove more than the anchor within the criterion, the probe is Unresolved, and difference in means is left out under H4; with the pooled fits alone, LEACE is close to the anchor and the others remove less.
 - [The ceiling against the fitters (H3)](#the-ceiling-against-the-fitters-h3) — **Misses**. The optimized direction, which acts at every position, removes less than the rank-1 fitters that edit the example answers.
 - [The ceiling against the anchor (S1)](#the-ceiling-against-the-anchor-s1) — **Matches**. Net of the axis-median baseline that favors it, the optimized direction removes about as much as the anchor, and its two runs over the spill criterion are within chance of the anchored none.
 - [The fitters find a placed concept (H4)](#the-fitters-find-a-placed-concept-h4) — **Partial**. The probe, LEACE, and INLP find the placed concept; difference in means misses the gate by less than 0.001.
-- [Without role labels](#without-role-labels) — Restricted to fits that need no role labels, LEACE and INLP remove about as much as the anchor and spill past the criterion at matched removal on two runs in eight against none; difference in means removes less and spills on six.
 - [Grading, landing, and where the answers go (E2)](#grading-landing-and-where-the-answers-go-e2) — The edits grade alike and send the answers to the same places; the fitters land a little further toward the target null than the anchor.
 - [How many labels a fitter needs (E3)](#how-many-labels-a-fitter-needs-e3) — Difference in means, LEACE, and INLP keep their removal down to a fiftieth of the labels, and the probe drops to 0.84.
 - [The write against each bound (E4)](#the-write-against-each-bound-e4) — The writes stay within their bounds apart from three sites on two runs, though most post-hoc edits act at one slice, where the write equals the bound.
 - [What a fresh probe can still find (E5)](#what-a-fresh-probe-can-still-find-e5) — No edit brings a fresh probe near chance, LEACE included.
 - [The two baseline rules (E6)](#the-two-baseline-rules-e6) — The two baselines disagree at configurations far past the spill criterion; at the points the verdicts read, no verdict of H1 or H2 changes under either one alone, and S1 would fall short under the permuted-label rule alone.
+- [Without role labels](#without-role-labels) — Restricted to fits that need no role labels, LEACE and INLP remove about as much as the anchor and spill past the criterion at matched removal on two runs in eight against none; difference in means removes less and spills on six. Drawn again with these fits, E1 to E5 show the same picture, with the fitters a little lower.
 
 /// admonition | How to read this report
 This report was preregistered: the predictions, the grid, and the rule that picks a configuration from it were frozen at commit `bf73293`, before any run of this experiment. Each section opens with what we expect, and the results replaced the placeholders in place.
@@ -552,9 +576,12 @@ Each mark is net of the median drop along the fifteen coordinate axes of the tun
 # %%
 
 
-def run_cloud(method: str, seed: int) -> tuple[np.ndarray, np.ndarray]:
+SCOPE_SITES = {"all": None, "pooled": ("pooled",)}
+
+
+def run_cloud(method: str, seed: int, scope: str = "all") -> tuple[np.ndarray, np.ndarray]:
     """Removal and spill of every configuration of *method* on the test set of one control run, net of the
-    tuning-set axis median under its operator form.
+    tuning-set axis median under its operator form; NaN for a configuration outside *scope*.
     """
     run = RUNS[("control", seed)]
     g = run["test"][METHODS.index(method)]
@@ -562,7 +589,17 @@ def run_cloud(method: str, seed: int) -> tuple[np.ndarray, np.ndarray]:
     med = run["axes"]["median_drop"]
     base = np.array([med[str(ex.config_of(c).form)] for c in g["configs"]])
     net = clean[None] - np.asarray(g["scores"]) - base
-    return net[:, D] / (clean[D] - null[D]), np.delete(net, D, axis=1).max(axis=1)
+    removal, spill = net[:, D] / (clean[D] - null[D]), np.delete(net, D, axis=1).max(axis=1)
+    if (sites := SCOPE_SITES[scope]) is not None:
+        out = np.array([c["site"] not in sites for c in g["configs"]])
+        removal[out], spill[out] = np.nan, np.nan
+    return removal, spill
+
+
+def finite_frontier(removal: np.ndarray, spill: np.ndarray) -> np.ndarray:
+    """`frontier` over the configurations with a score, with the indices of the whole grid."""
+    ok = np.flatnonzero(np.isfinite(removal))
+    return ok[ex.frontier(removal[ok], spill[ok])]
 
 
 def cloud(method: str) -> tuple[np.ndarray, np.ndarray]:
@@ -571,19 +608,44 @@ def cloud(method: str) -> tuple[np.ndarray, np.ndarray]:
     return np.mean([r for r, _ in per], axis=0), np.mean([sp for _, sp in per], axis=0)
 
 
-def run_fronts(method: str) -> list[tuple[np.ndarray, np.ndarray]]:
+def run_fronts(method: str, scope: str = "all") -> list[tuple[np.ndarray, np.ndarray]]:
     """The frontier of each control run of *method*, as (spill, removal) lines."""
     out = []
     for s in SEEDS:
-        r, sp = run_cloud(method, s)
-        f = ex.frontier(r, sp)
+        r, sp = run_cloud(method, s, scope)
+        f = finite_frontier(r, sp)
         out.append((sp[f], r[f]))
     return out
+
+
+def shared_point(method: str, scope: str = "all") -> tuple[np.ndarray, np.ndarray]:
+    """Removal and spill per run at a configuration chosen on the other seven runs: the selection rule read at the
+    spill criterion off the frontier of their seed means on the tuning set, then scored on the test set of the run
+    left out, as `run_cloud` scores it. The fit is still made on the run left out; only the choice of target,
+    site, slices, dose, refit, replacement, and rank comes from the others.
+    """
+
+    def tuning(s: int) -> tuple[np.ndarray, np.ndarray]:
+        run = RUNS[("control", s)]
+        sel = scope_selection(run, method, scope)
+        r, sp = (np.array([np.nan if v is None else v for v in sel[k]], float) for k in ("removal", "spill"))
+        return r, sp
+
+    rem, spl = [], []
+    for s in SEEDS:
+        others = [tuning(o) for o in SEEDS if o != s]
+        tr, ts = np.mean([a for a, _ in others], axis=0), np.mean([b for _, b in others], axis=0)
+        p = ex.read_point(tr, ts, finite_frontier(tr, ts), CRITERION, "spill")
+        r, sp = run_cloud(method, s, scope)
+        rem.append(sum(w * r[i] for i, w in zip(p["configs"], p["weights"], strict=True)))
+        spl.append(sum(w * sp[i] for i, w in zip(p["configs"], p["weights"], strict=True)))
+    return np.asarray(rem), np.asarray(spl)
 
 
 CLOUD = {m: cloud(m) for m in METHODS}
 FRONT = {m: ex.frontier(*CLOUD[m]) for m in METHODS}
 RUN_FRONTS = {m: run_fronts(m) for m in METHODS}
+SHARED = {m: shared_point(m) for m in METHODS}
 H1["optimized"], H2["optimized"] = h1_verdict("optimized"), h2_verdict("optimized")
 ANCHOR_CURVE = (
     np.mean([ANCHOR[s]["removal"] for s in SEEDS], axis=0),
@@ -634,15 +696,19 @@ def _e1_anchor(ax, anchor_runs: list, a_rem: np.ndarray, a_spill: np.ndarray) ->
 
 @memo
 def e1_draw(fronts: dict, anchor_runs: list, anchor_curve: tuple, chosen: dict, a_rem: np.ndarray,
-            a_spill: np.ndarray, accepted: dict, rejected: dict, alt_text: str) -> str:  # fmt: skip
+            a_spill: np.ndarray, accepted: dict, rejected: dict, alt_text: str, name: str = "post-hoc-compare-tradeoff",
+            caption: str | None = None) -> str:  # fmt: skip
     @themed(
-        name="post-hoc-compare-tradeoff",
+        name=name,
         alt_text=alt_text,
-        caption=f"""
+        caption=caption
+        or f"""
             **Removal against spill, one line per run**, on the test set of the eight controls. Each panel is one
             method. A line is the frontier of one run: the configurations that no other configuration of that run
             beats on both removal and spill. The marker on each line is the point the selection rule read for that run
-            at the spill criterion (H2), so every run has its own configuration. In the anchor panel a line is the
+            at the spill criterion (H2), net of the axis median as the lines are, so every run has its own
+            configuration; the tables take the baseline that favors the method, which can put a point a little
+            to the left. In the anchor panel a line is the
             anchored edit of one run as its dose rises, ending at a diamond (full dose); the dashed curve in the other
             panels is their mean. The other methods are drawn as grey hairlines behind. The dotted vertical line is
             the spill criterion, and the dotted horizontal one the anchored removal. A red border marks a method
@@ -684,21 +750,10 @@ E1_ALT = (
 )
 
 
-def _front_at_criterion(m: str) -> float:
-    """Removal where the frontier of seed means crosses the spill criterion: one configuration for every run."""
-    r, sp = CLOUD[m]
-    p = ex.read_point(r, sp, FRONT[m], CRITERION, "spill")
-    return float(sum(w * r[i] for i, w in zip(p["configs"], p["weights"], strict=True)))
-
-
-FRONT_AT = {m: _front_at_criterion(m) for m in METHODS}
-# REVIEW: the first draft said every fitter's frontier climbs past the anchored removal before the criterion, and
-# the alt text said the frontiers reach 0.95. That holds for the per-run frontiers the rule reads (every run but one
-# of the probe), not for the frontiers of seed means the figure draws, which cross the criterion below the anchor
-# for difference in means and LEACE. Verify: `FRONT_AT` against `A_REMOVAL.mean()`.
-assert all(FRONT_AT[m] > A_REMOVAL.mean() for m in ("ridge", "inlp")), FRONT_AT
-assert all(FRONT_AT[m] < A_REMOVAL.mean() for m in ("dim", "leace")), FRONT_AT
-CHOSEN = {m: (M_CONTROL[m]["removal"], M_CONTROL[m]["spill_at"]) for m in METHODS}
+# The markers take the axis median of the test set, close to the tuning-set median the lines take; the favoring
+# rule of the tables can put a point a little further left.
+_AXIS = {m: measures("control", m, rule="axis") for m in METHODS}
+CHOSEN = {m: (_AXIS[m]["removal"], _AXIS[m]["spill_at"]) for m in METHODS}
 E1_ACCEPTED = {m: H1[m] == "accepted" and H2[m] == "accepted" for m in METHODS}
 E1_REJECTED = {m: m in FITTERS and not H4_ACCEPTED[m] for m in METHODS}
 assert all(chosen_sites("control", m) == "answers 8" for m in FITTERS)
@@ -709,8 +764,6 @@ e1_draw(RUN_FRONTS, ANCHOR_RUNS, ANCHOR_CURVE, CHOSEN, A_REMOVAL, A_SPILL, E1_AC
 
 f"""
 On every run but one, each standard fitter has a frontier that climbs past the anchored removal before it reaches the spill criterion. The configuration it picks at the criterion removes nearly all of `{DIFF}`.
-
-Each run picks its own configuration, among about a thousand, and part of the edge of the fitters comes from that choice. If one configuration had to serve all eight runs, the frontier of seed means would cross the criterion at a removal of {num(FRONT_AT["dim"])} for difference in means and {num(FRONT_AT["leace"])} for LEACE, under the anchor at {num(A_REMOVAL.mean())}, and at {num(FRONT_AT["inlp"])} for INLP and {num(FRONT_AT["ridge"])} for the probe. The anchor has one configuration for every run.
 
 On every run, the configuration each fitter chose at the criterion was fitted at the example answers and edits there alone; the table below counts the sites. The optimized direction, which acts at every position by design, stops about where the anchor does.
 """
@@ -767,6 +820,52 @@ f"""
 So on this model a direction fitted after training, with every label and a per-run grid, removes more of `{DIFF}` within the criterion than the anchored edit does, and spills no more at matched removal. It costs the task nothing, since the model is the control, while the anchored runs score {num(-TASK_CHANGE, ".3f")} lower than the controls. The fixed-labels row removes less than the main anchored arm, as that experiment found.
 
 The edge comes mostly from fitting and editing at the example answers, a role a real corpus does not label. Restricted to the pooled fits, which need no role labels, the fitters lose most of that edge ([Without role labels](#without-role-labels)).
+"""
+
+# %%
+
+r"""
+### One configuration chosen on other runs
+
+Each run above picks its own configuration, among about a thousand, on the model it edits. The anchor had no such choice on these runs: its recipe was settled on earlier seeds and run on these eight as it was. The next figure puts the fitters on the same terms. For each run, the selection rule picks a configuration on the other seven, off the frontier of their seed means on the tuning set, and the fitter is then fitted on the run left out with that configuration. This analysis was not preregistered.
+"""
+
+# %%
+
+SHARED_712 = {m: float(SHARED[m][0][SEEDS.index(712)]) for m in METHODS}
+SHARED_REST = {m: float(np.delete(SHARED[m][0], SEEDS.index(712)).mean()) for m in METHODS}
+OWN_REST = {m: float(np.delete(M_CONTROL[m]["removal"], SEEDS.index(712)).mean()) for m in METHODS}
+SHARED_OVER = {m: over_count(SHARED[m][1]) for m in METHODS}
+# Seed 712 is the run where a configuration chosen on the others fails: difference in means, LEACE, and INLP keep
+# almost nothing there, and its own choices edit slice 1 where the others edit slice 2.
+assert all(SHARED_712[m] < 0.1 for m in ("dim", "leace", "inlp")), SHARED_712
+assert all(RUNS[("control", 712)]["test"][METHODS.index(m)]["configs"][RUNS[("control", 712)]["selection"][m]["at_criterion"]["configs"][0]]["slices"][0] == 1 for m in ("dim", "leace", "inlp"))  # fmt: skip
+assert all(SHARED_REST[m] < OWN_REST[m] for m in FITTERS), (SHARED_REST, OWN_REST)
+assert all(3 <= SHARED_OVER[m] <= 4 for m in FITTERS) and SHARED_OVER["optimized"] == 0, SHARED_OVER
+E1_SHARED_ALT = (
+    "Six panels of removal against spill, one line per run, as in the figure before. In the method panels each "
+    "marker is the configuration chosen on the other seven runs, scored on its own run: most sit near or a little "
+    "under their line, about half just past the spill criterion, and for difference in means, LEACE, and INLP one "
+    "marker sits near zero removal. The optimized direction markers stay near the anchor."
+)
+e1_draw(RUN_FRONTS, ANCHOR_RUNS, ANCHOR_CURVE, {m: SHARED[m] for m in METHODS}, A_REMOVAL, A_SPILL,
+        dict.fromkeys(METHODS, False), dict.fromkeys(METHODS, False), alt_text=E1_SHARED_ALT,
+        name="post-hoc-compare-shared", caption=f"""
+            **Removal against spill with a configuration chosen on the other runs**, on the test set of the eight
+            controls. The lines are the frontiers of the figure before, one per run. The marker on each run is the
+            configuration the selection rule picked on the other seven runs, at the spill criterion, fitted and scored
+            on this run; where it sits under its line, the run would have done better with a choice of its own. The
+            anchor panel is as before. Spill here is net of the median along the coordinate axes of the tuning set,
+            as in the figure before. The spill axis is cut at {SPILL_LIM[1]}.
+        """)  # fmt: skip
+
+# %%
+
+f"""
+With the configuration chosen on other runs, the fitters remove about {num(min(SHARED_REST[m] for m in FITTERS))} to {num(max(SHARED_REST[m] for m in FITTERS))} on seven of the eight runs, a little less than with a choice of their own ({num(min(OWN_REST[m] for m in FITTERS))} to {num(max(OWN_REST[m] for m in FITTERS))}), and land past the spill criterion on {NUMBER_WORD[min(SHARED_OVER[m] for m in FITTERS)]} or {NUMBER_WORD[max(SHARED_OVER[m] for m in FITTERS)]} of the eight. A point picked right at the criterion on other runs lands on either side of it about as often, while the anchor sits well inside it on every run.
+
+The eighth run, seed 712, is where the choice fails to carry over. Difference in means, LEACE, and INLP keep almost nothing of their removal there ({num(min(SHARED_712[m] for m in ("dim", "leace", "inlp")))} to {num(max(SHARED_712[m] for m in ("dim", "leace", "inlp")))}): their choices on the other runs edit slice 2, and on this run their own choices edit slice 1. The probe keeps {num(SHARED_712["ridge"])} there, with an edit over slices 1 to 3. So where a post-hoc edit works moves from run to run, by a slice on one run in eight here, and a fixed recipe for a fitter has to cover that, while the anchor puts the concept on e₁ on every run. One run is a small sample; a larger set of seeds would say how often this happens.
+
 """
 
 # %%
@@ -1127,70 +1226,6 @@ The directions of difference in means, LEACE, and INLP on these runs point well 
 # %%
 
 r"""
-## Without role labels
-
-The anchor uses no role labels. Its pull pools over the positions of a labelled context, and its edit acts at every position and slice. A fit at the example answers, the query `=`, or the query operands uses a role, which a real corpus does not label. So the like-for-like comparison restricts every fitter to the pooled fits: the selection rule runs again over the configurations fitted at every position, pooled, on the same runs and with the same baselines. The fitters keep a label on every `difference` context and a grid tuned per run over the target, slices, dose, refit, replacement, and rank, which the anchor does not have.
-
-This reading was not preregistered, so it gives no verdict. The table applies the rules of H1 and H2 as a guide to how far apart the methods are.
-"""
-
-# %%
-
-per_run_draw(
-    "post-hoc-compare-pooled",
-    {"anchor": A_REMOVAL} | {key(m): M_POOLED[m]["removal"] for m in METHODS},
-    float(A_REMOVAL.mean()),
-    "below",
-    f"removal of {DIFF} at the criterion (net)",
-    (0.1, 1.02),
-    """**Removal at the spill criterion per run, with the pooled fits alone**, on the test set, net. A small dot per
-    run and the seed mean as the method's marker; the anchor at full dose. The dashed line is the seed mean of the
-    anchor, and the side under it is hatched.""",
-    "Removal at the spill criterion per run with the pooled fits alone. LEACE and INLP sit near the anchor line, "
-    "the probe a little below, and difference in means well below with one run near 0.2; the optimized direction "
-    "sits on the anchor line.",
-)
-
-# %%
-
-POOLED_CI = {m: t_interval(A_REMOVAL, M_POOLED[m]["removal"]) for m in METHODS}
-POOLED_RULES = {m: (h1_verdict(m, M_POOLED[m]), h2_verdict(m, M_POOLED[m])) for m in METHODS}
-POOLED_ROWS = ["anchor", *METHODS]
-table_html(
-    ["method", "removal at criterion ↑", "anchor minus method, 95% interval", "over at matched removal",
-     "H1, H2 rules would read"],
-    [["anchor", span(A_REMOVAL), "", f"{A_OVER} of 8", ""]]
-    + [[SHOWN[m], span(M_POOLED[m]["removal"]), interval(POOLED_CI[m]), f"{over_count(M_POOLED[m]['spill'])} of 8" + (f" ({u} not matched)" if (u := int((~np.isfinite(M_POOLED[m]["spill"])).sum())) else ""),
-        ", ".join(POOLED_RULES[m])] for m in METHODS],
-    """**The comparison with the pooled fits alone**: removal at the spill criterion (seed mean and range, net),
-    the 95% Welch interval on the anchored seed mean minus the method seed mean, the runs over the criterion at
-    matched removal out of eight, and what the rules of H1 and H2 would read; no verdict. The optimized direction is
-    always pooled, so its row is the same as in H2. A greyed row is a fitter rejected under H4.""",
-    grey=h4_grey(POOLED_ROWS),
-)  # fmt: skip
-
-# %%
-
-POOLED_UNMATCHED = {m: int((~np.isfinite(M_POOLED[m]["spill"])).sum()) for m in METHODS}
-POOLED_OVER = {m: over_count(M_POOLED[m]["spill"]) for m in METHODS}
-assert POOLED_OVER["leace"] == POOLED_OVER["inlp"] == 2
-assert A_OVER == 0 and POOLED_OVER["dim"] == 6 and POOLED_RULES["dim"][0] == "rejected"
-assert all(POOLED_OVER[m] in (2, 3) for m in ("ridge", "leace", "inlp", "optimized")), POOLED_OVER
-assert all(POOLED_RULES[m][1] == "unresolved" for m in FITTERS)
-_P2 = fisher_greater(2, A_OVER)
-assert not any(POOLED_UNMATCHED[m] for m in FITTERS)
-
-f"""
-Without role labels the fitters lose most of their edge in removal. LEACE removes {num(M_POOLED["leace"]["removal"].mean())} against the anchored {num(A_REMOVAL.mean())}, with an interval on the gap of {interval(POOLED_CI["leace"])}. INLP ({num(M_POOLED["inlp"]["removal"].mean())}) and the probe ({num(M_POOLED["ridge"]["removal"].mean())}) come close on average with a wider spread, and difference in means removes {num(M_POOLED["dim"]["removal"].mean())}, with one run at {num(M_POOLED["dim"]["removal"].min())}. Read by the rule of H2, every fitter's interval reaches further than 0.05 from zero on one side, so none is a match and none falls short.
-
-At matched removal the order turns around. The anchored edit spills past the criterion on no run; LEACE and INLP do on {POOLED_OVER["leace"]} runs each, the probe on {POOLED_OVER["ridge"]}, and difference in means on {POOLED_OVER["dim"]}, which the rule of H1 would reject. Every fitter reaches the anchored removal on every run, so these are runs that spill, not runs that fall short. The Fisher test cannot tell two runs in eight from none (p {num(_P2)}), so for LEACE and INLP this is a lean, not a separation.
-
-So in the setting the anchor is built for, the best post-hoc eraser removes about as much as the anchored edit and, even with a grid tuned per run, spills past the criterion on a few more runs. Difference in means, the direction most steering work uses, removes less and spills more.
-"""
-
-# %%
-
-r"""
 ## Grading, landing, and where the answers go (E2)
 
 At the configuration each method selects for removal at the spill criterion, we run the scoring suite of the fixed-effects experiment. The anchored edit is scored on the same held-out contexts as the other methods.
@@ -1222,19 +1257,32 @@ def label_of(kind: str, s: int) -> str:
     return RUNS[(kind, s)]["label"]
 
 
-def edited(m: str, s: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Clean and edited expected exact match per context, and the clean and edited answer distributions on the
-    `difference` contexts, for a method on the control at seed *s*, or for the anchor on the anchored run.
+def method_finish(m: str, s: int, pooled: bool = False) -> dict:
+    """What `finish_one` read for method *m* on the control at seed *s*: at the selection over the whole grid, or
+    with *pooled*, over the pooled fits alone (the optimized direction is always pooled).
     """
-    a = ARRAYS[label_of("anchored" if m == "anchor" else "control", s)]
+    if pooled and m in FITTERS:
+        return POOLED_FINISH[label_of("control", s)]["methods"][m]
+    return RUNS[("control", s)]["finish"]["methods"][m]
+
+
+def edited(m: str, s: int, pooled: bool = False) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Clean and edited expected exact match per context, and the clean and edited answer distributions on the
+    `difference` contexts, for a method on the control at seed *s* (with *pooled*, at its pooled selection), or for
+    the anchor on the anchored run.
+    """
+    if pooled and m in FITTERS:
+        a = POOLED_ARRAYS[label_of("control", s)]
+    else:
+        a = ARRAYS[label_of("anchored" if m == "anchor" else "control", s)]
     return a["clean/eem"], a[f"{m}/eem"], a["clean/p_difference"], a[f"{m}/p_difference"]
 
 
-def share_by_bin(m: str) -> np.ndarray:
+def share_by_bin(m: str, pooled: bool = False) -> np.ndarray:
     """The share of the way to the target null removed, per bin of the posterior on `difference`, per seed."""
     out = []
     for s in SEEDS:
-        clean, ed, _, _ = edited(m, s)
+        clean, ed, _, _ = edited(m, s, pooled)
         drop, dep = clean - ed, clean - NULL_EEM
         out.append([drop[(BIN == b) & IS_D].mean() / dep[(BIN == b) & IS_D].mean() for b in range(len(BIN_LABEL))])
     return np.asarray(out)
@@ -1245,11 +1293,12 @@ SHARE = {m: share_by_bin(m) for m in E2_METHODS}
 
 
 @memo
-def grading_draw(share: dict, alt_text: str) -> str:
+def grading_draw(share: dict, alt_text: str, name: str = "post-hoc-compare-grading", caption: str | None = None) -> str:
     @themed(
-        name="post-hoc-compare-grading",
+        name=name,
         alt_text=alt_text,
-        caption="""
+        caption=caption
+        or """
             **The share of the way to the target null removed, by how sure the context is of `difference`**, on the
             held-out `difference` contexts, raw, seed mean over eight runs; the anchor on the anchored runs, the
             methods on the controls at the configuration each selected for removal at the spill criterion.
@@ -1304,11 +1353,11 @@ def tv(q: np.ndarray, p: np.ndarray) -> np.ndarray:
     return 0.5 * (np.abs(q - p).sum(-1) + np.clip(1.0 - p.sum(-1), 0, None))
 
 
-def landing(m: str) -> np.ndarray:
+def landing(m: str, pooled: bool = False) -> np.ndarray:
     """The share of the clean distance to the target null that the edit covers, in total variation, per seed."""
     out = []
     for s in SEEDS:
-        _, _, pc, pe = edited(m, s)
+        _, _, pc, pe = edited(m, s, pooled)
         out.append(1 - tv(Q_NULL_D, pe.astype(np.float64)).mean() / tv(Q_NULL_D, pc.astype(np.float64)).mean())
     return np.asarray(out)
 
@@ -1316,10 +1365,10 @@ def landing(m: str) -> np.ndarray:
 LANDING = {m: landing(m) for m in E2_METHODS}
 
 
-def share_all(m: str) -> np.ndarray:
+def share_all(m: str, pooled: bool = False) -> np.ndarray:
     out = []
     for s in SEEDS:
-        clean, ed, _, _ = edited(m, s)
+        clean, ed, _, _ = edited(m, s, pooled)
         out.append((clean - ed)[IS_D].mean() / (clean - NULL_EEM)[IS_D].mean())
     return np.asarray(out)
 
@@ -1376,11 +1425,12 @@ WHERE |= {SHOWN[m]: np.mean([where_mass(edited(m, s)[3]) for s in SEEDS], axis=0
 
 
 @memo
-def where_draw(rows: dict, alt_text: str) -> str:
+def where_draw(rows: dict, alt_text: str, name: str = "post-hoc-compare-where", caption: str | None = None) -> str:
     @themed(
-        name="post-hoc-compare-where",
+        name=name,
         alt_text=alt_text,
-        caption=f"""
+        caption=caption
+        or f"""
             **Where the answers go on `{DIFF}` contexts**, seed mean over eight runs. Each row is a model or an edit;
             each column the mass on the colors the column op can give for the query operands and `{DIFF}` cannot.
             The `{DIFF}` column (the mass on its own answers) is outlined, printed in grey italics, and left out of
@@ -1463,19 +1513,19 @@ The removal and spill here are those of the configuration E2 to E5 read, with it
 # %%
 
 
-def ladder(m: str) -> tuple[np.ndarray, np.ndarray]:
+def ladder(m: str, pooled: bool = False) -> tuple[np.ndarray, np.ndarray]:
     """Removal and spill of *m* at each rung of the label ladder, per seed: `(seeds, rungs)` each, at the
     configuration E2 to E5 read, net of its baselines by the rule that favors the method.
     """
     rem, spl = [], []
     for s in SEEDS:
         run = RUNS[("control", s)]
-        i = run["selection"][m]["at_criterion"]["configs"][0]
+        i = scope_selection(run, m, "pooled" if pooled else "all")["at_criterion"]["configs"][0]
         g = run["test"][METHODS.index(m)]
         clean, null = np.asarray(g["clean"]), np.asarray(g["null"])
         den = clean[D] - null[D]
         bases = baselines(run, m, i)
-        drops = np.asarray(run["finish"]["methods"][m]["ladder_drops"])
+        drops = np.asarray(method_finish(m, s, pooled)["ladder_drops"])
         rem.append([max((d[D] - b[D]) / den for b in bases) for d in drops])
         spl.append([min(np.delete(d - b, D).max() for b in bases) for d in drops])
     return np.asarray(rem), np.asarray(spl)
@@ -1493,11 +1543,13 @@ assert set(FIXED_AT) <= set(RATES)
 
 
 @memo
-def ladder_draw(ladder: dict, anchor: float, fixed: dict, alt_text: str) -> str:
+def ladder_draw(ladder: dict, anchor: float, fixed: dict, alt_text: str, name: str = "post-hoc-compare-ladder",
+                caption: str | None = None) -> str:  # fmt: skip
     @themed(
-        name="post-hoc-compare-ladder",
+        name=name,
         alt_text=alt_text,
-        caption="""
+        caption=caption
+        or """
             **Removal against the share of `difference` contexts labelled**, on the test set, net of the baselines,
             seed mean (marker) and range (bar) over the eight controls, at the configuration each fitter selected
             with every label. The dotted line is the anchored removal at the recipe of record, which draws a
@@ -1585,7 +1637,7 @@ REL_TOL = 1.25
 ROLE = ("a", "?", "b", "=", "y", ",")
 
 
-def write_over(m: str) -> tuple[int, list[tuple[int, int, str, float, float]]]:
+def write_over(m: str, pooled: bool = False) -> tuple[int, list[tuple[int, int, str, float, float]]]:
     """How many runs edit more than one slice at the configuration E2 to E5 read, and the sites (seed, slice, role,
     write, bound in degrees) past the embedding where the write goes over both tolerances.
     """
@@ -1593,8 +1645,9 @@ def write_over(m: str) -> tuple[int, list[tuple[int, int, str, float, float]]]:
     several, over = 0, []
     for s in SEEDS:
         fin = RUNS[(kind, s)]["finish"]
-        w = fin["anchor"]["write"] if m == "anchor" else fin["methods"][m]["write"]
-        several += m == "anchor" or len(fin["methods"][m]["main_config"]["slices"]) > 1
+        got = None if m == "anchor" else method_finish(m, s, pooled)
+        w = fin["anchor"]["write"] if got is None else got["write"]
+        several += got is None or len(got["main_config"]["slices"]) > 1
         W, B = np.asarray(w["write"]), np.asarray(w["bound"])
         for sl, r in zip(*np.nonzero((W > REL_TOL * B) & (W - B > ABS_TOL)), strict=True):
             if sl > 0:
@@ -1656,12 +1709,12 @@ The query `=` is the position whose output predicts the answer the task scores, 
 PROBE_SITES = ("query =", "answers")
 
 
-def probe_auc(kind: str, which: str) -> np.ndarray:
+def probe_auc(kind: str, which: str, pooled: bool = False) -> np.ndarray:
     """Seed-mean AUC per site and slice, `(sites, slices)`: *which* is "clean", "anchor", or a method."""
     out = []
     for s in SEEDS:
         fin = RUNS[(kind, s)]["finish"]
-        p = fin["probe_clean"] if which == "clean" else fin["anchor"]["probe"] if which == "anchor" else fin["methods"][which]["probe"]  # fmt: skip
+        p = fin["probe_clean"] if which == "clean" else fin["anchor"]["probe"] if which == "anchor" else method_finish(which, s, pooled)["probe"]  # fmt: skip
         out.append([[p[f"{site}, slice {sl}"] for sl in range(ex.N_SLICES)] for site in PROBE_SITES])
     return np.mean(out, axis=0)
 
@@ -1671,11 +1724,12 @@ AUC |= {SHOWN[m]: probe_auc("control", m) for m in METHODS} | {SHOWN["anchor"]: 
 
 
 @memo
-def probe_draw(auc: dict, alt_text: str) -> str:
+def probe_draw(auc: dict, alt_text: str, name: str = "post-hoc-compare-probe", caption: str | None = None) -> str:
     @themed(
-        name="post-hoc-compare-probe",
+        name=name,
         alt_text=alt_text,
-        caption=f"""
+        caption=caption
+        or f"""
             **What a fresh probe finds after each edit**, the area under the ROC curve of a ridge probe for
             `{DIFF}` on the edited states, by slice, seed mean over eight runs; at the query `=` (left) and the
             example answers (right). The dashed grey line is the clean control, the dashed teal one the clean
@@ -1866,6 +1920,227 @@ At the points the verdicts read, the axis rule gives the higher removal and the 
 S1 is the exception. It uses the axis rule for removal, and under the permuted rule alone the optimized direction removes {num(_S1_PERM.mean())}. The interval on the gap then lies wholly above zero ({interval(_S1_PERM_CI)}), and the ceiling would fall short of the anchor.
 
 A permuted search is not neutral either, since each context keeps its own target null under the permutation. So the search still pulls the `{DIFF}` contexts that land in the permuted labelled set toward the null, against the keep term on the rest, and it finds a direction that removes much of the op.
+"""
+
+# %%
+
+r"""
+## Without role labels
+
+The anchor uses no role labels. Its pull pools over the positions of a labelled context, and its edit acts at every position and slice. A fit at the example answers, the query `=`, or the query operands uses a role, which a real corpus does not label. So the like-for-like comparison restricts every fitter to the pooled fits: the selection rule runs again over the configurations fitted at every position, pooled, on the same runs and with the same baselines. The fitters keep a label on every `difference` context and a grid tuned per run over the target, slices, dose, refit, replacement, and rank, which the anchor does not have.
+
+This reading was not preregistered, so it gives no verdict. The table applies the rules of H1 and H2 as a guide to how far apart the methods are. After it, the figures of E1 to E5 are drawn again with the pooled fits alone.
+"""
+
+# %%
+
+per_run_draw(
+    "post-hoc-compare-pooled",
+    {"anchor": A_REMOVAL} | {key(m): M_POOLED[m]["removal"] for m in METHODS},
+    float(A_REMOVAL.mean()),
+    "below",
+    f"removal of {DIFF} at the criterion (net)",
+    (0.1, 1.02),
+    """**Removal at the spill criterion per run, with the pooled fits alone**, on the test set, net. A small dot per
+    run and the seed mean as the method's marker; the anchor at full dose. The dashed line is the seed mean of the
+    anchor, and the side under it is hatched.""",
+    "Removal at the spill criterion per run with the pooled fits alone. LEACE and INLP sit near the anchor line, "
+    "the probe a little below, and difference in means well below with one run near 0.2; the optimized direction "
+    "sits on the anchor line.",
+)
+
+# %%
+
+POOLED_CI = {m: t_interval(A_REMOVAL, M_POOLED[m]["removal"]) for m in METHODS}
+POOLED_RULES = {m: (h1_verdict(m, M_POOLED[m]), h2_verdict(m, M_POOLED[m])) for m in METHODS}
+POOLED_ROWS = ["anchor", *METHODS]
+table_html(
+    ["method", "removal at criterion ↑", "anchor minus method, 95% interval", "over at matched removal",
+     "H1, H2 rules would read"],
+    [["anchor", span(A_REMOVAL), "", f"{A_OVER} of 8", ""]]
+    + [[SHOWN[m], span(M_POOLED[m]["removal"]), interval(POOLED_CI[m]), f"{over_count(M_POOLED[m]['spill'])} of 8" + (f" ({u} not matched)" if (u := int((~np.isfinite(M_POOLED[m]["spill"])).sum())) else ""),
+        ", ".join(POOLED_RULES[m])] for m in METHODS],
+    """**The comparison with the pooled fits alone**: removal at the spill criterion (seed mean and range, net),
+    the 95% Welch interval on the anchored seed mean minus the method seed mean, the runs over the criterion at
+    matched removal out of eight, and what the rules of H1 and H2 would read; no verdict. The optimized direction is
+    always pooled, so its row is the same as in H2. A greyed row is a fitter rejected under H4.""",
+    grey=h4_grey(POOLED_ROWS),
+)  # fmt: skip
+
+# %%
+
+POOLED_UNMATCHED = {m: int((~np.isfinite(M_POOLED[m]["spill"])).sum()) for m in METHODS}
+POOLED_OVER = {m: over_count(M_POOLED[m]["spill"]) for m in METHODS}
+assert POOLED_OVER["leace"] == POOLED_OVER["inlp"] == 2
+assert A_OVER == 0 and POOLED_OVER["dim"] == 6 and POOLED_RULES["dim"][0] == "rejected"
+assert all(POOLED_OVER[m] in (2, 3) for m in ("ridge", "leace", "inlp", "optimized")), POOLED_OVER
+assert all(POOLED_RULES[m][1] == "unresolved" for m in FITTERS)
+_P2 = fisher_greater(2, A_OVER)
+assert not any(POOLED_UNMATCHED[m] for m in FITTERS)
+
+f"""
+Without role labels the fitters lose most of their edge in removal. LEACE removes {num(M_POOLED["leace"]["removal"].mean())} against the anchored {num(A_REMOVAL.mean())}, with an interval on the gap of {interval(POOLED_CI["leace"])}. INLP ({num(M_POOLED["inlp"]["removal"].mean())}) and the probe ({num(M_POOLED["ridge"]["removal"].mean())}) come close on average with a wider spread, and difference in means removes {num(M_POOLED["dim"]["removal"].mean())}, with one run at {num(M_POOLED["dim"]["removal"].min())}. Read by the rule of H2, every fitter's interval reaches further than 0.05 from zero on one side, so none is a match and none falls short.
+
+At matched removal the order turns around. The anchored edit spills past the criterion on no run; LEACE and INLP do on {NUMBER_WORD[POOLED_OVER["leace"]]} runs each, the probe on {NUMBER_WORD[POOLED_OVER["ridge"]]}, and difference in means on {NUMBER_WORD[POOLED_OVER["dim"]]}, which the rule of H1 would reject. Every fitter reaches the anchored removal on every run, so these are runs that spill, not runs that fall short. The Fisher test cannot tell two runs in eight from none (p {num(_P2)}), so for LEACE and INLP this is a lean, not a separation.
+
+So in the setting the anchor is built for, the best post-hoc eraser removes about as much as the anchored edit and, even with a grid tuned per run, spills past the criterion on a few more runs. Difference in means, the direction most steering work uses, removes less and spills more.
+"""
+
+# %%
+
+r"""
+### The trade-off with the pooled fits
+
+As in E1, one frontier per run, now over the pooled fits alone, with the point the selection rule read on it. The optimized direction panel is the same as in E1.
+"""
+
+# %%
+
+RUN_FRONTS_POOLED = {m: run_fronts(m, "pooled") for m in METHODS}
+e1_draw(RUN_FRONTS_POOLED, ANCHOR_RUNS, ANCHOR_CURVE, {m: (v["removal"], v["spill_at"]) for m in METHODS if (v := measures("control", m, "pooled", rule="axis"))},
+        A_REMOVAL, A_SPILL, dict.fromkeys(METHODS, False), {m: E1_REJECTED[m] for m in METHODS},
+        alt_text="Six panels of removal against spill, one line per run, with the pooled fits alone. The fitter lines "
+        "rise more slowly than in E1 and level off lower; most markers sit near the anchor line at the spill "
+        "criterion, with one difference in means marker near 0.2 and a few probe markers lower.",
+        name="post-hoc-compare-pooled-tradeoff", caption=f"""
+            **Removal against spill with the pooled fits alone, one line per run**, on the test set of the eight
+            controls, drawn as in E1: a line is the frontier of one run over the configurations fitted at every
+            position, pooled, and its marker the point the selection rule read on it at the spill criterion, net of
+            the axis median as in E1. The
+            anchor panel is as in E1, and a hatched panel a fitter rejected under H4. The spill axis is cut at
+            {SPILL_LIM[1]}.
+        """)  # fmt: skip
+
+# %%
+
+SHARED_POOLED = {m: shared_point(m, "pooled") for m in METHODS}
+SP_712 = {m: float(SHARED_POOLED[m][0][SEEDS.index(712)]) for m in FITTERS}
+SP_REST = {m: float(np.delete(SHARED_POOLED[m][0], SEEDS.index(712)).mean()) for m in FITTERS}
+SP_OVER = {m: over_count(SHARED_POOLED[m][1]) for m in FITTERS}
+assert all(v < 0.5 for m, v in SP_712.items() if m != "dim") and SP_712["dim"] > 0.7, SP_712
+assert all(len(method_finish(m, 712, True)["main_config"]["slices"]) == 1 and method_finish(m, 712, True)["main_config"]["slices"][0] == 1 for m in ("ridge", "leace", "inlp"))  # fmt: skip
+
+f"""
+The frontiers rise more slowly than at the example answers and level off lower, so each run settles for less removal at the criterion. A configuration chosen on the other seven runs, as in E1, removes {num(min(SP_REST.values()))} to {num(max(SP_REST.values()))} on seven runs and lands past the criterion on {NUMBER_WORD[min(SP_OVER.values())]} to {NUMBER_WORD[max(SP_OVER.values())]} of the eight. Seed 712 again takes a slice-1 edit for LEACE, INLP, and the probe, which keep {num(min(SP_712[m] for m in ("ridge", "leace", "inlp")))} to {num(max(SP_712[m] for m in ("ridge", "leace", "inlp")))} there with a choice made on the other runs; difference in means keeps {num(SP_712["dim"])}, its choice on the others being a slice-2 edit that still works there.
+"""
+
+# %%
+
+r"""
+### Grading and where the answers go with the pooled fits
+
+As in E2, on the held-out `difference` contexts, raw, at the configuration each fitter selected over the pooled fits alone.
+"""
+
+# %%
+
+SHARE_POOLED = {m: share_by_bin(m, True) for m in E2_METHODS}
+grading_draw(
+    SHARE_POOLED,
+    alt_text="Share removed by posterior bin with the pooled fits alone, on an axis from 0 to 1. The anchor and LEACE "
+    "sit near the top, INLP and the probe a little lower, and difference in means lowest, near 0.6 to 0.8.",
+    name="post-hoc-compare-pooled-grading",
+    caption="""
+        **The share of the way to the target null removed, by how sure the context is of `difference`, with the
+        pooled fits alone**, on the held-out `difference` contexts, raw, seed mean over eight runs, drawn as in E2.
+    """,
+)
+
+# %%
+
+LANDING_POOLED = {m: landing(m, True) for m in E2_METHODS}
+SHARE_ALL_POOLED = {m: share_all(m, True) for m in E2_METHODS}
+table_html(
+    ["", "share removed ↑", "landing ↑"],
+    [[SHOWN[m], span(SHARE_ALL_POOLED[m]), span(LANDING_POOLED[m])] for m in E2_METHODS],
+    """**How much and how far with the pooled fits alone**, on the held-out `difference` contexts, seed mean and
+    range, raw, as in E2. A greyed row is a fitter rejected under H4.""",
+    grey=h4_grey(E2_METHODS),
+)
+
+# %%
+
+WHERE_POOLED = {k: WHERE[k] for k in ("clean (control)", "target null", "sans-diff", "clean (anchored)")}
+WHERE_POOLED |= {SHOWN[m]: np.mean([where_mass(edited(m, s, True)[3]) for s in SEEDS], axis=0) for m in E2_METHODS}
+where_draw(
+    WHERE_POOLED,
+    alt_text="A matrix of where the answers go on difference contexts with the pooled fits alone, laid out as in E2. "
+    "Every edit moves mass to the answers of the other ops in about the proportions of the target null; difference "
+    "in means leaves about a fifth on the difference answers.",
+    name="post-hoc-compare-pooled-where",
+    caption=f"""
+        **Where the answers go on `{DIFF}` contexts with the pooled fits alone**, seed mean over eight runs, drawn as
+        in E2; the four reference rows above the first rule are the same.
+    """,
+)
+
+# %%
+
+_STAY_P = {m: WHERE_POOLED[SHOWN[m]][D] for m in E2_METHODS}
+assert SHARE_ALL_POOLED["anchor"].mean() > max(SHARE_ALL_POOLED[m].mean() for m in FITTERS)
+assert LANDING_POOLED["leace"].mean() > LANDING_POOLED["anchor"].mean() > LANDING_POOLED["dim"].mean()
+assert _STAY_P["dim"] > 0.15 and _STAY_P["anchor"] < _STAY_P["leace"] < 0.08
+
+f"""
+With the pooled fits the edits still grade alike, and the anchored edit removes the largest share ({num(SHARE_ALL_POOLED["anchor"].mean())}), with LEACE next at {num(SHARE_ALL_POOLED["leace"].mean())} and difference in means lowest at {num(SHARE_ALL_POOLED["dim"].mean())}. LEACE lands a little further toward the target null than the anchor ({num(LANDING_POOLED["leace"].mean())} against {num(LANDING_POOLED["anchor"].mean())}), and difference in means less far ({num(LANDING_POOLED["dim"].mean())}). The answers go where they went in E2, except that difference in means leaves {num(_STAY_P["dim"])} on the answers of `{DIFF}`, against {num(_STAY_P["anchor"])} for the anchor and {num(_STAY_P["leace"])} for LEACE.
+"""
+
+# %%
+
+r"""
+### Labels, write, and probe with the pooled fits
+"""
+
+# %%
+
+LADDER_POOLED = {m: ladder(m, True) for m in FITTERS}
+ladder_draw(
+    LADDER_POOLED,
+    float(A_REMOVAL.mean()),
+    FIXED_AT,
+    alt_text="Removal against the share of difference contexts labelled with the pooled fits alone. Every fitter is "
+    "flat from all labels down to one in fifty: LEACE near 0.91, INLP near 0.87, the probe near 0.84, and difference "
+    "in means near 0.70. The anchored runs with fixed labels sit near 0.81 to 0.88.",
+    name="post-hoc-compare-pooled-ladder",
+    caption="""
+        **Removal against the share of `difference` contexts labelled, with the pooled fits alone**, on the test set,
+        net of the baselines, seed mean (marker) and range (bar) over the eight controls, drawn as in E3. The dotted
+        line is the anchored removal with labels redrawn, and the diamonds the anchored runs of fixed-labels.
+    """,
+)
+
+# %%
+
+_FLAT_P = {m: float(np.ptp(LADDER_POOLED[m][0].mean(0))) for m in FITTERS}
+assert max(_FLAT_P.values()) < 0.02, _FLAT_P
+WRITE_POOLED = {m: write_over(m, True) for m in FITTERS}
+assert all(WRITE_POOLED[m] == (0, []) for m in FITTERS), WRITE_POOLED
+AUC_POOLED = {k: AUC[k] for k in ("clean control", "clean anchored")}
+AUC_POOLED |= {SHOWN[m]: probe_auc("control", m, True) for m in METHODS} | {SHOWN["anchor"]: AUC[SHOWN["anchor"]]}
+probe_draw(
+    AUC_POOLED,
+    alt_text="Probe AUC by slice with the pooled fits alone, laid out as in E5. After every edit the probe falls to "
+    "about 0.64 to 0.74 at the query equals sign at slice 3 and 0.70 to 0.79 at the answers; none reaches chance.",
+    name="post-hoc-compare-pooled-probe",
+    caption=f"""
+        **What a fresh probe finds after each edit, with the pooled fits alone**, the area under the ROC curve of a
+        ridge probe for `{DIFF}` on the edited states, by slice, seed mean over eight runs, drawn as in E5.
+    """,
+)
+
+# %%
+
+_Q3_P = {n: v[0, 3] for n, v in AUC_POOLED.items()}
+_A2_P = {n: v[1, 2] for n, v in AUC_POOLED.items()}
+_EDITS_P = [SHOWN[m] for m in E2_METHODS]
+assert min(_Q3_P[n] for n in _EDITS_P) > 0.6 and min(_A2_P[n] for n in _EDITS_P) > 0.6
+
+f"""
+The label ladder stays flat for every pooled fit: from every label down to a fiftieth, the seed-mean removal moves by less than 0.02. At a fiftieth, LEACE, INLP, and the probe remove {num(min(LADDER_POOLED[m][0][:, -1].mean() for m in ("ridge", "leace", "inlp")))} to {num(max(LADDER_POOLED[m][0][:, -1].mean() for m in ("ridge", "leace", "inlp")))}, above the {num(FIXED_AT[0.02].mean())} of the anchor with fixed labels at the same rate, and difference in means {num(LADDER_POOLED["dim"][0][:, -1].mean())}. So the number of labels is still not where the anchor has an edge.
+
+Every pooled selection edits one slice, so its write equals its bound and E4 has nothing to measure. Slice 2 on most runs, and slice 1 on seed 712 for LEACE, INLP, and the probe.
+
+A fresh probe still finds the op after every edit, as in E5: {num(min(_Q3_P[n] for n in _EDITS_P))} to {num(max(_Q3_P[n] for n in _EDITS_P))} at the query `=` of slice 3, and {num(min(_A2_P[n] for n in _EDITS_P))} to {num(max(_A2_P[n] for n in _EDITS_P))} at the example answers of slice 2. LEACE leaves the least at the answers, and the anchored edit the least at the query `=`.
 """
 
 # %%
