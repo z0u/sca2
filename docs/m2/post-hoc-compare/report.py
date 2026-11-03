@@ -303,6 +303,14 @@ def table_html(head: list[str], rows: list[list[str]], caption: str, *, grey: fr
     return figure_html(table, caption=caption, class_="report-figure")
 
 
+NUMBER_WORD = dict(enumerate(("no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")))
+
+
+def h4_grey(names) -> frozenset[int]:
+    """The rows, by position in *names*, of fitters rejected under H4, which the frozen rule of H4 greys out."""
+    return frozenset(i for i, m in enumerate(names) if m in FITTERS and not H4_ACCEPTED[m])
+
+
 # Theme inks are functions: `light_dark` picks by the theme active when it is called.
 INK = {
     "anchor": ("#2a9d8f", "#7fd8c8"),
@@ -379,7 +387,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-We compare the anchored edit with edits along directions found after training (four standard fitters, and one direction optimized against the scoring itself), each fitted on a control model with every label, tuned per run on data it is never scored on, and scored the same way as the anchor. Given role labels and a per-run grid, the fitters remove more of the op than the anchored edit within the same spill limit, mostly by editing the example answers, a role that a real corpus does not label. Restricted to fits that need no role labels, the best of them is about level with the anchor.
+We compare the anchored edit with edits along directions found after training: four standard fitters, and one direction optimized against the scoring itself. Each is fitted on a control model with every label, tuned per run on data it is never scored on, and scored the same way as the anchor. Given role labels and a per-run grid, the fitters remove more of the op than the anchored edit within the same spill limit, mostly by editing the example answers, a role that a real corpus does not label. Restricted to fits that need no role labels, the best of them is close to the anchor, within the seed scatter.
 ///
 
 Placing a concept during training needs an extra training term, and it lowers the task score somewhat. This report asks whether that placement does better than searching for the concept afterwards, on the same model and with the same scoring.
@@ -391,14 +399,14 @@ r"""
 ## Findings
 
 - [The trade-off (E1)](#the-trade-off-e1) — On every run but one, each standard fitter climbs past the anchored removal before it reaches the spill criterion, mostly through edits at the example answers.
-- [Spill at matched removal (H1)](#spill-at-matched-removal-h1) — **Misses**. Turned up to the anchored removal, no standard fitter spills past the criterion on more than two runs, so each is accepted.
-- [Removal at the spill criterion (H2)](#removal-at-the-spill-criterion-h2) — **Misses**. LEACE and INLP remove more than the anchor within the criterion, the probe is Unresolved, and difference in means is left out under H4; with the pooled fits alone, LEACE is about level with the anchor and the others remove less.
+- [Spill at matched removal (H1)](#spill-at-matched-removal-h1) — **Misses**. Turned up to the anchored removal, no standard fitter spills past the criterion on more than one run, so each is accepted.
+- [Removal at the spill criterion (H2)](#removal-at-the-spill-criterion-h2) — **Misses**. LEACE and INLP remove more than the anchor within the criterion, the probe is Unresolved, and difference in means is left out under H4; with the pooled fits alone, LEACE is close to the anchor and the others remove less.
 - [The ceiling against the fitters (H3)](#the-ceiling-against-the-fitters-h3) — **Misses**. The optimized direction, which acts at every position, removes less than the rank-1 fitters that edit the example answers.
-- [The ceiling against the anchor (S1)](#the-ceiling-against-the-anchor-s1) — **Matches**. The optimized direction removes about as much as the anchor, and spills past the criterion on no more runs than chance would give.
+- [The ceiling against the anchor (S1)](#the-ceiling-against-the-anchor-s1) — **Matches**. Net of the axis-median baseline that favors it, the optimized direction removes about as much as the anchor, and its two runs over the spill criterion are within chance of the anchored none.
 - [The fitters find a placed concept (H4)](#the-fitters-find-a-placed-concept-h4) — **Partial**. The probe, LEACE, and INLP find the placed concept; difference in means misses the gate by less than 0.001.
 - [Grading, landing, and where the answers go (E2)](#grading-landing-and-where-the-answers-go-e2) — The edits grade alike and send the answers to the same places; the fitters land a little further toward the target null than the anchor.
 - [How many labels a fitter needs (E3)](#how-many-labels-a-fitter-needs-e3) — Difference in means, LEACE, and INLP keep their removal down to a fiftieth of the labels, and the probe drops to 0.84.
-- [The write against each bound (E4)](#the-write-against-each-bound-e4) — The writes stay within their bounds apart from three sites on two runs, though most post-hoc edits act at one slice, where the write is the bound by construction.
+- [The write against each bound (E4)](#the-write-against-each-bound-e4) — The writes stay within their bounds apart from three sites on two runs, though most post-hoc edits act at one slice, where the write equals the bound.
 - [What a fresh probe can still find (E5)](#what-a-fresh-probe-can-still-find-e5) — No edit brings a fresh probe near chance, LEACE included.
 - [The two baseline rules (E6)](#the-two-baseline-rules-e6) — The two baselines disagree at configurations far past the criterion; at the points the verdicts read, no verdict of H1 or H2 changes under either one alone, and S1 would fall short under the permuted-label rule alone.
 
@@ -528,7 +536,7 @@ r"""
 
 Each hypothesis takes a point from this trade-off, so it comes first. The figure plots every post-hoc configuration at its seed-mean removal and spill on the test set, beside the anchored dose curve. The table after it gives, per method, the two points of the selection rule, the task change, and how many runs chose each site.
 
-Each mark is net of the median over the fifteen tuning axes under the same operator form, the baseline the selection rule uses on the tuning set. We use it here because the two test-set baselines were computed only at the configurations the rule chose.
+Each mark is net of the median drop along the fifteen coordinate axes of the tuning set under the same operator form, the baseline the selection rule uses on the tuning set. We use it here because the two test-set baselines were computed only at the configurations the rule chose.
 
 <!-- REVIEW: the figure uses the tuning-set baseline on test-set drops, a mix the preregistration did not name. The points the verdicts read use the test-set baselines. Verify: is the mix fine for a figure where nothing is chosen? -->
 """
@@ -608,7 +616,7 @@ def e1_draw(cloud: dict, front: dict, anchor_curve: tuple, chosen: dict, a_rem: 
             as a dashed dose curve ending at a diamond (full dose). The dotted vertical line is the spill criterion,
             and the dotted horizontal one the anchored removal. A red border marks a method accepted under both H1 and
             H2 (the optimized direction scored by the same rules, for the figure only), and a hatched panel a fitter
-            rejected under H4. The spill axis is cut at {SPILL_LIM[1]}.
+            rejected under H4; the anchor panel has a border in its own color. The spill axis is cut at {SPILL_LIM[1]}.
         """,
     )
     def _plot() -> plt.Figure:
@@ -663,16 +671,20 @@ assert all(FRONT_AT[m] < A_REMOVAL.mean() for m in ("dim", "leace")), FRONT_AT
 CHOSEN = {m: (M_CONTROL[m]["removal"], M_CONTROL[m]["spill_at"]) for m in METHODS}
 E1_ACCEPTED = {m: H1[m] == "accepted" and H2[m] == "accepted" for m in METHODS}
 E1_REJECTED = {m: m in FITTERS and not H4_ACCEPTED[m] for m in METHODS}
+assert all(chosen_sites("control", m) == "answers 8" for m in FITTERS)
+assert max(over_count(M_CONTROL[m]["spill"]) for m in FITTERS) <= 1
 e1_draw(CLOUD, FRONT, ANCHOR_CURVE, CHOSEN, A_REMOVAL, A_SPILL, E1_ACCEPTED, E1_REJECTED, alt_text=E1_ALT)
 
-f"""
-On every run but one, each standard fitter has a frontier that climbs past the anchored removal before it reaches the spill criterion. The configuration it picks there removes nearly all of `{DIFF}`.
+# %%
 
-The frontier of seed means, the line drawn in each panel, crosses the criterion lower: above the anchor for INLP and the probe, and below it for difference in means and LEACE. The line sits under most of the per-run markers because each run picks its own best configuration, while the seed mean of one configuration also averages runs where it was not the best.
+f"""
+On every run but one, each standard fitter has a frontier that climbs past the anchored removal before it reaches the spill criterion. The configuration it picks at the criterion removes nearly all of `{DIFF}`.
+
+The frontier of seed means, the line drawn in each panel, crosses the criterion at a lower removal: above the anchor for INLP and the probe, and below it for difference in means and LEACE. The line sits under most of the per-run markers because each run picks its own best configuration, while the seed mean of one configuration also averages runs where it was not the best.
 
 So part of the edge of the fitters comes from choosing a configuration per run, among about a thousand. The anchor has one configuration for every run, and a single configuration shared by the eight runs would put difference in means and LEACE under the anchor at the criterion.
 
-On nearly every run, the chosen configurations were fitted at the example answers and edit there alone; the table below counts the sites. The optimized direction, which acts at every position by design, stops about where the anchor does.
+On every run, the configuration each fitter chose at the criterion was fitted at the example answers and edits there alone; the table below counts the sites. The optimized direction, which acts at every position by design, stops about where the anchor does.
 """
 
 # %%
@@ -726,7 +738,7 @@ e1_table()
 f"""
 So on this model a direction fitted after training, with every label and a per-run grid, removes more of `{DIFF}` within the criterion than the anchored edit does, and spills no more at matched removal. It costs the task nothing, since the model is the control, while the anchored runs score {num(-TASK_CHANGE, ".3f")} lower than the controls. The fixed-labels row removes less than the main anchored arm, as that experiment found.
 
-The edge comes mostly from fitting and editing at the example answers, a role a real corpus does not label. Restricted to the pooled fits, which need no role labels, LEACE still removes about as much as the anchor and the others somewhat less ([the last table of H2](#removal-at-the-spill-criterion-h2)).
+The edge comes mostly from fitting and editing at the example answers, a role a real corpus does not label. Restricted to the pooled fits, which need no role labels, the fitters lose most of that edge ([the last table of H2](#removal-at-the-spill-criterion-h2)).
 """
 
 # %%
@@ -829,7 +841,7 @@ assert H1_VERDICT == "Misses" and all(H1[m] == "accepted" for m in FITTERS), (
 )
 
 f"""
-**{H1_VERDICT}.** No standard fitter spills past the criterion on more than a run or two once it is turned up to the anchored removal, so each is accepted, and H1 misses. Difference in means is left out of the verdict under H4, and it would have been accepted too. Turned up that far, a fitted direction costs the other ops about as little as the anchored edit does.
+**{H1_VERDICT}.** No standard fitter spills past the criterion on more than one run once it is turned up to the anchored removal, so each is accepted, and H1 misses. Difference in means is left out of the verdict under H4, and it would have been accepted too. Turned up that far, a fitted direction costs the other ops about as little as the anchored edit does.
 """
 
 # %%
@@ -881,11 +893,7 @@ def h2_table(meas: dict, verdicts: dict | None, caption: str) -> str:
         else:
             row.append("")
         rows.append(row)
-    grey = (
-        frozenset(i + 1 for i, m in enumerate(METHODS) if m in FITTERS and not H4_ACCEPTED[m])
-        if verdicts
-        else frozenset()
-    )
+    grey = frozenset(i + 1 for i, m in enumerate(METHODS) if m in FITTERS and not H4_ACCEPTED[m])
     return table_html(["method", "removal at criterion ↑", "seed sd", "anchor minus method, 95% interval",
                        "verdict" if verdicts else ""], rows, caption, grey=grey)  # fmt: skip
 
@@ -903,7 +911,7 @@ h2_table(
 assert H2_VERDICT == "Misses" and H2["ridge"] == "unresolved" and H2["leace"] == H2["inlp"] == "accepted"
 
 f"""
-**{H2_VERDICT}.** LEACE and INLP remove more than the anchor within the criterion, by more than the seeds scatter, so both are accepted. The probe removes more on seven runs but stops far short on one, which widens its interval to span {num(t_interval(A_REMOVAL, M_CONTROL["ridge"]["removal"])[0])} to just above zero, past the band, so its verdict is Unresolved.
+**{H2_VERDICT}.** LEACE and INLP remove more than the anchor within the criterion, by more than the seeds scatter, so both are accepted. The probe removes more on seven runs but stops far short on one, which widens its interval to span {num(t_interval(A_REMOVAL, M_CONTROL["ridge"]["removal"])[0])} to just above zero. That interval contains zero but reaches further than 0.05 from it, so the verdict of the probe is Unresolved.
 
 Every resolved verdict is an acceptance, so H2 misses. Difference in means would have been accepted too, but it is left out under H4.
 
@@ -920,11 +928,11 @@ h2_table(
     None,
     """**Removal at the spill criterion with the pooled fits alone**, which need no role labels: the selection rule
     over the configurations fitted at every position, pooled. Not part of any verdict. The optimized direction is
-    always pooled, so its row is the same as above.""",
+    always pooled, so its row is the same as above. A greyed row is a fitter rejected under H4.""",
 )
 
 f"""
-With the pooled fits alone, LEACE still removes about as much as the anchor (the interval on the gap is {interval(POOLED_CI["leace"])}), INLP and the probe somewhat less on average, and difference in means much less, with one run near zero. So without role labels the fitters lose most of their edge, and the best of them is about level with the anchored edit.
+With the pooled fits alone, LEACE still removes about as much as the anchor (the interval on the gap is {interval(POOLED_CI["leace"])}), INLP and the probe somewhat less on average, and difference in means much less, with one run near zero. So without role labels the fitters lose most of their edge, and the best of them is close to the anchored edit, within the seed scatter.
 """
 
 # %%
@@ -961,7 +969,7 @@ def h3_table() -> str:
         rows.append([SHOWN[m], span(v["removal"]), f"{over_count(v['spill'])} of 8", note])
     grey = frozenset(i + 1 for i, m in enumerate(FITTERS) if not H4_ACCEPTED[m])
     return table_html(
-        ["method", "removal at criterion ↑", "over the criterion at matched removal ↓", ""],
+        ["method", "removal at criterion ↑", "over the criterion at matched removal ↓", "role in H3"],
         rows,
         """**The optimized direction beside the standard fitters**, on the controls: removal at the spill criterion
         (seed mean and range, net) and the runs over the criterion at matched removal, out of eight.""",
@@ -978,7 +986,7 @@ assert H3_VERDICT == "Misses" and not H3_REMOVAL and not H3_SPILL
 f"""
 **{H3_VERDICT}.** The optimized direction removes less than any of the rank-1 fitters it is compared with, and is over the criterion at matched removal on more runs. Both shortfalls come from two runs on which its frontier never reaches the anchored removal. INLP, outside the rule, does better than it too.
 
-So it is no ceiling for the fitters here, for the reason seen in H2: the search acts at every position, as it was planned to, while the fitters picked edits at the example answers alone. Against the pooled fits of the last table it does about as well as the best of them.
+So it is no ceiling for the fitters here, for the reason seen in H2: the search acts at every position, as it was planned to, while the fitters picked edits at the example answers alone. Against the pooled fits of H2 (its last table) it does about as well as the best of them.
 """
 
 # %%
@@ -1076,7 +1084,7 @@ def h4_table() -> str:
         f"""**The fitters on the anchored runs**, restricted to the pooled positions and the example answers: removal
         at the spill criterion (seed mean and range, net of the permuted-label baseline, and raw), and the seed mean
         of the absolute cosine with e₁ at slices 1 to 3. The edit along e₁ removes {span(A_REMOVAL)}; a fitter is
-        accepted at {num(A_REMOVAL.mean() - H4_MARGIN)} or more. The cosines are for the configuration the rule chose
+        accepted at {num(A_REMOVAL.mean() - H4_MARGIN, ".3f")} or more. The cosines are for the configuration the rule chose
         over the whole grid, which on most runs is the same site. For LEACE the cosine is that of its covariance
         vector, which is the difference in means, so its row matches that of difference in means where both chose
         the same fit.""",
@@ -1089,15 +1097,16 @@ h4_table()
 
 assert H4_VERDICT == "Partial" and not H4_ACCEPTED["dim"] and all(H4_ACCEPTED[m] for m in ("ridge", "leace", "inlp"))
 H4_DIM_GAP = float(A_REMOVAL.mean() - H4_MARGIN - M_H4["dim"]["removal"].mean())
+assert 0 < H4_DIM_GAP < 0.001, H4_DIM_GAP  # the prose says "by less than 0.001"
 
 f"""
-**{H4_VERDICT}.** The probe, LEACE, and INLP each remove within {H4_MARGIN} of what the edit along e₁ removes, and LEACE more. Difference in means falls short of the gate by {num(H4_DIM_GAP, ".3f")}, so it is rejected and left out of the other verdicts.
+**{H4_VERDICT}.** The probe, LEACE, and INLP each remove within {H4_MARGIN} of what the edit along e₁ removes, and LEACE more. Difference in means falls short of the gate by less than 0.001 ({num(M_H4["dim"]["removal"].mean(), ".3f")} against {num(A_REMOVAL.mean() - H4_MARGIN, ".3f")}; both print as 0.78 in the table), so it is rejected and left out of the other verdicts.
 
 That rejection is fragile, and its cause is the baseline more than the fitter. Raw, difference in means removes as much as the others; it is the permuted-label baseline that takes it under the gate.
 
 On the anchored runs a permuted fit is not neutral. The difference of the means of two random halves of the states points along the directions where the states vary most, and training made e₁ one of those. So a permuted fit removes part of the op too, which puts the net removal of every fitter on these runs below its raw one. E6 compares the baselines on the controls.
 
-The fitted directions on these runs point well toward e₁ at the slice where the fit was made, without lying on it, as the low-runs experiment led us to expect.
+The directions of difference in means, LEACE, and INLP on these runs point well toward e₁ at the slice where the fit was made, without lying on it, as the low-runs experiment led us to expect. The probe points much less toward e₁ and still removes the op, likely because a probe turns its direction away from where the states vary most, and training made e₁ one of those directions.
 
 <!-- REVIEW: the run's selection code did not restrict H4 to the pooled fits and the example answers, as the rule above says. A second pass after the run (about $0.64) ran the selection again over that part of the grid, on the same tuning scores, and computed the test-set baselines of any configuration it chose that the main pass had not scored; the table of the pooled fits in H2 comes from the same pass. The cosines in the table still come from the configuration chosen over the whole grid, which is at the example answers or pooled on nearly every run. Verify: is the second pass described well enough in the method, and is the cosine source fine? -->
 """
@@ -1243,7 +1252,9 @@ table_html(
     [[SHOWN[m], span(SHARE_ALL[m]), span(LANDING[m])] for m in E2_METHODS],
     """**How much and how far**, on the held-out `difference` contexts, seed mean and range, raw. The share removed
     is the drop as a share of the way to the target null, over all of them. The landing is the share of the clean
-    distance to the target null, in total variation, that the edit covers.""",
+    distance to the target null, in total variation, that the edit covers. A greyed row is a fitter rejected under
+    H4.""",
+    grey=h4_grey(E2_METHODS),
 )
 
 # %%
@@ -1289,7 +1300,8 @@ def where_draw(rows: dict, alt_text: str) -> str:
             **Where the answers go on `{DIFF}` contexts**, seed mean over eight runs. Each row is a model or an edit;
             each column the mass on the colors the column op can give for the query operands and `{DIFF}` cannot.
             The `{DIFF}` column (the mass on its own answers) is outlined, printed in grey italics, and left out of
-            the color scale. Values of at least 0.01 are printed.
+            the color scale. Values of at least 0.01 are printed. Rules separate the unedited references (above), the
+            anchored edit, and the post-hoc edits (below).
         """,
     )
     def _plot() -> plt.Figure:
@@ -1361,7 +1373,7 @@ At the configuration each method selects, we repeat the fit with labels on every
 
 A fixed fiftieth is 800 contexts: about what the anchor met in one pass over the corpus, and far fewer than it met over training. So in that respect the lowest rate is harsher than what the anchor had. In another it is kinder: the fitters still see every label of the fixed set at once.
 
-The removal and spill here are those of the one configuration the later sections use, with its own baselines. So at every label count the numbers differ slightly from the points of H2, which mix two configurations.
+The removal and spill here are those of the one configuration the later sections use, with its own baselines. So at every label count the numbers differ slightly from the points of H2, which interpolate between two configurations.
 """
 
 # %%
@@ -1423,7 +1435,7 @@ def ladder_draw(ladder: dict, anchor: float, fixed: dict, alt_text: str) -> str:
         dx = 2.5 * step
         ax.vlines(fx + dx, [v.min() for v in fv], [v.max() for v in fv], color=ink("anchor"), lw=0.8, alpha=0.5)
         ax.plot(fx + dx, [v.mean() for v in fv], MARKER["anchor"], ms=5, color=ink("anchor"), ls="none",
-                mec=light_dark("white", "#111"), mew=0.5, label="anchor, labels fixed")  # fmt: skip
+                mec=light_dark("white", "#111"), mew=0.5, label="anchor, fixed labels")  # fmt: skip
         ax.set_xticks(x, [RATE_NAME[r] for r in RATES], fontsize=7)
         ax.invert_xaxis()
         ax.set_xlabel(f"share of {DIFF} contexts labelled", fontsize=8)
@@ -1452,10 +1464,11 @@ table_html(
         [SHOWN[m], *(f"{num(rem[:, j].mean())} ({over_count(spl[:, j])})" for j in range(len(RATES)))]
         for m, (rem, spl) in LADDER.items()
     ]
-    + [["anchor, labels fixed", *(num(FIXED_AT[r].mean()) if r in FIXED_AT else "–" for r in RATES)]],
+    + [["anchor, fixed labels", *(num(FIXED_AT[r].mean()) if r in FIXED_AT else "–" for r in RATES)]],
     """**Removal by the share of labels**, seed mean over eight runs, with the number of runs over the spill
     criterion in brackets. The anchored row is the fixed-labels experiment, at the full dose, where it spills on no
-    run.""",
+    run. A greyed row is a fitter rejected under H4.""",
+    grey=h4_grey(LADDER),
 )
 
 # %%
@@ -1523,15 +1536,17 @@ table_html(
     [[SHOWN[m], str(WRITE_OVER[m][0]), _sites(WRITE_OVER[m][1])] for m in E2_METHODS],
     """**The write against each bound**, on 2,000 test contexts of the other ops, at the configuration E2 to E5
     read. A site is over when the write passes the bound by more than a quarter and by more than about a degree;
-    each is given as seed, slice, and role, with the write and the bound at the 99% quantile.""",
+    each is given as seed, slice, and role, with the write and the bound at the 99% quantile. A greyed row is a
+    fitter rejected under H4.""",
+    grey=h4_grey(E2_METHODS),
 )
 
 # %%
 
 f"""
-The write stays within its bound almost everywhere, though for most of the post-hoc edits there is little to measure. An edit at one slice has no edits before it, so its write is its bound by construction, and most of the configurations read here edit slice 2 alone.
+The write stays within its bound almost everywhere, though for most of the post-hoc edits there is little to measure. An edit at one slice has no edits before it, so its write equals its bound, and most of the configurations read here edit slice 2 alone.
 
-Of the {sum(WRITE_OVER[m][0] for m in METHODS)} runs where a method edits several slices, two show a site over: the probe at seed 716 and the optimized direction at seed 717. The anchored edit acts at every slice and shows no site over, as in the fixed-effects experiment.
+Of the {NUMBER_WORD[sum(WRITE_OVER[m][0] for m in METHODS)]} runs where a method edits several slices, two show a site over: the probe at seed 716 and the optimized direction at seed 717. The anchored edit acts at every slice and shows no site over, as in the fixed-effects experiment.
 """
 
 # %%
@@ -1549,7 +1564,7 @@ We expect the anchored edit and the projections to leave the op readable well ab
 
 We score the probe by the area under the ROC curve[^auc] at the query `=` and at the example answers, pooled. It is fitted on half of 7,000 test contexts and scored on the other half.
 
-[^auc]: The area under the ROC curve: the chance that the probe scores a random `difference` context above a random context of another op. 0.5 is chance, 1 a perfect split.
+[^auc]: Area under the ROC curve (AUC): the chance that the probe scores a random `difference` context above a random context of another op. 0.5 is chance, 1 a perfect split.
 """
 
 # %%
@@ -1684,7 +1699,8 @@ def rules_draw(pairs: dict, alt_text: str) -> str:
             **The two test-set baselines, configuration by configuration**, on the controls: net removal (left) and
             net spill (right) under the permuted-label baseline against the same under the coordinate-axis median,
             one mark per run and configuration. On the diagonal the two rules agree; below it, the permuted baseline
-            takes more of the drop as background.
+            takes more of the drop as background. The grey lines in the right panel mark the spill criterion on each
+            axis.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1740,7 +1756,9 @@ table_html(
     ],  # fmt: skip
     """**The points of H1 and H2 under each baseline alone**, seed means over eight controls: removal at the spill
     criterion, and the number of runs over the criterion at the anchored removal, with the verdicts each would give.
-    The hypotheses take the rule that favors the fitter, measure by measure.""",
+    The hypotheses take the rule that favors the fitter, measure by measure. A greyed row is a fitter rejected
+    under H4.""",
+    grey=h4_grey(METHODS),
 )
 
 # %%
