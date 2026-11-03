@@ -238,6 +238,9 @@ PREFIX = "reports/m2/post-hoc-compare"
 RESULTS_REF = PREFIX + "/results"
 ARRAYS_REF = PREFIX + "/arrays/{label}"
 SMOKE_REF = PREFIX + "/smoke"
+# The selections over part of the grid (`RESTRICTED`), added after the full run: H4 restricts its fitters to two
+# sites, and `select` had taken the frontier over all four.
+RESTRICTED_REF = PREFIX + "/restricted"
 
 
 def runs(smoke: bool = False) -> list[dict[str, Any]]:
@@ -776,6 +779,89 @@ def select(grids: list[dict], axes: dict, anchored_removal: float) -> dict:
     return out
 
 
+# The frontiers taken over part of the grid: H4 restricts each fitter to the fits on the pooled positions or at the
+# example answers, and the pooled fits alone are what a pipeline with no role labels could use.
+RESTRICTED = {"h4": ("pooled", "answers"), "pooled": ("pooled",)}
+
+
+def select_sites(grids: list[dict], axes: dict, anchored_removal: float, sites: tuple[str, ...]) -> dict:
+    """`select` over the configurations fitted at *sites* alone, with the indices of the whole grid."""
+    sub, keep = [], {}
+    for g in grids:
+        idx = [i for i, c in enumerate(g["configs"]) if c["site"] in sites]
+        keep[g["method"]] = idx
+        sub.append(g | {"configs": [g["configs"][i] for i in idx], "scores": [g["scores"][i] for i in idx]})
+    out = select(sub, axes, anchored_removal)
+    for m, sel in out.items():
+        idx = keep[m]
+        n = len(grids[[g["method"] for g in grids].index(m)]["configs"])
+        for key in ("removal", "spill"):
+            full = [None] * n
+            for j, i in enumerate(idx):
+                full[i] = sel[key][j]
+            sel[key] = full
+        sel["frontier"] = [idx[j] for j in sel["frontier"]]
+        for p in ("at_criterion", "at_matched"):
+            sel[p]["configs"] = [idx[j] for j in sel[p]["configs"]]
+    return out
+
+
+def restricted_one(checkpoint, holdout, fits, searched: list[dict], tune_grids: list[dict], axes: dict,
+                   selection: dict, label: str, anchored: bool, anchored_removal: float) -> dict:  # fmt: skip
+    """The restricted selections of `RESTRICTED` (H4 on the anchored runs only), with the two test-set baselines
+    at each bracketing configuration that `finish_one` did not already score: the permuted-label median and the
+    median along the other 63 axes, as `finish_one` takes them.
+    """
+    import pickle
+
+    from mini.store import get
+    from sca.posthoc import SliceEdit, with_mean
+
+    model, s, workdir = _load_common(checkpoint, lambda w: get(holdout, w / "test.npz"), label, "restricted", True)
+    width = model.transformer.wte.shape[1]
+    with open(get(fits, workdir / "fits.pkl"), "rb") as f:
+        f_ = _Fits(pickle.load(f), searched, width)
+    clean = _per_op_scores(model, s, SliceEdit.identity(N_SLICES, width, CONTEXT_LEN))
+    by_method = {g["method"]: [config_of(c) for c in g["configs"]] for g in tune_grids}
+    out: dict[str, Any] = {"selections": {}, "baselines": {}}
+    for name, sites in RESTRICTED.items():
+        if name == "h4" and not anchored:
+            continue
+        sels = select_sites(tune_grids, axes, anchored_removal, sites)
+        out["selections"][name] = sels
+        for method, sel in sels.items():
+            done = set(_chosen(selection[method]))
+            for i in _chosen(sel):
+                if i in done or str(i) in out["baselines"].get(method, {}):
+                    continue
+                c = by_method[method][i]
+                if method == "optimized":
+                    perms = [p for p in range(N_PERMUTED_SEARCH) if (c.target, c.slices, c.weight, p) in f_.searched]
+                else:
+                    perms = list(range(N_PERMUTED))
+                permuted = [(clean - _per_op_scores(model, s, f_.edit(c, perm=p))).tolist() for p in perms]
+                axis_drops = []
+                for a in range(1, width):
+                    c_ax, sub = axis_config(c.form, a, width)
+                    subs = {sl: (with_mean(sub, f_.others(c_ax, sl)) if c.replacement == "mean" else sub)
+                            for sl in c.slices}  # fmt: skip
+                    edit = SliceEdit.build(subs, N_SLICES, width, c.dose, site_masks()[SITES.index(c.position_site)])
+                    axis_drops.append(clean - _per_op_scores(model, s, edit))
+                out["baselines"].setdefault(method, {})[str(i)] = {
+                    "config": asdict(c), "permuted_drops": permuted,
+                    "axis_median_drop": np.median(axis_drops, axis=0).tolist()}  # fmt: skip
+    return {"label": label} | out
+
+
+def publish_restricted(rows: list[dict], restricted: list[dict]) -> dict:
+    import json
+
+    from mini.store import put, set_ref
+
+    set_ref(RESTRICTED_REF, put(json.dumps({"runs": restricted}).encode(), name=f"{NAME}-restricted.json"))
+    return {"runs": len(rows), "ref": RESTRICTED_REF}
+
+
 # =============================================================================================
 # What the hypotheses and the E sections read at the selected configurations
 # =============================================================================================
@@ -1162,7 +1248,24 @@ def run(ctx: Ctx, smoke: bool = False) -> dict:
         role="score",
     )
     ref = SMOKE_REF if smoke else RESULTS_REF
-    return ctx.run(publish, rows, sets, fitted, searched, axes, tune, test, selections, finished, anchored, ref, role="prep")  # fmt: skip
+    published = ctx.run(publish, rows, sets, fitted, searched, axes, tune, test, selections, finished, anchored, ref, role="prep")  # fmt: skip
+    if smoke:
+        return published
+    restricted = ctx.map(
+        restricted_one,
+        ckpt,
+        [holdout] * n,
+        [f["fits"] for f in fitted],
+        searched,
+        tune,
+        axes,
+        selections,
+        labels,
+        [r["kind"] == "anchored" for r in rows],
+        [anchored] * n,
+        role="score",
+    )
+    return published | {"restricted": ctx.run(publish_restricted, rows, restricted, role="prep")}
 
 
 def main(ctx: Ctx) -> dict:
