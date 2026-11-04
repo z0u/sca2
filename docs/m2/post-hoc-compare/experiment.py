@@ -245,6 +245,10 @@ RESTRICTED_REF = PREFIX + "/restricted"
 # results: the like-for-like comparison of the report repeats E2–E5 with the pooled fits alone.
 POOLED_REF = PREFIX + "/pooled"
 POOLED_ARRAYS_REF = PREFIX + "/pooled-arrays/{label}"
+# A fresh probe on the clean states of the sans-diff model (the filtered-corpus experiment) at each seed, added after
+# the second paper round on the results: what a probe finds in a model never trained to use `difference`.
+SANS_PROBE_REF = PREFIX + "/sans-diff-probe"
+SANS_CHECKPOINT_REF = "reports/m2/filtered-corpus/checkpoints/sans-diff-s{seed}"
 
 
 def runs(smoke: bool = False) -> list[dict[str, Any]]:
@@ -871,6 +875,25 @@ def publish_restricted(rows: list[dict], restricted: list[dict]) -> dict:
 # =============================================================================================
 
 
+def sans_probe_one(checkpoint, holdout, label: str) -> dict:
+    """`_probe` on the clean states of one sans-diff model, on the test set."""
+    from mini.store import get
+    from sca.posthoc import SliceEdit
+
+    model, s, _ = _load_common(checkpoint, lambda w: get(holdout, w / "test.npz"), label, "sans-probe", True)
+    width = model.transformer.wte.shape[1]
+    return {"label": label, "probe": _probe(model, s, SliceEdit.identity(N_SLICES, width, CONTEXT_LEN))}
+
+
+def publish_sans_probe(rows: list[dict]) -> dict:
+    import json
+
+    from mini.store import put, set_ref
+
+    set_ref(SANS_PROBE_REF, put(json.dumps({"runs": rows}).encode(), name=f"{NAME}-sans-diff-probe.json"))
+    return {"runs": len(rows), "ref": SANS_PROBE_REF}
+
+
 def publish_pooled(rows: list[dict], finished: list[dict]) -> dict:
     import json
 
@@ -1301,7 +1324,18 @@ def run(ctx: Ctx, smoke: bool = False) -> dict:
         [False] * len(ctl),
         role="score",
     )
-    return out | {"pooled": ctx.run(publish_pooled, [rows[i] for i in ctl], pooled, role="prep")}
+    out |= {"pooled": ctx.run(publish_pooled, [rows[i] for i in ctl], pooled, role="prep")}
+    seeds = sorted({r["seed"] for r in rows})
+    sans_refs = [SANS_CHECKPOINT_REF.format(seed=s) for s in seeds]
+    sans = ctx.run(resolve, sans_refs, role="prep")
+    probed = ctx.map(
+        sans_probe_one,
+        [sans["checkpoints"][r] for r in sans_refs],
+        [sans["holdout"]] * len(seeds),
+        [f"sans-diff-s{s}" for s in seeds],
+        role="score",
+    )
+    return out | {"sans_probe": ctx.run(publish_sans_probe, probed, role="prep")}
 
 
 def main(ctx: Ctx) -> dict:

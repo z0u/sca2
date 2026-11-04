@@ -77,7 +77,7 @@ def fetch_all() -> tuple[dict, dict, dict, dict, dict]:
                 arr[lab] = {k: z[k] for k in z.files}
         for s, ref in sans.items():
             with np.load(paths[ref]) as z:
-                arr[("sans-diff", s)] = {k: z[k] for k in ("op_ids", "query_pair", "p_clean")}
+                arr[("sans-diff", s)] = {k: z[k] for k in ("op_ids", "query_pair", "p_clean", "clean_eem")}
     return body, restricted, axes["fixed"], axes["labels"], arr
 
 
@@ -106,6 +106,19 @@ def fetch_pooled() -> tuple[dict, dict]:
 
 
 POOLED_FINISH, POOLED_ARRAYS = fetch_pooled()
+
+
+def fetch_sans_probe() -> dict[str, dict]:
+    """The fresh probe on the clean states of each sans-diff model, keyed by label."""
+    store = project_store()
+    got = store.get_refs([ex.SANS_PROBE_REF])[ex.SANS_PROBE_REF]
+    assert got is not None, f"not published: {ex.SANS_PROBE_REF}"
+    with tempfile.TemporaryDirectory() as tmp:
+        path = store.get_many([(got, Path(tmp) / "p")])[0]
+        return {r["label"]: r["probe"] for r in json.loads(path.read_text())["runs"]}
+
+
+SANS_PROBE = fetch_sans_probe()
 OPS: tuple[str, ...] = tuple(BODY["design"]["ops"])
 DIFF = ex.ANCHORED_OP
 D = OPS.index(DIFF)
@@ -114,7 +127,8 @@ METHODS: tuple[str, ...] = ex.METHODS
 FITTERS = ("dim", "ridge", "leace", "inlp")  # the standard fitters; the optimized direction is the ceiling
 RANK1 = ("dim", "ridge", "leace")
 SHOWN = {"dim": "difference in means", "ridge": "probe", "leace": "LEACE", "inlp": "INLP",
-         "optimized": "optimized direction", "anchor": "anchor"}  # fmt: skip
+         "optimized": "optimized direction", "anchor": "SCA (anchor)",
+         "sans": "sans-diff"}  # fmt: skip
 RUNS = {(r["kind"], r["seed"]): r for r in BODY["runs"]}
 REST = {r["label"]: r for r in RESTRICTED_BODY["runs"]}
 ANCHORED_REMOVAL: float = BODY["anchored_removal"]  # the seed mean a fitter is matched to (spill at matched removal)
@@ -325,7 +339,7 @@ def table_html(head: list[str], rows: list[list[str]], caption: str, *, grey: fr
     head, rows = [code(h) for h in head], [[code(c) for c in r] for r in rows]
     ths = "".join(f"<th{' class=num' if i else ''}>{h}</th>" for i, h in enumerate(head))
     body = "".join(
-        f"<tr{' class=muted' if k in grey else ''}>"
+        f"<tr{' class=muted style="opacity:0.45"' if k in grey else ''}>"
         + "".join(f"<td{' class=num' if i else ''}>{c}</td>" for i, c in enumerate(r))
         + "</tr>"
         for k, r in enumerate(rows)
@@ -350,8 +364,9 @@ INK = {
     "leace": ("#3a6ea5", "#8fb8e8"),
     "inlp": ("#b5485d", "#f08aa0"),
     "optimized": ("#555555", "#bbbbbb"),
+    "sans": ("#8c6d46", "#d1b48c"),
 }
-MARKER = {"anchor": "D", "dim": "o", "ridge": "s", "leace": "^", "inlp": "v", "optimized": "*"}
+MARKER = {"anchor": "D", "dim": "o", "ridge": "s", "leace": "^", "inlp": "v", "optimized": "*", "sans": "P"}
 
 
 def ink(m: str) -> str:
@@ -380,7 +395,9 @@ def hatch_side(ax, y: float, side: str, *, vertical: bool = False) -> None:
     """Hatch the side of a gate that misses it, after the marks, keeping the limits."""
     lo, hi = ax.get_xlim() if vertical else ax.get_ylim()
     rng_ = (lo, y) if side == "below" else (y, hi)
-    kw = dict(facecolor="none", edgecolor=light_dark("#000", "#fff"), hatch="/", lw=0, zorder=0, alpha=0.05)
+    kw = dict(
+        facecolor="none", edgecolor=light_dark("#000", "#fff"), hatch="/", lw=0, zorder=0, alpha=light_dark(0.05, 0.16)
+    )
     (ax.axvspan if vertical else ax.axhspan)(*rng_, **kw)
     (ax.set_xlim if vertical else ax.set_ylim)(lo, hi)
 
@@ -443,7 +460,7 @@ r"""
 - [Without role labels](#without-role-labels) — Restricted to fits that need no role labels, LEACE and INLP remove about as much as the anchor and spill past the criterion at matched removal on two runs in eight against none; difference in means removes less and spills on six. Drawn again with these fits, E1 to E5 show the same picture, with the fitters a little lower.
 
 /// admonition | How to read this report
-This report was preregistered: the predictions, the grid, and the rule that picks a configuration from it were frozen at commit `bf73293`, before any run of this experiment. Each section opens with what we expect, and the results replaced the placeholders in place.
+This report was preregistered: the predictions, the grid, and the rule that picks a configuration from it were frozen at commit `bf73293`, before any run of this experiment. Each section opens with what we expect, and the results replaced the placeholders in place. A few analyses were added after the run, and each says so where it appears: the configuration chosen on other runs in E1, the reading of H4 under the axis baseline, the section [Without role labels](#without-role-labels), and the marks for the sans-diff model. They give no verdicts.
 
 The hypotheses are judged one fitter at a time, and then as a whole. A fitter is *accepted* when it does what the test asks of a working method (in H1 and H2, matching or beating the anchor; in H4, finding a placed concept) and *rejected* when it does not. A hypothesis as a whole *passes*, *misses*, or is *partial*; a fitter or a hypothesis the rule cannot settle is *Unresolved*.
 ///
@@ -618,11 +635,9 @@ def run_fronts(method: str, scope: str = "all") -> list[tuple[np.ndarray, np.nda
     return out
 
 
-def shared_point(method: str, scope: str = "all") -> tuple[np.ndarray, np.ndarray]:
-    """Removal and spill per run at a configuration chosen on the other seven runs: the selection rule read at the
-    spill criterion off the frontier of their seed means on the tuning set, then scored on the test set of the run
-    left out, as `run_cloud` scores it. The fit is still made on the run left out; only the choice of target,
-    site, slices, dose, refit, replacement, and rank comes from the others.
+def shared_choice(method: str, scope: str = "all") -> list[dict]:
+    """Per run left out, the point of the selection rule at the spill criterion on the frontier of the seed means of
+    the other seven runs, on the tuning set: the bracketing configurations and their weights.
     """
 
     def tuning(s: int) -> tuple[np.ndarray, np.ndarray]:
@@ -631,15 +646,44 @@ def shared_point(method: str, scope: str = "all") -> tuple[np.ndarray, np.ndarra
         r, sp = (np.array([np.nan if v is None else v for v in sel[k]], float) for k in ("removal", "spill"))
         return r, sp
 
-    rem, spl = [], []
+    out = []
     for s in SEEDS:
         others = [tuning(o) for o in SEEDS if o != s]
         tr, ts = np.mean([a for a, _ in others], axis=0), np.mean([b for _, b in others], axis=0)
-        p = ex.read_point(tr, ts, finite_frontier(tr, ts), CRITERION, "spill")
+        out.append(ex.read_point(tr, ts, finite_frontier(tr, ts), CRITERION, "spill"))
+    return out
+
+
+def _mix(p: dict, v: np.ndarray) -> float:
+    return float(sum(w * v[i] for i, w in zip(p["configs"], p["weights"], strict=True)))
+
+
+def shared_point(method: str, scope: str = "all") -> tuple[np.ndarray, np.ndarray]:
+    """Removal and spill per run at a configuration chosen on the other seven runs (`shared_choice`), scored on the
+    test set of the run left out, as `run_cloud` scores it. The fit is still made on the run left out; only the
+    choice of target, site, slices, dose, refit, replacement, and rank comes from the others.
+    """
+    rem, spl = [], []
+    for s, p in zip(SEEDS, shared_choice(method, scope), strict=True):
         r, sp = run_cloud(method, s, scope)
-        rem.append(sum(w * r[i] for i, w in zip(p["configs"], p["weights"], strict=True)))
-        spl.append(sum(w * sp[i] for i, w in zip(p["configs"], p["weights"], strict=True)))
+        rem.append(_mix(p, r))
+        spl.append(_mix(p, sp))
     return np.asarray(rem), np.asarray(spl)
+
+
+def shared_lines(method: str, scope: str = "all") -> tuple[list, tuple[np.ndarray, np.ndarray]]:
+    """Per run left out, the frontier of the seed means of the other seven runs on the test set, as a (spill,
+    removal) line, and where the choice of `shared_choice` sits on those means.
+    """
+    lines, er, es = [], [], []
+    for s, p in zip(SEEDS, shared_choice(method, scope), strict=True):
+        per = [run_cloud(method, o, scope) for o in SEEDS if o != s]
+        r, sp = np.mean([a for a, _ in per], axis=0), np.mean([b for _, b in per], axis=0)
+        f = finite_frontier(r, sp)
+        lines.append((sp[f], r[f]))
+        er.append(_mix(p, r))
+        es.append(_mix(p, sp))
+    return lines, (np.asarray(er), np.asarray(es))
 
 
 CLOUD = {m: cloud(m) for m in METHODS}
@@ -653,6 +697,28 @@ ANCHOR_CURVE = (
 )
 SPILL_LIM = (-0.03, 0.12)
 ANCHOR_RUNS = [(ANCHOR[s]["spill"], ANCHOR[s]["removal"]) for s in SEEDS]
+
+
+def sans_point() -> tuple[np.ndarray, np.ndarray]:
+    """Removal and spill per seed of the sans-diff model against the control at the same seed, raw: the drop in
+    expected exact match per op from the control to sans-diff on the held-out contexts, with no edit and so no
+    baseline.
+    """
+    ops, null = ARRAYS["held-out"]["op_ids"], ARRAYS["held-out"]["null_eem"]
+    per_op = lambda v: np.array([v[ops == o].mean() for o in range(len(OPS))])  # noqa: E731
+    rem, spl = [], []
+    for s in SEEDS:
+        c, sd_ = (
+            per_op(ARRAYS[RUNS[("control", s)]["label"]]["clean/eem"]),
+            per_op(ARRAYS[("sans-diff", s)]["clean_eem"]),
+        )
+        drop = c - sd_
+        rem.append(drop[D] / (c[D] - per_op(null)[D]))
+        spl.append(np.delete(drop, D).max())
+    return np.asarray(rem), np.asarray(spl)
+
+
+SANS_POINT = sans_point()
 
 
 def _border(ax, color: str) -> None:
@@ -680,8 +746,25 @@ def _e1_method(ax, m: str, fronts: list, chosen: tuple, accepted: bool, rejected
     if accepted:
         _border(ax, light_dark("#c0392b", "#ff8a76"))
     if rejected:
-        ax.axvspan(*SPILL_LIM, facecolor="none", edgecolor=light_dark("#000", "#fff"), hatch="/", lw=0, alpha=0.05,
+        ax.axvspan(*SPILL_LIM, facecolor="none", edgecolor=light_dark("#000", "#fff"), hatch="/", lw=0, alpha=light_dark(0.05, 0.16),
                    zorder=0)  # fmt: skip
+
+
+def _e1_expected(ax, m: str, expected: tuple, chosen: tuple) -> None:
+    """Where each choice sat on the line it was made on (hollow), joined to where it landed on its own run."""
+    er, es = expected
+    cr, cs = chosen
+    for x0, y0, x1, y1 in zip(es, er, cs, cr, strict=True):
+        ax.plot([x0, x1], [y0, y1], "-", color=ink(m), lw=0.6, alpha=0.7, zorder=4)
+    ax.plot(es, er, MARKER[m], ms=4, mfc="none", mec=ink(m), mew=0.8, zorder=4)
+
+
+def _e1_sans(ax, sans: tuple) -> None:
+    """The sans-diff model against the control at the same seed: seed mean with bars over the range of runs."""
+    r, sp = sans
+    ax.errorbar(sp.mean(), r.mean(), xerr=[[sp.mean() - sp.min()], [sp.max() - sp.mean()]],
+                yerr=[[r.mean() - r.min()], [r.max() - r.mean()]], fmt=MARKER["sans"], ms=5, color=ink("sans"),
+                mec=light_dark("white", "#111"), mew=0.5, elinewidth=0.7, capsize=0, zorder=6)  # fmt: skip
 
 
 def _e1_anchor(ax, anchor_runs: list, a_rem: np.ndarray, a_spill: np.ndarray) -> None:
@@ -697,7 +780,7 @@ def _e1_anchor(ax, anchor_runs: list, a_rem: np.ndarray, a_spill: np.ndarray) ->
 @memo
 def e1_draw(fronts: dict, anchor_runs: list, anchor_curve: tuple, chosen: dict, a_rem: np.ndarray,
             a_spill: np.ndarray, accepted: dict, rejected: dict, alt_text: str, name: str = "post-hoc-compare-tradeoff",
-            caption: str | None = None) -> str:  # fmt: skip
+            caption: str | None = None, sans: tuple | None = None, expected: dict | None = None) -> str:  # fmt: skip
     @themed(
         name=name,
         alt_text=alt_text,
@@ -713,7 +796,9 @@ def e1_draw(fronts: dict, anchor_runs: list, anchor_curve: tuple, chosen: dict, 
             panels is their mean. The other methods are drawn as grey hairlines behind. The dotted vertical line is
             the spill criterion, and the dotted horizontal one the anchored removal. A red border marks a method
             accepted under both H1 and H2 (the optimized direction scored by the same rules, for the figure only), and
-            a hatched panel a fitter rejected under H4. The spill axis is cut at {SPILL_LIM[1]}.
+            a hatched panel a fitter rejected under H4. The plus is the sans-diff model, trained with no loss on
+            `{DIFF}`, against the control at the same seed, raw since nothing is edited: seed mean, with bars over the
+            runs. The spill axis is cut at {SPILL_LIM[1]}.
         """,
     )
     def _plot() -> plt.Figure:
@@ -727,6 +812,10 @@ def e1_draw(fronts: dict, anchor_runs: list, anchor_curve: tuple, chosen: dict, 
             else:
                 _e1_backdrop(ax, m, fronts, anchor_curve)
                 _e1_method(ax, m, fronts[m], chosen[m], accepted[m], rejected[m])
+                if expected is not None:
+                    _e1_expected(ax, m, expected[m], chosen[m])
+            if sans is not None:
+                _e1_sans(ax, sans)
             ax.axvline(CRITERION, color=rule(), lw=0.8, ls=":", zorder=1)
             ax.axhline(a_rem.mean(), color=rule(), lw=0.6, ls=":", zorder=1)
             ax.set_xlim(*SPILL_LIM)
@@ -758,7 +847,18 @@ E1_ACCEPTED = {m: H1[m] == "accepted" and H2[m] == "accepted" for m in METHODS}
 E1_REJECTED = {m: m in FITTERS and not H4_ACCEPTED[m] for m in METHODS}
 assert all(chosen_sites("control", m) == "answers 8" for m in FITTERS)
 assert max(over_count(M_CONTROL[m]["spill"]) for m in FITTERS) <= 1
-e1_draw(RUN_FRONTS, ANCHOR_RUNS, ANCHOR_CURVE, CHOSEN, A_REMOVAL, A_SPILL, E1_ACCEPTED, E1_REJECTED, alt_text=E1_ALT)
+e1_draw(
+    RUN_FRONTS,
+    ANCHOR_RUNS,
+    ANCHOR_CURVE,
+    CHOSEN,
+    A_REMOVAL,
+    A_SPILL,
+    E1_ACCEPTED,
+    E1_REJECTED,
+    alt_text=E1_ALT,
+    sans=SANS_POINT,
+)
 
 # %%
 
@@ -819,7 +919,7 @@ e1_table()
 f"""
 So on this model a direction fitted after training, with every label and a per-run grid, removes more of `{DIFF}` within the criterion than the anchored edit does, and spills no more at matched removal. It costs the task nothing, since the model is the control, while the anchored runs score {num(-TASK_CHANGE, ".3f")} lower than the controls. The fixed-labels row removes less than the main anchored arm, as that experiment found.
 
-The edge comes mostly from fitting and editing at the example answers, a role a real corpus does not label. Restricted to the pooled fits, which need no role labels, the fitters lose most of that edge ([Without role labels](#without-role-labels)).
+The edge of the fitters comes mostly from fitting and editing at the example answers, a role a real corpus does not label. Restricted to the pooled fits, which need no role labels, the fitters lose most of that edge ([Without role labels](#without-role-labels)).
 """
 
 # %%
@@ -827,7 +927,7 @@ The edge comes mostly from fitting and editing at the example answers, a role a 
 r"""
 ### One configuration chosen on other runs
 
-Each run above picks its own configuration, among about a thousand, on the model it edits. The anchor had no such choice on these runs: its recipe was settled on earlier seeds and run on these eight as it was. The next figure puts the fitters on the same terms. For each run, the selection rule picks a configuration on the other seven, off the frontier of their seed means on the tuning set, and the fitter is then fitted on the run left out with that configuration. This analysis was not preregistered.
+Each run above picks its own configuration, among about a thousand, on the model it edits. The anchor had no such choice on these runs: its recipe was settled on earlier seeds and run on these eight as it was. The next figure puts the fitters on the same terms. For each run in turn, the selection rule picks a configuration on the other seven, off the frontier of their seed means on the tuning set, and the fitter is then fitted on the run left out with that configuration. So the choice is made eight times per method: seed 712 takes the configuration chosen on 713 to 719, seed 713 the one chosen on 712 and 714 to 719, and so on. This analysis was not preregistered.
 """
 
 # %%
@@ -843,20 +943,23 @@ assert all(RUNS[("control", 712)]["test"][METHODS.index(m)]["configs"][RUNS[("co
 assert all(SHARED_REST[m] < OWN_REST[m] for m in FITTERS), (SHARED_REST, OWN_REST)
 assert all(3 <= SHARED_OVER[m] <= 4 for m in FITTERS) and SHARED_OVER["optimized"] == 0, SHARED_OVER
 E1_SHARED_ALT = (
-    "Six panels of removal against spill, one line per run, as in the figure before. In the method panels each "
-    "marker is the configuration chosen on the other seven runs, scored on its own run: most sit near or a little "
-    "under their line, about half just past the spill criterion, and for difference in means, LEACE, and INLP one "
-    "marker sits near zero removal. The optimized direction markers stay near the anchor."
+    "Six panels of removal against spill. In each method panel, eight nearly identical lines (the frontiers of seven "
+    "runs averaged) with hollow markers bunched at the spill criterion near removal 0.9, each joined to a filled "
+    "marker for the run left out: most land close by, about half just past the criterion, and for difference in "
+    "means, LEACE, and INLP one drops to near zero removal. The optimized direction stays near the anchor."
 )
-e1_draw(RUN_FRONTS, ANCHOR_RUNS, ANCHOR_CURVE, {m: SHARED[m] for m in METHODS}, A_REMOVAL, A_SPILL,
-        dict.fromkeys(METHODS, False), dict.fromkeys(METHODS, False), alt_text=E1_SHARED_ALT,
-        name="post-hoc-compare-shared", caption=f"""
+SHARED_LINES = {m: shared_lines(m) for m in METHODS}
+e1_draw({m: SHARED_LINES[m][0] for m in METHODS}, ANCHOR_RUNS, ANCHOR_CURVE, {m: SHARED[m] for m in METHODS},
+        A_REMOVAL, A_SPILL, dict.fromkeys(METHODS, False), dict.fromkeys(METHODS, False), alt_text=E1_SHARED_ALT,
+        name="post-hoc-compare-shared", sans=SANS_POINT, expected={m: SHARED_LINES[m][1] for m in METHODS},
+        caption=f"""
             **Removal against spill with a configuration chosen on the other runs**, on the test set of the eight
-            controls. The lines are the frontiers of the figure before, one per run. The marker on each run is the
-            configuration the selection rule picked on the other seven runs, at the spill criterion, fitted and scored
-            on this run; where it sits under its line, the run would have done better with a choice of its own. The
-            anchor panel is as before. Spill here is net of the median along the coordinate axes of the tuning set,
-            as in the figure before. The spill axis is cut at {SPILL_LIM[1]}.
+            controls. Each line is the frontier of the seed means of seven runs, one line for each run left out. The
+            hollow marker is where the selection rule chose on those seven, at the spill criterion; the filled marker
+            joined to it is what that configuration, fitted on the run left out, scores there. The anchor panel is as
+            before, and the plus is the sans-diff model against the control at the same seed (seed mean, with bars
+            over the runs). Spill here is net of the median along the coordinate axes of the tuning set, as in the
+            figure before. The spill axis is cut at {SPILL_LIM[1]}.
         """)  # fmt: skip
 
 # %%
@@ -1214,7 +1317,7 @@ assert 0 < H4_DIM_GAP < 0.001, H4_DIM_GAP  # the prose says "by less than 0.001"
 f"""
 **{H4_VERDICT}.** The probe, LEACE, and INLP each remove within {H4_MARGIN} of what the edit along e₁ removes, and LEACE more. Difference in means falls short of the gate by less than 0.001 ({num(M_H4["dim"]["removal"].mean(), ".3f")} against {num(A_REMOVAL.mean() - H4_MARGIN, ".3f")}; both print as 0.78 in the table), so it is rejected and left out of the other verdicts.
 
-That rejection is fragile, and its cause is the baseline more than the fitter. Raw, difference in means removes as much as the others; it is the permuted-label baseline that takes it under the gate. Net of the coordinate-axis median instead, the baseline the anchored edit itself is scored against, difference in means removes {num(M_H4_AXIS["dim"]["removal"].mean())}, well above the gate, and every fitter would be accepted (removals {num(min(M_H4_AXIS[m]["removal"].mean() for m in FITTERS))} to {num(max(M_H4_AXIS[m]["removal"].mean() for m in FITTERS))}). Had it been kept in, H1 and H2 would have accepted it too, so leaving it out changes no verdict.
+That rejection is fragile, and its cause is the baseline more than the fitter. Raw, difference in means removes as much as the others; it is the permuted-label baseline that takes it under the gate. Net of the coordinate-axis median instead, the baseline the anchored edit itself is scored against, difference in means removes {num(M_H4_AXIS["dim"]["removal"].mean())}, well above the gate, and every fitter would be accepted (removals {num(min(M_H4_AXIS[m]["removal"].mean() for m in FITTERS))} to {num(max(M_H4_AXIS[m]["removal"].mean() for m in FITTERS))}). Had it been kept in, H1 and H2 would have accepted it too, so leaving it out changes no verdict. This reading under the axis baseline was added after the run.
 
 On the anchored runs a permuted fit is not neutral. The difference of the means of two random halves of the states points along the directions where the states vary most, and training made e₁ one of those. So a permuted fit removes part of the op too, which puts the net removal of every fitter on these runs below its raw one. E6 compares the baselines on the controls.
 
@@ -1292,6 +1395,19 @@ E2_METHODS = ("anchor", *METHODS)
 SHARE = {m: share_by_bin(m) for m in E2_METHODS}
 
 
+def sans_share_by_bin() -> np.ndarray:
+    """`share_by_bin` for the sans-diff model in place of an edit: the drop from the control at the same seed."""
+    out = []
+    for s in SEEDS:
+        clean, ed = edited("dim", s)[0], ARRAYS[("sans-diff", s)]["clean_eem"]
+        drop, dep = clean - ed, clean - NULL_EEM
+        out.append([drop[(BIN == b) & IS_D].mean() / dep[(BIN == b) & IS_D].mean() for b in range(len(BIN_LABEL))])
+    return np.asarray(out)
+
+
+SANS_SHARE = sans_share_by_bin()
+
+
 @memo
 def grading_draw(share: dict, alt_text: str, name: str = "post-hoc-compare-grading", caption: str | None = None) -> str:
     @themed(
@@ -1301,7 +1417,8 @@ def grading_draw(share: dict, alt_text: str, name: str = "post-hoc-compare-gradi
         or """
             **The share of the way to the target null removed, by how sure the context is of `difference`**, on the
             held-out `difference` contexts, raw, seed mean over eight runs; the anchor on the anchored runs, the
-            methods on the controls at the configuration each selected for removal at the spill criterion.
+            methods on the controls at the configuration each selected for removal at the spill criterion, and the
+            sans-diff model (no edit) against the control at the same seed.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1323,7 +1440,7 @@ def grading_draw(share: dict, alt_text: str, name: str = "post-hoc-compare-gradi
 
 
 grading_draw(
-    {m: SHARE[m] for m in E2_METHODS},
+    {m: SHARE[m] for m in E2_METHODS} | {"sans": SANS_SHARE},
     alt_text="Share removed by posterior bin for the anchor and five methods, on an axis from 0 to 1. Every line is "
     "nearly flat, between about 0.82 and 0.98, rising a little from the lowest bin to the middle one; the anchor and "
     "INLP sit at the top and the optimized direction at the bottom.",
@@ -1433,8 +1550,8 @@ def where_draw(rows: dict, alt_text: str, name: str = "post-hoc-compare-where", 
         or f"""
             **Where the answers go on `{DIFF}` contexts**, seed mean over eight runs. Each row is a model or an edit;
             each column the mass on the colors the column op can give for the query operands and `{DIFF}` cannot.
-            The `{DIFF}` column (the mass on its own answers) is outlined, printed in grey italics, and left out of
-            the color scale. Values of at least 0.01 are printed. Rules separate the unedited references (above), the
+            The `{DIFF}` column (the mass on its own answers) has a bold label, is printed in grey italics, and is
+            left out of the color scale; the anchored edit has a border in its own color. Values of at least 0.01 are printed. Rules separate the unedited references (above), the
             anchored edit, and the post-hoc edits (below).
         """,
     )
@@ -1452,7 +1569,6 @@ def where_draw(rows: dict, alt_text: str, name: str = "post-hoc-compare-where", 
         ax.imshow(show, cmap=cmap, vmin=0, vmax=vmax, aspect="equal")
         for i, j in np.ndindex(*m.shape):
             if j == D:
-                ax.add_patch(Rectangle((j - 0.46, i - 0.42), 0.92, 0.84, fill=False, ec="0.6", lw=0.6))
                 ax.text(j, i, f"{m[i, j]:.2f}", ha="center", va="center", fontsize=6, color=light_dark("#777", "#999"),
                         fontstyle="italic")  # fmt: skip
             elif m[i, j] >= 0.01:
@@ -1461,9 +1577,15 @@ def where_draw(rows: dict, alt_text: str, name: str = "post-hoc-compare-where", 
                     j, i, f"{m[i, j]:.2f}", ha="center", va="center", fontsize=6, color="#fff" if dark_cell else "#000"
                 )
         ax.set_xticks(range(len(OPS)), OPS, fontsize=7, rotation=30, ha="right")
+        ax.get_xticklabels()[D].set_fontweight("bold")
         ax.set_yticks(range(len(names)), names, fontsize=7)
+        a = names.index(SHOWN["anchor"])
+        ax.get_yticklabels()[a].set_fontweight("bold")
         for i in (3, 4):
             ax.axhline(i + 0.5, color=light_dark("#000", "#fff"), lw=0.8)
+        ax.add_patch(
+            Rectangle((-0.5, a - 0.5), len(OPS), 1, fill=False, ec=ink("anchor"), lw=2.0, zorder=5, clip_on=False)
+        )
         return fig
 
     return _plot()
@@ -1721,6 +1843,14 @@ def probe_auc(kind: str, which: str, pooled: bool = False) -> np.ndarray:
 
 AUC = {"clean control": probe_auc("control", "clean"), "clean anchored": probe_auc("anchored", "clean")}
 AUC |= {SHOWN[m]: probe_auc("control", m) for m in METHODS} | {SHOWN["anchor"]: probe_auc("anchored", "anchor")}
+SANS_AUC = np.mean(
+    [
+        [[SANS_PROBE[f"sans-diff-s{s}"][f"{site}, slice {sl}"] for sl in range(ex.N_SLICES)] for site in PROBE_SITES]
+        for s in SEEDS
+    ],
+    axis=0,
+)
+AUC["sans-diff"] = SANS_AUC
 
 
 @memo
@@ -1733,7 +1863,8 @@ def probe_draw(auc: dict, alt_text: str, name: str = "post-hoc-compare-probe", c
             **What a fresh probe finds after each edit**, the area under the ROC curve of a ridge probe for
             `{DIFF}` on the edited states, by slice, seed mean over eight runs; at the query `=` (left) and the
             example answers (right). The dashed grey line is the clean control, the dashed teal one the clean
-            anchored model, and the dotted line chance.
+            anchored model, the dashed brown one the sans-diff model (trained with no loss on `{DIFF}`, clean), and
+            the dotted line chance.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1743,8 +1874,14 @@ def probe_draw(auc: dict, alt_text: str, name: str = "post-hoc-compare-probe", c
         key = {SHOWN[m]: m for m in E2_METHODS}
         for j, (ax, site) in enumerate(zip(axes, PROBE_SITES, strict=True)):
             for name, v in auc.items():
-                if name.startswith("clean"):
-                    c = ink("anchor") if "anchored" in name else light_dark("#888", "#999")
+                if name.startswith("clean") or name == "sans-diff":
+                    c = (
+                        ink("anchor")
+                        if "anchored" in name
+                        else ink("sans")
+                        if name == "sans-diff"
+                        else light_dark("#888", "#999")
+                    )
                     ax.plot(x, v[j], "--", color=c, lw=0.9, label=name)
                 else:
                     m = key[name]
@@ -1776,9 +1913,12 @@ _Q3 = {n: v[0, 3] for n, v in AUC.items()}
 _A2 = {n: v[1, 2] for n, v in AUC.items()}
 _EDITS = [SHOWN[m] for m in E2_METHODS]
 assert min(_Q3[n] for n in _EDITS) > 0.6 and min(_A2[n] for n in _EDITS) > 0.6
+assert min(_Q3[n] for n in _EDITS) - 0.05 < _Q3["sans-diff"] < max(_Q3[n] for n in _EDITS) + 0.02, _Q3
 
 f"""
 No edit brings the probe near chance. Before any edit, a probe finds the op at the query `=` of slice 3 with an AUC of {num(_Q3["clean control"])} on the control and {num(_Q3["clean anchored"])} on the anchored model. After the edits it scores {num(min(_Q3[n] for n in _EDITS))} to {num(max(_Q3[n] for n in _EDITS))} there, lowest after the anchored edit.
+
+The sans-diff model, trained with no loss on `{DIFF}`, leaves {num(_Q3["sans-diff"])} for a fresh probe at the same site, about what the edits leave. So most of what the probe finds after an edit is there in a model that never learned the op, likely because the operand colors carry it.
 
 At the example answers the order turns around: the anchored edit leaves the op more readable ({num(_A2[SHOWN["anchor"]])} at slice 2) than difference in means, LEACE, or INLP ({num(min(_A2[SHOWN[m]] for m in ("dim", "leace", "inlp")))} to {num(max(_A2[SHOWN[m]] for m in ("dim", "leace", "inlp")))}), which edit there.
 
@@ -2002,13 +2142,12 @@ e1_draw(RUN_FRONTS_POOLED, ANCHOR_RUNS, ANCHOR_CURVE, {m: (v["removal"], v["spil
         alt_text="Six panels of removal against spill, one line per run, with the pooled fits alone. The fitter lines "
         "rise more slowly than in E1 and level off lower; most markers sit near the anchor line at the spill "
         "criterion, with one difference in means marker near 0.2 and a few probe markers lower.",
-        name="post-hoc-compare-pooled-tradeoff", caption=f"""
+        name="post-hoc-compare-pooled-tradeoff", sans=SANS_POINT, caption=f"""
             **Removal against spill with the pooled fits alone, one line per run**, on the test set of the eight
             controls, drawn as in E1: a line is the frontier of one run over the configurations fitted at every
             position, pooled, and its marker the point the selection rule read on it at the spill criterion, net of
-            the axis median as in E1. The
-            anchor panel is as in E1, and a hatched panel a fitter rejected under H4. The spill axis is cut at
-            {SPILL_LIM[1]}.
+            the axis median as in E1. The anchor panel and the plus for the sans-diff model are as in E1, and a hatched
+            panel is a fitter rejected under H4. The spill axis is cut at {SPILL_LIM[1]}.
         """)  # fmt: skip
 
 # %%
@@ -2036,7 +2175,7 @@ As in E2, on the held-out `difference` contexts, raw, at the configuration each 
 
 SHARE_POOLED = {m: share_by_bin(m, True) for m in E2_METHODS}
 grading_draw(
-    SHARE_POOLED,
+    SHARE_POOLED | {"sans": SANS_SHARE},
     alt_text="Share removed by posterior bin with the pooled fits alone, on an axis from 0 to 1. The anchor and LEACE "
     "sit near the top, INLP and the probe a little lower, and difference in means lowest, near 0.6 to 0.8.",
     name="post-hoc-compare-pooled-grading",
@@ -2115,7 +2254,7 @@ _FLAT_P = {m: float(np.ptp(LADDER_POOLED[m][0].mean(0))) for m in FITTERS}
 assert max(_FLAT_P.values()) < 0.02, _FLAT_P
 WRITE_POOLED = {m: write_over(m, True) for m in FITTERS}
 assert all(WRITE_POOLED[m] == (0, []) for m in FITTERS), WRITE_POOLED
-AUC_POOLED = {k: AUC[k] for k in ("clean control", "clean anchored")}
+AUC_POOLED = {k: AUC[k] for k in ("clean control", "clean anchored", "sans-diff")}
 AUC_POOLED |= {SHOWN[m]: probe_auc("control", m, True) for m in METHODS} | {SHOWN["anchor"]: AUC[SHOWN["anchor"]]}
 probe_draw(
     AUC_POOLED,
@@ -2148,7 +2287,15 @@ A fresh probe still finds the op after every edit, as in E5: {num(min(_Q3_P[n] f
 r"""
 ## Discussion
 
-<!-- Written after a paper round on the result sections. -->
+On this model, a direction found after training does about as well as the anchored edit. With role labels and a grid tuned on each run, the standard fitters remove more of `difference` within the spill criterion, mostly by editing the example answers alone. Restricted to fits that need no role labels, which is the comparison the anchor was built for, LEACE and INLP remove about as much as the anchor and spill past the criterion on a few more runs, and difference in means falls behind on both. So the anchored edit matches the best post-hoc eraser we tried, and does better than the direction most steering work uses. We have not shown that it does better than LEACE.
+
+The fitters had help the anchor did not. They saw every label at once, and each run chose among about a thousand configurations scored on that run. The anchor had one configuration, but it came from some thirty experiments at other seeds, so its search happened once, earlier. The configuration chosen on other runs in E1 is the closest this report comes to comparing the two kinds of search: for the fitters it works on most runs, and on one run it misses because that run holds the op a slice earlier. One run in eight is too few to say how often a fixed recipe for a fitter would miss, though it fits the idea that placing the concept saves finding where it sits in each new model.
+
+Placing the concept had costs here too: an extra training term, and a small drop in task score. What it offers that a post-hoc method lacks is a location chosen before training, and this experiment uses that only in the plainest way, one concept on one axis. Whether a chosen location helps more when several concepts are placed at once, when they are arranged in a designed subspace, or when a concept is harder to find after training, is open, and nothing here bears on it either way.
+
+None of the edits, LEACE included, left a fresh probe at chance. For the anchor that was expected, since part of the evidence lies off e₁. For LEACE it was not, and we don't know the cause. The sans-diff model, which never learned the op, leaves a probe about as much, so what remains may be what any model of these contexts holds. Either way, on this model taking the op out of the answer and making it unreadable are different properties, and a claim of erasure needs to say which one it means.
+
+The comparison covers one concept in one small model on a synthetic task, with eight runs per arm, and several readings depend on the choice of baseline (E6). The pooled comparison and the configuration chosen on other runs were added after the run, so they describe what we saw rather than test a prediction.
 """
 
 # %%
@@ -2176,7 +2323,7 @@ r"""
 
 **Left out.** The same comparison for *red* on the D2.1 checkpoints, where ex-2.2.1 gave the fitters far less, is not run here: this report is about the inferred op.
 
-**Cost.** No training. Each run takes about 6,000 scoring passes: the grid on the tuning and test sets, the axis baseline on the tuning set, the permuted fits, and the ladder. The anchored runs take the same for H4, so sixteen runs come to about 100,000 passes, plus the state passes over the fit set and for sequential refit, and the optimized direction. The plan estimated eight to ten L4-hours, about \$15, with \$25 as the ceiling. The run took L40S cards: the full run cost \$15.80 and the second pass for the restricted selections \$0.64, and with the smoke tests and the speed-ups between them the experiment came to \$22.14.
+**Cost.** No training. Each run takes about 6,000 scoring passes: the grid on the tuning and test sets, the axis baseline on the tuning set, the permuted fits, and the ladder. The anchored runs take the same for H4, so sixteen runs come to about 100,000 passes, plus the state passes over the fit set and for sequential refit, and the optimized direction. The plan estimated eight to ten L4-hours, about \$15, with \$25 as the ceiling. The run took L40S cards: the full run cost \$15.80 and the second pass for the restricted selections \$0.64, and with the smoke tests and the speed-ups between them the experiment came to \$22.14. The passes added after the paper rounds on the results, E2 to E5 at the pooled selections and the probe on the sans-diff models, brought the total to \$22.72.
 """
 
 # %%
