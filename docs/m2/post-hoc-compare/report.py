@@ -635,7 +635,7 @@ def run_fronts(method: str, scope: str = "all") -> list[tuple[np.ndarray, np.nda
     return out
 
 
-def shared_choice(method: str, scope: str = "all") -> list[dict]:
+def shared_choice(method: str, scope: str = "all", at: float = CRITERION) -> list[dict]:
     """Per run left out, the point of the selection rule at the spill criterion on the frontier of the seed means of
     the other seven runs, on the tuning set: the bracketing configurations and their weights.
     """
@@ -650,7 +650,7 @@ def shared_choice(method: str, scope: str = "all") -> list[dict]:
     for s in SEEDS:
         others = [tuning(o) for o in SEEDS if o != s]
         tr, ts = np.mean([a for a, _ in others], axis=0), np.mean([b for _, b in others], axis=0)
-        out.append(ex.read_point(tr, ts, finite_frontier(tr, ts), CRITERION, "spill"))
+        out.append(ex.read_point(tr, ts, finite_frontier(tr, ts), at, "spill"))
     return out
 
 
@@ -658,13 +658,13 @@ def _mix(p: dict, v: np.ndarray) -> float:
     return float(sum(w * v[i] for i, w in zip(p["configs"], p["weights"], strict=True)))
 
 
-def shared_point(method: str, scope: str = "all") -> tuple[np.ndarray, np.ndarray]:
+def shared_point(method: str, scope: str = "all", at: float = CRITERION) -> tuple[np.ndarray, np.ndarray]:
     """Removal and spill per run at a configuration chosen on the other seven runs (`shared_choice`), scored on the
     test set of the run left out, as `run_cloud` scores it. The fit is still made on the run left out; only the
     choice of target, site, slices, dose, refit, replacement, and rank comes from the others.
     """
     rem, spl = [], []
-    for s, p in zip(SEEDS, shared_choice(method, scope), strict=True):
+    for s, p in zip(SEEDS, shared_choice(method, scope, at), strict=True):
         r, sp = run_cloud(method, s, scope)
         rem.append(_mix(p, r))
         spl.append(_mix(p, sp))
@@ -969,6 +969,40 @@ With the configuration chosen on other runs, the fitters remove about {num(min(S
 
 The eighth run, seed 712, is where the choice fails to carry over. Difference in means, LEACE, and INLP keep almost nothing of their removal there ({num(min(SHARED_712[m] for m in ("dim", "leace", "inlp")))} to {num(max(SHARED_712[m] for m in ("dim", "leace", "inlp")))}): their choices on the other runs edit slice 2, and on this run their own choices edit slice 1. The probe keeps {num(SHARED_712["ridge"])} there, with an edit over slices 1 to 3. So where a post-hoc edit works moves from run to run, by a slice on one run in eight here, and a fixed recipe for a fitter has to cover that, while the anchor puts the concept on e₁ on every run. One run is a small sample; a larger set of seeds would say how often this happens.
 
+"""
+
+# %%
+
+MARGIN = 0.01
+SHARED_MARGIN = {m: shared_point(m, at=MARGIN) for m in METHODS}
+_K = np.array(SEEDS) != 712
+
+
+def _shared_cells(v: tuple) -> list[str]:
+    r, sp = v
+    return [num(r[_K].mean()), num(r[~_K][0]), f"{over_count(sp)} of 8"]
+
+
+table_html(
+    ["", "removal, seven runs ↑", "removal, seed 712 ↑", "over ↓", "removal, seven runs ↑", "removal, seed 712 ↑",
+     "over ↓"],
+    [[SHOWN[m], *_shared_cells(SHARED[m]), *_shared_cells(SHARED_MARGIN[m])] for m in METHODS],
+    f"""**A configuration chosen on other runs, at the criterion and with a margin**: removal on the test set of the
+    run left out, seed mean over the seven runs other than 712 and on 712 itself, and the runs over the spill
+    criterion out of eight; first with the choice made at the criterion (as in the figure), then at a spill of
+    {MARGIN} on the other seven. Net of the axis median, as in the figure. A greyed row is a fitter rejected under
+    H4.""",
+    grey=h4_grey(METHODS),
+)  # fmt: skip
+
+# %%
+
+_OVER_M = {m: over_count(SHARED_MARGIN[m][1]) for m in FITTERS}
+assert max(_OVER_M.values()) <= 3 and all(_OVER_M[m] <= SHARED_OVER[m] for m in FITTERS), _OVER_M
+assert all(SHARED_MARGIN[m][0][~_K][0] < 0.1 for m in ("dim", "leace", "inlp"))
+
+f"""
+A practitioner would choose with some room under the criterion rather than at it. With the choice made at a spill of {MARGIN} on the other runs, the fitters land past the criterion on at most {NUMBER_WORD[max(_OVER_M.values())]} of the eight runs (LEACE on {NUMBER_WORD[_OVER_M["leace"]] if _OVER_M["leace"] else "none"}), and remove about as much as before on the seven. So most of the runs over the criterion come from choosing at the line. The miss on seed 712 stays: the choice made on the other runs still edits a slice where that run does not hold the op. This check was added after the run, after a second reader suggested it.
 """
 
 # %%
@@ -2156,11 +2190,15 @@ SHARED_POOLED = {m: shared_point(m, "pooled") for m in METHODS}
 SP_712 = {m: float(SHARED_POOLED[m][0][SEEDS.index(712)]) for m in FITTERS}
 SP_REST = {m: float(np.delete(SHARED_POOLED[m][0], SEEDS.index(712)).mean()) for m in FITTERS}
 SP_OVER = {m: over_count(SHARED_POOLED[m][1]) for m in FITTERS}
+_SP_MARGIN = {m: shared_point(m, "pooled", at=MARGIN) for m in FITTERS}
+_SPM = {m: v[0] for m, v in _SP_MARGIN.items()}
+_SPM_OVER = {m: over_count(v[1]) for m, v in _SP_MARGIN.items()}
+assert _SPM_OVER["leace"] == 1 and _SPM["dim"].mean() < 0.7, (_SPM_OVER, _SPM["dim"].mean())
 assert all(v < 0.5 for m, v in SP_712.items() if m != "dim") and SP_712["dim"] > 0.7, SP_712
 assert all(len(method_finish(m, 712, True)["main_config"]["slices"]) == 1 and method_finish(m, 712, True)["main_config"]["slices"][0] == 1 for m in ("ridge", "leace", "inlp"))  # fmt: skip
 
 f"""
-The frontiers rise more slowly than at the example answers and level off lower, so each run settles for less removal at the criterion. A configuration chosen on the other seven runs, as in E1, removes {num(min(SP_REST.values()))} to {num(max(SP_REST.values()))} on seven runs and lands past the criterion on {NUMBER_WORD[min(SP_OVER.values())]} to {NUMBER_WORD[max(SP_OVER.values())]} of the eight. Seed 712 again takes a slice-1 edit for LEACE, INLP, and the probe, which keep {num(min(SP_712[m] for m in ("ridge", "leace", "inlp")))} to {num(max(SP_712[m] for m in ("ridge", "leace", "inlp")))} there with a choice made on the other runs; difference in means keeps {num(SP_712["dim"])}, its choice on the others being a slice-2 edit that still works there.
+The frontiers rise more slowly than at the example answers and level off lower, so each run settles for less removal at the criterion. A configuration chosen on the other seven runs, as in E1, removes {num(min(SP_REST.values()))} to {num(max(SP_REST.values()))} on seven runs and lands past the criterion on {NUMBER_WORD[min(SP_OVER.values())]} to {NUMBER_WORD[max(SP_OVER.values())]} of the eight. Seed 712 again takes a slice-1 edit for LEACE, INLP, and the probe, which keep {num(min(SP_712[m] for m in ("ridge", "leace", "inlp")))} to {num(max(SP_712[m] for m in ("ridge", "leace", "inlp")))} there with a choice made on the other runs; difference in means keeps {num(SP_712["dim"])}, its choice on the others being a slice-2 edit that still works there. With the choice made at a spill of {MARGIN}, as in E1, LEACE lands past the criterion on {NUMBER_WORD[_SPM_OVER["leace"]]} run with about the same removal ({num(_SPM["leace"].mean())}), while difference in means falls to {num(_SPM["dim"].mean())}.
 """
 
 # %%
@@ -2287,13 +2325,15 @@ A fresh probe still finds the op after every edit, as in E5: {num(min(_Q3_P[n] f
 r"""
 ## Discussion
 
-On this model, a direction found after training does about as well as the anchored edit. With role labels and a grid tuned on each run, the standard fitters remove more of `difference` within the spill criterion, mostly by editing the example answers alone. Restricted to fits that need no role labels, which is the comparison the anchor was built for, LEACE and INLP remove about as much as the anchor and spill past the criterion on a few more runs, and difference in means falls behind on both. So the anchored edit matches the best post-hoc eraser we tried, and does better than the direction most steering work uses. We have not shown that it does better than LEACE.
+The preregistered comparison missed. Given role labels and a grid tuned on each run, every standard fitter that could be judged spilled no more than the anchored edit at matched removal and removed more within the spill criterion, mostly by editing the example answers alone. That is the result of record.
 
-The fitters had help the anchor did not. They saw every label at once, and each run chose among about a thousand configurations scored on that run. The anchor had one configuration, but it came from some thirty experiments at other seeds, so its search happened once, earlier. The configuration chosen on other runs in E1 is the closest this report comes to comparing the two kinds of search: for the fitters it works on most runs, and on one run it misses because that run holds the op a slice earlier. One run in eight is too few to say how often a fixed recipe for a fitter would miss, though it fits the idea that placing the concept saves finding where it sits in each new model.
+The comparison the anchor was built for restricts the fitters to fits that need no role labels, and it was added after the run. There, LEACE and INLP remove about as much as the anchor and spill past the criterion on a few more runs, and difference in means falls behind on both. So on this model the anchored edit matches the best post-hoc eraser we tried, and does better than the direction most steering work uses. We have not shown that it does better than LEACE.
+
+The fitters had help the anchor did not. They saw every label at once, and each run chose among about a thousand configurations scored on that run. The anchor had one configuration, but it came from some thirty experiments at other seeds, so its search happened once, earlier. The configuration chosen on other runs in E1 is the closest this report comes to comparing the two kinds of search: for the fitters it works on most runs, with the runs over the criterion mostly an effect of choosing at the line, and on one run it misses because that run holds the op a slice earlier. One run in eight is too few to say how often a fixed recipe for a fitter would miss, though it fits the idea that placing the concept saves finding where it sits in each new model.
 
 Placing the concept had costs here too: an extra training term, and a small drop in task score. What it offers that a post-hoc method lacks is a location chosen before training, and this experiment uses that only in the plainest way, one concept on one axis. Whether a chosen location helps more when several concepts are placed at once, when they are arranged in a designed subspace, or when a concept is harder to find after training, is open, and nothing here bears on it either way.
 
-None of the edits, LEACE included, left a fresh probe at chance. For the anchor that was expected, since part of the evidence lies off e₁. For LEACE it was not, and we don't know the cause. The sans-diff model, which never learned the op, leaves a probe about as much, so what remains may be what any model of these contexts holds. Either way, on this model taking the op out of the answer and making it unreadable are different properties, and a claim of erasure needs to say which one it means.
+None of the edits, LEACE included, left a fresh probe at chance. For the anchor that was expected, since part of the evidence lies off e₁. For LEACE it was not, and the cause is an open puzzle. The sans-diff model, which never learned the op, leaves a probe about as much, so what remains may be what any model of these contexts holds. Either way, on this model taking the op out of the answer and making it unreadable are different properties, and a claim of erasure needs to say which one it means.
 
 The comparison covers one concept in one small model on a synthetic task, with eight runs per arm, and several readings depend on the choice of baseline (E6). The pooled comparison and the configuration chosen on other runs were added after the run, so they describe what we saw rather than test a prediction.
 """
