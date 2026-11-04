@@ -78,6 +78,20 @@ Settled: the low runs get a part of their own, and the post goes ahead without f
 - What to put in: which analyses were not preregistered (the pooled reading, the configuration chosen on other runs, the axis-baseline reading of H4); the pooled table beside the main one; and above it the caveat that the pooled reading is a lower bound on the fitters, since a per-position gate from the fitted direction's own score might recover much of the role-label edge without role labels. Two smaller caveats to carry: the seed 712 story is one run in eight, and the LEACE probe result is an open puzzle in the report. If the free re-analysis of the configuration chosen on other runs (picked at a small spill margin in place of at the criterion) runs before the post, the no-search point takes its number.
 - Figures: one frontier panel per method, as seed-mean frontiers with a sans-diff mark; the confusion matrices with the anchored row set off by a bold label.
 
+### A change of prior
+
+A short reflection after the comparison, in the first person, drafted from a note in review and tied to Cammarata's essay ([comparison with the essay](https://claude.ai/artifact/MrLjEZNbVEhEi8MgJTwPZ8)). Draft:
+
+> When I started this program, I assumed that the representations in neural networks were tangled by default, and that a concept we cared about would be hard to find unless we gave the model somewhere to put it. SCA was meant to give that signal early in training. So when we started D2.2, we designed a grammar with what we thought would be a hard-to-find latent concept: an operation that is never written down.
+>
+> That isn't quite what we found. The anchor settled on the example answers, and the post-hoc methods found the same evidence in models trained with no anchor at all. What both found was a judgement about each example: does this one fit `difference`? Block 1 writes that judgement, and a later block reads it where the query is answered. We went looking for a noun and found a verb, which is close to how Nick Cammarata reads neurons in *Neural Networks Are Already Clean*: as distinctions that later parts of the network use, more often than the named things we bring to them.[^essay]
+>
+> We don't yet know whether the op itself is represented anywhere, or whether the answer is composed from those judgements by the blocks that read them; looking at what the readers write at the query would tell us. But the evidence is pretty cleanly represented: an arc on a plane, from the direction of a non-fitting answer to the axis we chose. If networks often hold evidence this cleanly on their own, the anchor is less about making a concept clean and more about deciding where it goes before training.
+>
+> [^essay]: Cammarata argues from neurons in much larger vision and language models that this is the usual case. The essay is a position piece and still debated, and our result is one concept in one small synthetic model, so we offer it as related company rather than support.
+
+Notes for the draft: it avoids "disentangled" and "superposition", which carry several meanings and invite questions the result can't answer. "Spread over several sites" is composition across the examples and slices, the kind of spread the essay counts as clean. The essay is wary of training-time changes to a network, and the last sentence of the draft is where SCA and the essay meet.
+
 ## 7. How few labels? (claim e)
 
 - One `difference` context in fifty carries a label, the shape of label we expect for a concept in natural language, and about a quarter of the labelled contexts have a posterior below one half on `difference`, so many labels mark an op the context does not show ([design § e](design.md#e-scarce-noisy-labels-are-enough)).
