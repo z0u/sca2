@@ -24,8 +24,8 @@ main.lit dfn.term {
 main.lit .term-ring,
 main.lit dfn.term:not(:has(.term-ring))::after {
   display: inline-block;
-  width: 0.22em;
-  height: 0.22em;
+  width: round(0.16em, 1px);
+  height: round(0.16em, 1px);
   margin-left: 0.06em;
   border: 0.06em solid color-mix(in srgb, var(--fg) 55%, transparent);
   border-radius: 50%;
