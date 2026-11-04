@@ -8,16 +8,20 @@ Reader {.manual}
 :   Someone who may not have read the earlier posts. The D2.1 post opened with a hand-drawn picture of the residual stream and built the recipe up one piece at a time, in about 2,200 words with ten figures. This one can lean on it for the basics, and should stay near that length. Method detail goes in LessWrong footnotes where a sentence or two will do, and in an appendix linked from the site where it won't.
 
 Headline {.manual}
-:   We anchored a concept the model has to infer, an operation that is never written down, onto an axis we chose. Editing that axis out removes most of what the model does with the op, in proportion to how much each context needed it, and leaves the other ops alone. The edited model ends up a little short of a model that never learned the op, and we have a lead on where the rest of the evidence for the op is kept.
+:   We anchored a concept the model has to infer, an operation that is never written down, onto an axis we chose. Editing that axis out removes most of what the model does with the op, in proportion to how much each context needed it, and leaves the other ops alone. On this model a direction fitted after training (LEACE, INLP) removes the op about as well, and the two edits are hard to tell apart. What the anchor adds is a location known before training: no search over where and how hard to edit, an edit that stayed within the spill criterion on every run without tuning, and a fixed geometry to analyse. The edited model ends up a little short of a model that never learned the op, and we have a lead on where the rest of the evidence for the op is kept.
+
+    The sentence on fitted directions belongs in the opening summary at the top of the post, since it answers the first question a reader will ask ([second opinion on the comparison](https://claude.ai/artifact/W8KpG2fcAEjr4uhdbHXp6z), agreed in review).
 
 What D2.1 promised {.manual}
-:   The D2.1 post said we would try intervening on the anchored models, add more ops and anchor them, and compare with other methods. This post delivers the first two (with one op anchored of seven), and compares with three of the other methods (directions found after training). Gradient routing and SAE steering stay future work.
+:   The D2.1 post said we would try intervening on the anchored models, add more ops and anchor them, and compare with other methods. This post delivers the first two (with one op anchored of seven), and compares with several of the other methods (directions found after training). Gradient routing and SAE steering stay future work.
 
 ## Decisions
 
 Settled: the body of the post reports on the per-visit runs, since the reference model, the confusion matrices and the write bound all come from them, and the setup says plainly how the labels were drawn. Over 400 epochs about 34,000 of the 42,891 `difference` contexts carry a label at some point. Each label scheme stands in for something real. The per-visit draw is like a very large corpus, where most contexts are seen once and a fixed share of them is labelled. The fixed draw is like a small labelled set reused over many epochs. The fixed draw gets its own part of the labels section (section 7).
 
-Settled: the post waits for the post-hoc comparison, since a comparison is the first question a reader will ask. Its anchored arm is likely `τ_ℓ fixed` with the per-visit draw, which a Fable second opinion supports (section 6).
+Settled: the post includes the post-hoc comparison, which has reported, with `τ_ℓ fixed` and the per-visit draw as its anchored arm (section 6).
+
+Leaning: no further experiments before the post. The comparison carries one caveat instead, that its reading without role labels is a lower bound on the fitters until a position gate is tried (section 6). The decision is being settled in the thread that weighed the comparison.
 
 Settled: the low runs get a part of their own, and the post goes ahead without fixing them.
 
@@ -62,22 +66,28 @@ Settled: the low runs get a part of their own, and the post goes ahead without f
 
 ## 6. Against directions found after training
 
-- The difference in means, a ridge probe and LEACE (a linear eraser), fitted on the controls with every label, and edited through the same scorer ([plan](post-hoc-comparison.md), [PR #318](https://github.com/z0u/sca2/pull/318)).
-- How to describe the labels, for the comparison: the fitters get every `difference` label at once, about 43,000 contexts, while the anchor sees one in fifty per visit, which comes to about 34,000 distinct contexts over training. So the two are about level on distinct labelled contexts, and the comparison is fair in that sense. The fitters still have it easier in one way, since they see all their labels together on a model that has finished training. Whether the per-visit draw is realistic is a separate question, which section 7 answers with the fixed draw.
-- The anchored arm, from a second opinion in the low-runs thread: `τ_ℓ fixed` with the per-visit draw as the main arm, since one pass over a large corpus is per-visit by construction and no per-visit run showed the low tail. The fixed 1/50 draw can be one robustness row below the main table, since its runs already exist; it asks whether the ranking survives with the anchor at its weakest.
-- Say once that the fitters see every label at once while the anchor pull sees one in fifty per pass, so a reader doesn't take parity on distinct labels as a tie.
-- Expect a small removal edge for the fitters: the e₁ edit leaves a few hundredths of the op in normal runs (the off-axis part of section 7), and a fitted direction can pick up both parts. That edge is no mark against the anchor, and the post should say why before showing the numbers.
-- **Open:** the result.
+- Open with the same sentence as the summary: on this model a direction fitted after training removes the op about as well as the anchored edit, and the two edits are hard to tell apart on grading, landing and where the answers go. Then what the anchor still offers ([post-hoc compare, PR #318](https://github.com/z0u/sca2/pull/318); [second opinion](https://claude.ai/artifact/W8KpG2fcAEjr4uhdbHXp6z)).
+- What was compared: the difference in means, a ridge probe, LEACE and INLP (linear erasers), and a direction found by gradient search, each fitted on the controls with every label and tuned per run over slice, site and dose, and edited through the same scorer as the anchor.
+- The numbers, in two tables side by side. With role labels and a per-run grid, LEACE and INLP remove 0.94 to 0.97 of the way within the spill criterion, against 0.88 for the anchor, and land a little closer to the target null (0.54 to 0.55 against 0.50) with the same confusion pattern. Pooled over positions, which needs no role labels, LEACE removes 0.91 and INLP 0.89, about level with the anchor; at matched removal they spill past the criterion on 2 runs of 8 against 0 of 8, within chance of each other. The difference in means, the usual choice for steering, falls behind once role labels are taken away.
+- So claims (b) through (e) describe what removing one direction does in this model. They hold for the anchored edit and for a fitted one, and the post should present them that way, in sections 4 and 5 as well as here.
+- The case for the anchor is a different cost profile, as an alternative to an eraser:
+    - The cost: an extra training term, a task score 0.003 lower, and a recipe that took some thirty experiments to settle. Post-hoc methods apply to a model that already exists, which is why most people use them. Say this plainly.
+    - No search: the location is known before training, so there is no sweep over slice, site and dose for each model, and the full edit stayed within the criterion on all 8 runs without tuning. A fitted configuration chosen on the other seven runs missed the slice on one run in eight (seed 712), which kept 0.36 to 0.43 of its removal. Tell that in a sentence with the sample size beside it.
+    - A fixed geometry to analyse: because e₁ was chosen, the write bound could be read off the clean model before any edit, and the arc of section 7 was visible only because one end of it was pinned. This is where the program is heading (several concepts, designed subspaces), and the post can name it as the direction of travel.
+- What to leave out: label efficiency as an edge, since the fitters stay flat down to one label in fifty; the ceiling hypotheses (H3 and the gradient-searched direction), since they turn on the baseline and invite a question a footnote can't answer; and the verdict words of the report. Say what happened in plain words and link the preregistration.
+- What to put in: which analyses were not preregistered (the pooled reading, the configuration chosen on other runs, the axis-baseline reading of H4); the pooled table beside the main one; and above it the caveat that the pooled reading is a lower bound on the fitters, since a per-position gate from the fitted direction's own score might recover much of the role-label edge without role labels.
+- Figures: one frontier panel per method, as seed-mean frontiers with a sans-diff mark; the confusion matrices with the anchored row set off by a bold label.
 
 ## 7. How few labels? (claim e)
 
 - One `difference` context in fifty carries a label, the shape of label we expect for a concept in natural language, and about a quarter of the labelled contexts have a posterior below one half on `difference`, so many labels mark an op the context does not show ([design § e](design.md#e-scarce-noisy-labels-are-enough)).
-- The fixed draw: the anchor held at 1/50, 1/25 and 1/10 on all 24 runs, and most runs removed the op about as well as under the per-visit draw. At 1/25 removal matched (with one late spill); at 1/50 and 1/10 it averaged 0.81, pulled down by a low tail of two or three runs in eight. No trend with label count between about 900 and 4,300 labelled contexts ([fixed-labels, PR #323](https://github.com/z0u/sca2/pull/323)).
+- The fixed draw: the anchor held at 1/50, 1/25 and 1/10 on all 24 runs, and most runs removed the op about as well as under the per-visit draw. At 1/25 removal matched (with one late spill); at 1/50 and 1/10 it averaged 0.81, pulled down by a low tail of two or three runs in eight. No trend with label count between about 900 and 4,300 labelled contexts ([fixed-labels](/docs/m2/fixed-labels/report.py)).
+- The fitters in section 6 were as flat down to one label in fifty, so scarce labels are enough for both, and the post shouldn't present them as an edge for the anchor.
 - Retraining the same labels and seed moved which runs ended low, so whether a run ends low comes down to small numerical differences along training (fixed-labels E5).
 
 ### What the edit misses, and why some runs end low
 
-- Every run writes the evidence that an example fits `difference` as one vector with two parts: along e₁, where the anchor put it, and along the direction a non-fitting answer has, which the loss made on its own. The readers (attention, at block 3 or 4) take some of the evidence from each part, and the edit reaches only the first ([low-runs, PR #332](https://github.com/z0u/sca2/pull/332)).
+- Every run writes the evidence that an example fits `difference` as one vector with two parts: along e₁, where the anchor put it, and along the direction a non-fitting answer has, which the loss made on its own. The readers (attention, at block 3 or 4) take some of the evidence from each part, and the edit reaches only the first ([low-runs](/docs/m2/low-runs/report.py)).
 - Anchoring as an interpretability tool: fixing one end makes the other visible by contrast. The evidence is one arc on the unit sphere, from the non-fitting direction to e₁, and each example sits along it by how well it fits. Without e₁ in place these would be two unnamed directions. Figure candidate: the answer states of one run projected onto the plane of e₁ and the non-fitting direction, fitting and non-fitting examples in two colors, slices 2 and 3 side by side, with the arc drawn.
 - A cheap check before writing: whether the non-fitting direction is shared across ops or differs by op (stored checkpoints, no training).
 - Which aspect of the evidence the readers lean on is invisible to training: twins with the same labels, seed and batches match in loss and α for the whole run and part only in removal.
@@ -87,7 +97,8 @@ Settled: the low runs get a part of their own, and the post goes ahead without f
 ## 8. What we would do next
 
 - The ones to name: gradient routing, a training-time method to compare with, and the D2.3 verification measurements.
-- Briefly, if there is room: an edit-aware term that makes the readers depend on e₁ (proposed in [PR #332](https://github.com/z0u/sca2/pull/332)); the anchor and anti terms at the [mid-block states](/todo/science/anchor-and-anti-at-mid-block-states.md); more ops anchored at once ([design § future work](design.md#future-work)).
+- The comparison that tests what the anchor claims: a recipe transfer on fresh seeds, counting how often a fitted configuration chosen on earlier runs misses the slice against how often the recipe of record misses, preregistered after the post. The post can say it is planned.
+- Briefly, if there is room: the position gate for the fitters; the same comparison for *red* on the D2.1 checkpoints; an edit-aware term that makes the readers depend on e₁ ([backlog](/todo/science/make-the-reader-depend-on-e1.md)); the anchor and anti terms at the [mid-block states](/todo/science/anchor-and-anti-at-mid-block-states.md); more ops anchored at once ([design § future work](design.md#future-work)).
 
 ## Appendix, linked from the site
 
@@ -100,5 +111,4 @@ The D2.1 post took its figures from a page of their own ([D2.1 figures](/docs/m2
 
 ## Sources still moving
 
-- Fixed labels ([PR #323](https://github.com/z0u/sca2/pull/323)) and low runs ([PR #332](https://github.com/z0u/sca2/pull/332)) are in review.
-- The post-hoc comparison ([PR #318](https://github.com/z0u/sca2/pull/318)) is preregistered; Fable-san recommended `τ_ℓ fixed` with the per-visit draw as its anchored arm, with the fixed draw as an optional robustness row; the choice is still to be confirmed in that thread.
+- The post-hoc comparison ([PR #318](https://github.com/z0u/sca2/pull/318)) has reported and is in review; the [second opinion](https://claude.ai/artifact/W8KpG2fcAEjr4uhdbHXp6z) on how to present it is agreed.
