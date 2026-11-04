@@ -105,6 +105,8 @@ Settled: the low runs get a part of their own, and the post goes ahead without f
 - The write bound, in plain terms. In the autoencoder the bound was geometric: removing the e₁ part of a state moves it by no more than that part. In a transformer the edited states feed later blocks, which could write e₁ back onto the states of other ops and move them further than the edit did. The write bound says how much e₁ the later blocks may put on those states: no more than the clean model already has there. Because we chose the axis, that limit can be read off the clean model before any edit, and the measured writes stay within it past the embedding, apart from a few sites at slice 1 on one run in eight (write-floor, fixed-effects).
 - The reference baseline (median over the quiet axes) and why Adam makes it fair; the absolute tolerance on the write bound; comparing conditions as two samples with a Welch t interval; perhaps the early α screen and why it cannot see a low run ([eng/determinism.md](/eng/determinism.md)).
 
+- Compute overhead, a question readers will ask. If an anchored model learns the task in as many steps as a control, the overhead is the per-step cost of the anchor and anti terms, which can be counted analytically and checked with a timing probe. Both are being checked in a thread of their own.
+
 ## Figures
 
 The D2.1 post took its figures from a page of their own ([D2.1 figures](/docs/m2/d2.1/report.py)), drawn from published results and uploaded from the bundle. A D2.2 figures page in the same shape is the natural next step once the sections above settle. It would hold the grammar images of section 1, the pooling picture of section 2, and the arc figure of section 7 drawn from stored checkpoints, beside the figures taken from the reports.
