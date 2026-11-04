@@ -9,6 +9,7 @@ import json
 import re
 import sys
 import tempfile
+import textwrap
 from pathlib import Path
 from typing import Any, cast
 
@@ -330,24 +331,47 @@ def interval(ci: tuple[float, float]) -> str:
     return f"{num(ci[0])} to {num(ci[1])}"
 
 
-def table_html(head: list[str], rows: list[list[str]], caption: str, *, grey: frozenset[int] = frozenset()) -> str:
-    """A results table; the rows in *grey* (a fitter rejected under H4) are greyed out."""
+def table_html(head: list[str], rows: list[list[str]], caption: str, *, grey: frozenset[int] = frozenset(),
+               groups: list[tuple[str, int]] | None = None) -> str:  # fmt: skip
+    """A results table; the rows in *grey* (a fitter rejected under H4) are greyed out. *groups* labels runs of
+    columns, as (label, span) from the left, with a rule before each group after the first labelled one.
+    """
 
     def code(c: str) -> str:
         return re.sub(r"`([^`]+)`", r"<code>\1</code>", c)
 
     head, rows = [code(h) for h in head], [[code(c) for c in r] for r in rows]
-    ths = "".join(f"<th{' class=num' if i else ''}>{h}</th>" for i, h in enumerate(head))
+    starts, top = set(), ""
+    if groups:
+        at, labelled = 0, 0
+        for label, n in groups:
+            if label:
+                labelled += 1
+                if labelled > 1:
+                    starts.add(at)
+            at += n
+        at = 0
+        for label, n in groups:
+            top += f'<th colspan={n} style="text-align:center{_RULE if at in starts else ""}">{label}</th>'
+            at += n
+        top = f"<tr>{top}</tr>"
+
+    def cell(tag: str, i: int, c: str) -> str:
+        style = f' style="{_RULE[1:]}"' if i in starts else ""
+        return f"<{tag}{' class=num' if i else ''}{style}>{c}</{tag}>"
+
+    ths = "".join(cell("th", i, h) for i, h in enumerate(head))
     body = "".join(
         f"<tr{' class=muted style="opacity:0.45"' if k in grey else ''}>"
-        + "".join(f"<td{' class=num' if i else ''}>{c}</td>" for i, c in enumerate(r))
+        + "".join(cell("td", i, c) for i, c in enumerate(r))
         + "</tr>"
         for k, r in enumerate(rows)
     )
-    table = f'<table class="report-table dense"><thead><tr>{ths}</tr></thead><tbody>{body}</tbody></table>'
+    table = f'<table class="report-table dense"><thead>{top}<tr>{ths}</tr></thead><tbody>{body}</tbody></table>'
     return figure_html(table, caption=caption, class_="report-figure")
 
 
+_RULE = ";border-left:1px solid rgba(128,128,128,0.6)"
 NUMBER_WORD = dict(enumerate(("no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")))
 
 
@@ -367,6 +391,15 @@ INK = {
     "sans": ("#8c6d46", "#d1b48c"),
 }
 MARKER = {"anchor": "D", "dim": "o", "ridge": "s", "leace": "^", "inlp": "v", "optimized": "*", "sans": "P"}
+
+
+def outlined_plot(ax, x, y, fmt: str, *, lw: float, zorder: float = 3, **kw: Any) -> None:
+    """A series outlined in the background color, so crossing lines stay legible: a wider line in that color
+    under it, and marker edges in it.
+    """
+    bg = light_dark("white", "#111")
+    ax.plot(x, y, "-", color=bg, lw=lw + 2.0, zorder=zorder - 0.01, solid_capstyle="round")
+    ax.plot(x, y, fmt, lw=lw, zorder=zorder, mec=bg, mew=0.5, **kw)
 
 
 def ink(m: str) -> str:
@@ -671,19 +704,17 @@ def shared_point(method: str, scope: str = "all", at: float = CRITERION) -> tupl
     return np.asarray(rem), np.asarray(spl)
 
 
-def shared_lines(method: str, scope: str = "all") -> tuple[list, tuple[np.ndarray, np.ndarray]]:
+def shared_lines(method: str, scope: str = "all") -> list[tuple[np.ndarray, np.ndarray]]:
     """Per run left out, the frontier of the seed means of the other seven runs on the test set, as a (spill,
-    removal) line, and where the choice of `shared_choice` sits on those means.
+    removal) line: the line `shared_choice` chooses on.
     """
-    lines, er, es = [], [], []
-    for s, p in zip(SEEDS, shared_choice(method, scope), strict=True):
+    lines = []
+    for s in SEEDS:
         per = [run_cloud(method, o, scope) for o in SEEDS if o != s]
         r, sp = np.mean([a for a, _ in per], axis=0), np.mean([b for _, b in per], axis=0)
         f = finite_frontier(r, sp)
         lines.append((sp[f], r[f]))
-        er.append(_mix(p, r))
-        es.append(_mix(p, sp))
-    return lines, (np.asarray(er), np.asarray(es))
+    return lines
 
 
 CLOUD = {m: cloud(m) for m in METHODS}
@@ -750,15 +781,6 @@ def _e1_method(ax, m: str, fronts: list, chosen: tuple, accepted: bool, rejected
                    zorder=0)  # fmt: skip
 
 
-def _e1_expected(ax, m: str, expected: tuple, chosen: tuple) -> None:
-    """Where each choice sat on the line it was made on (hollow), joined to where it landed on its own run."""
-    er, es = expected
-    cr, cs = chosen
-    for x0, y0, x1, y1 in zip(es, er, cs, cr, strict=True):
-        ax.plot([x0, x1], [y0, y1], "-", color=ink(m), lw=0.6, alpha=0.7, zorder=4)
-    ax.plot(es, er, MARKER[m], ms=4, mfc="none", mec=ink(m), mew=0.8, zorder=4)
-
-
 def _e1_sans(ax, sans: tuple) -> None:
     """The sans-diff model against the control at the same seed: seed mean with bars over the range of runs."""
     r, sp = sans
@@ -780,7 +802,7 @@ def _e1_anchor(ax, anchor_runs: list, a_rem: np.ndarray, a_spill: np.ndarray) ->
 @memo
 def e1_draw(fronts: dict, anchor_runs: list, anchor_curve: tuple, chosen: dict, a_rem: np.ndarray,
             a_spill: np.ndarray, accepted: dict, rejected: dict, alt_text: str, name: str = "post-hoc-compare-tradeoff",
-            caption: str | None = None, sans: tuple | None = None, expected: dict | None = None) -> str:  # fmt: skip
+            caption: str | None = None, sans: tuple | None = None) -> str:  # fmt: skip
     @themed(
         name=name,
         alt_text=alt_text,
@@ -812,8 +834,6 @@ def e1_draw(fronts: dict, anchor_runs: list, anchor_curve: tuple, chosen: dict, 
             else:
                 _e1_backdrop(ax, m, fronts, anchor_curve)
                 _e1_method(ax, m, fronts[m], chosen[m], accepted[m], rejected[m])
-                if expected is not None:
-                    _e1_expected(ax, m, expected[m], chosen[m])
             if sans is not None:
                 _e1_sans(ax, sans)
             ax.axvline(CRITERION, color=rule(), lw=0.8, ls=":", zorder=1)
@@ -944,19 +964,19 @@ assert all(SHARED_REST[m] < OWN_REST[m] for m in FITTERS), (SHARED_REST, OWN_RES
 assert all(3 <= SHARED_OVER[m] <= 4 for m in FITTERS) and SHARED_OVER["optimized"] == 0, SHARED_OVER
 E1_SHARED_ALT = (
     "Six panels of removal against spill. In each method panel, eight nearly identical lines (the frontiers of seven "
-    "runs averaged) with hollow markers bunched at the spill criterion near removal 0.9, each joined to a filled "
-    "marker for the run left out: most land close by, about half just past the criterion, and for difference in "
-    "means, LEACE, and INLP one drops to near zero removal. The optimized direction stays near the anchor."
+    "runs averaged), with a marker for each run left out: most sit near removal 0.9 close to the spill criterion, "
+    "about half just past it, and for difference in means, LEACE, and INLP one drops to near zero removal. The "
+    "optimized direction stays near the anchor."
 )
 SHARED_LINES = {m: shared_lines(m) for m in METHODS}
-e1_draw({m: SHARED_LINES[m][0] for m in METHODS}, ANCHOR_RUNS, ANCHOR_CURVE, {m: SHARED[m] for m in METHODS},
+e1_draw(SHARED_LINES, ANCHOR_RUNS, ANCHOR_CURVE, {m: SHARED[m] for m in METHODS},
         A_REMOVAL, A_SPILL, dict.fromkeys(METHODS, False), dict.fromkeys(METHODS, False), alt_text=E1_SHARED_ALT,
-        name="post-hoc-compare-shared", sans=SANS_POINT, expected={m: SHARED_LINES[m][1] for m in METHODS},
+        name="post-hoc-compare-shared", sans=SANS_POINT,
         caption=f"""
             **Removal against spill with a configuration chosen on the other runs**, on the test set of the eight
-            controls. Each line is the frontier of the seed means of seven runs, one line for each run left out. The
-            hollow marker is where the selection rule chose on those seven, at the spill criterion; the filled marker
-            joined to it is what that configuration, fitted on the run left out, scores there. The anchor panel is as
+            controls. Each line is the frontier of the seed means of seven runs, one line for each run left out, and
+            the selection rule chose on it at the spill criterion. Each marker is what that configuration, fitted on
+            the run left out, scores there. The anchor panel is as
             before, and the plus is the sans-diff model against the control at the same seed (seed mean, with bars
             over the runs). Spill here is net of the median along the coordinate axes of the tuning set, as in the
             figure before. The spill axis is cut at {SPILL_LIM[1]}.
@@ -993,6 +1013,7 @@ table_html(
     {MARGIN} on the other seven. Net of the axis median, as in the figure. A greyed row is a fitter rejected under
     H4.""",
     grey=h4_grey(METHODS),
+    groups=[("", 1), ("chosen at the criterion", 3), (f"chosen at a spill of {MARGIN}", 3)],
 )  # fmt: skip
 
 # %%
@@ -1043,7 +1064,7 @@ def per_run_draw(name: str, values: dict, gate: float, side: str, ylabel: str, y
         ax.axhline(gate, color=rule(), lw=0.9, ls="--", zorder=2)
         ax.set_xticks(
             range(len(names)),
-            [SHOWN[m.split(":")[0]] + (" (H4 out)" if m.endswith(":out") else "") for m in names],
+            [tick_label(m.split(":")[0]) + ("\n(H4 out)" if m.endswith(":out") else "") for m in names],
             fontsize=7,
         )
         ax.set_ylabel(ylabel, fontsize=8)
@@ -1054,6 +1075,11 @@ def per_run_draw(name: str, values: dict, gate: float, side: str, ylabel: str, y
         return fig
 
     return _plot()
+
+
+def tick_label(m: str) -> str:
+    """The shown name of a method, broken onto two lines where it is long, so neighbouring ticks don't overlap."""
+    return textwrap.fill(SHOWN[m], 12)
 
 
 def key(m: str) -> str:
@@ -1459,8 +1485,8 @@ def grading_draw(share: dict, alt_text: str, name: str = "post-hoc-compare-gradi
         fig, ax = plt.subplots(figsize=(5.2, 2.6), layout="constrained")
         x = np.arange(len(BIN_LABEL))
         for m, v in share.items():
-            ax.plot(x, np.mean(v, axis=0), "-", marker=MARKER[m], ms=4, color=ink(m), lw=2.0 if m == "anchor" else 1.0,
-                    label=SHOWN[m], zorder=4 if m == "anchor" else 3)  # fmt: skip
+            outlined_plot(ax, x, np.mean(v, axis=0), "-", marker=MARKER[m], ms=4, color=ink(m),
+                          lw=2.0 if m == "anchor" else 1.0, label=SHOWN[m], zorder=4 if m == "anchor" else 3)  # fmt: skip
         ax.axhline(1.0, color=rule(), lw=0.6, ls=":")
         ax.set_xticks(x, BIN_LABEL, fontsize=7)
         ax.set_xlabel(f"posterior on {DIFF}", fontsize=8)
@@ -1584,9 +1610,9 @@ def where_draw(rows: dict, alt_text: str, name: str = "post-hoc-compare-where", 
         or f"""
             **Where the answers go on `{DIFF}` contexts**, seed mean over eight runs. Each row is a model or an edit;
             each column the mass on the colors the column op can give for the query operands and `{DIFF}` cannot.
-            The `{DIFF}` column (the mass on its own answers) has a bold label, is printed in grey italics, and is
-            left out of the color scale; the anchored edit has a border in its own color. Values of at least 0.01 are printed. Rules separate the unedited references (above), the
-            anchored edit, and the post-hoc edits (below).
+            The `{DIFF}` column (the mass on its own answers) is left out of the color scale. Values of at least
+            0.01 are printed. Rules separate the unedited references (above), the anchored edit, and the post-hoc
+            edits (below).
         """,
     )
     def _plot() -> plt.Figure:
@@ -1916,11 +1942,11 @@ def probe_draw(auc: dict, alt_text: str, name: str = "post-hoc-compare-probe", c
                         if name == "sans-diff"
                         else light_dark("#888", "#999")
                     )
-                    ax.plot(x, v[j], "--", color=c, lw=0.9, label=name)
+                    ax.plot(x, v[j], "--", color=c, lw=0.9, label=name, zorder=2)
                 else:
                     m = key[name]
-                    ax.plot(x, v[j], "-", marker=MARKER[m], ms=3.5, color=ink(m), lw=2.0 if m == "anchor" else 1.0,
-                            label=name, zorder=4 if m == "anchor" else 3)  # fmt: skip
+                    outlined_plot(ax, x, v[j], "-", marker=MARKER[m], ms=3.5, color=ink(m),
+                                  lw=2.0 if m == "anchor" else 1.0, label=name, zorder=4 if m == "anchor" else 3)  # fmt: skip
             ax.axhline(0.5, color=rule(), lw=0.6, ls=":")
             ax.set_title("query =" if site == "query =" else "example answers", fontsize=8)
             ax.set_xticks(x, [str(i) for i in x], fontsize=7)
@@ -2329,11 +2355,11 @@ The preregistered comparison missed. Given role labels and a grid tuned on each 
 
 The comparison the anchor was built for restricts the fitters to fits that need no role labels, and it was added after the run. There, LEACE and INLP remove about as much as the anchor and spill past the criterion on a few more runs, and difference in means falls behind on both. So on this model the anchored edit matches the best post-hoc eraser we tried, and does better than the direction most steering work uses. We have not shown that it does better than LEACE.
 
-The fitters had help the anchor did not. They saw every label at once, and each run chose among about a thousand configurations scored on that run. The anchor had one configuration, but it came from some thirty experiments at other seeds, so its search happened once, earlier. The configuration chosen on other runs in E1 is the closest this report comes to comparing the two kinds of search: for the fitters it works on most runs, with the runs over the criterion mostly an effect of choosing at the line, and on one run it misses because that run holds the op a slice earlier. One run in eight is too few to say how often a fixed recipe for a fitter would miss, though it fits the idea that placing the concept saves finding where it sits in each new model.
+The fitters had help the anchor did not. They saw every label at once, and each run chose among about a thousand configurations scored on that run. The anchor had one configuration, but it came from some thirty experiments at other seeds, so its search happened earlier. The configuration chosen on other runs in E1 is the closest this report comes to comparing the two kinds of search: for the fitters it works on most runs, with the runs over the criterion mostly an effect of choosing at the line, and on one run it misses because that run holds the op a slice earlier. One run in eight is too few to say how often a fixed recipe for a fitter would miss, though it fits the idea that placing the concept saves finding where it sits in each new model.
 
-Placing the concept had costs here too: an extra training term, and a small drop in task score. What it offers that a post-hoc method lacks is a location chosen before training, and this experiment uses that only in the plainest way, one concept on one axis. Whether a chosen location helps more when several concepts are placed at once, when they are arranged in a designed subspace, or when a concept is harder to find after training, is open, and nothing here bears on it either way.
+Placing the concept had costs: an extra training term, and a small drop in task score. What it offers that a post-hoc method lacks is a location chosen before training, and this experiment uses that only in the plainest way, one concept on one axis. Whether a chosen location helps more when several concepts are placed at once, when they are arranged in a designed subspace, or when a concept is harder to find after training, is open, and nothing here bears on it either way.
 
-None of the edits, LEACE included, left a fresh probe at chance. For the anchor that was expected, since part of the evidence lies off e₁. For LEACE it was not, and the cause is an open puzzle. The sans-diff model, which never learned the op, leaves a probe about as much, so what remains may be what any model of these contexts holds. Either way, on this model taking the op out of the answer and making it unreadable are different properties, and a claim of erasure needs to say which one it means.
+None of the edits, LEACE included, left a fresh probe at chance (E5). For the anchor that was expected, since we know part of the evidence lies off e₁. LEACE leaves about as much at the slice it edits, though its guarantee covers every linear direction there, so the reason that holds for the anchor does not carry over. E5 lists three candidate causes, and the one we would look at first is the step that puts each edited state back at unit length, which the guarantee does not cover. At the query `=`, the sans-diff model, which never learned the op, leaves a probe about as much as the edits do, so most of what a probe finds there may be what any model of these contexts holds.
 
 The comparison covers one concept in one small model on a synthetic task, with eight runs per arm, and several readings depend on the choice of baseline (E6). The pooled comparison and the configuration chosen on other runs were added after the run, so they describe what we saw rather than test a prediction.
 """
