@@ -2,6 +2,7 @@
 status: open
 tags: [D2.2, anchoring, intervention]
 opened: 2026-11-02
+priority: high
 ---
 # Make the reader depend on e₁: an edit-aware term
 
