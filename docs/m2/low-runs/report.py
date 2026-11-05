@@ -687,11 +687,11 @@ def arc_figure() -> str:
     }
     alt = """
         The states at the example answers of three runs at seed 715 (the low run, its twin, and the per-visit run,
-        one per row), at slice 2 (left) and slice 3 (right), drawn in the plane of e₁ (horizontal) and the
-        direction a non-fitting answer has (vertical), a few hundred examples of each kind. The states are unit vectors, so a state that lies in
-        this plane sits on the unit circle. Non-fitting examples cluster at the bottom, at e₁ near zero, on the
-        circle at slice 3 and inside it at slice 2; fitting examples spread along the arc from there toward e₁ = 1
-        on the right, further along at slice 3 than at slice 2. The three runs have the same shape, with the
+        one per row), at slice 2 (left) and slice 3 (right), drawn in the plane of the
+        direction a non-fitting answer has (horizontal) and e₁ (vertical), a few hundred examples of each kind. The states are unit vectors, so a state that lies in
+        this plane sits on the unit circle. Non-fitting examples cluster on the right, at e₁ near zero, on the
+        circle at slice 3 and inside it at slice 2; fitting examples spread along the arc from there up toward
+        e₁ = 1 at the top, further along at slice 3 than at slice 2. The three runs have the same shape, with the
         fitting examples of the low run a little further from e₁ at slice 3.
     """
     return arc_draw(data, alt)
@@ -704,7 +704,7 @@ def arc_draw(data: dict, alt_text: str) -> str:
         alt_text=alt_text,
         caption="""
             **The arc from the non-fitting direction to e₁.** States at the example answers in the plane spanned by
-            e₁ (horizontal) and the direction a non-fitting answer has (vertical): 400 fitting examples (red for
+            the direction a non-fitting answer has (horizontal) and e₁ (vertical), as in the next figure: 400 fitting examples (red for
             the low run, blue for the others) and 400 non-fitting ones (grey) per panel. **Rows:** the low run at
             seed 715, its twin, and the per-visit run at the same seed. **Columns:** slice 2, slice 3. The states
             are unit vectors, so a state that lies in this plane sits on the dotted unit circle; one inside the
@@ -712,7 +712,7 @@ def arc_draw(data: dict, alt_text: str) -> str:
         """,
     )
     def _plot() -> plt.Figure:
-        fig, axes = plt.subplots(3, 2, figsize=(5.2, 7.3), layout="constrained", sharex=True, sharey=True)
+        fig, axes = plt.subplots(3, 2, figsize=(5.2, 7.0), layout="constrained", sharex=True, sharey=True)
         t = np.linspace(0, 2 * np.pi, 400)
         for (name, low), pts, row in zip(data["runs"], data["points"], axes, strict=True):
             for s, ax in zip(("2", "3"), row, strict=True):
@@ -721,17 +721,19 @@ def arc_draw(data: dict, alt_text: str) -> str:
                 ax.axvline(0, color=ghost(), lw=0.4, zorder=1)
                 nf = np.asarray(pts[s]["not"])
                 ff = np.asarray(pts[s]["fits"])
-                ax.scatter(nf[:, 0], nf[:, 1], s=3, color=ghost(), alpha=0.6, lw=0, zorder=2)
-                ax.scatter(ff[:, 0], ff[:, 1], s=3, color=ink_low() if low else ink_normal(), alpha=0.7, lw=0, zorder=3)
+                # Stored as (e₁, along v), with v pointing from the non-fitting mean toward the fitting one, so
+                # the non-fitting direction is -v: drawn with it across and e₁ up, as in the next figure.
+                ax.scatter(-nf[:, 1], nf[:, 0], s=3, color=ghost(), alpha=0.6, lw=0, zorder=2)
+                ax.scatter(-ff[:, 1], ff[:, 0], s=3, color=ink_low() if low else ink_normal(), alpha=0.7, lw=0, zorder=3)
                 ax.set_aspect("equal")
-                ax.set_xlim(-0.3, 1.1)
-                ax.set_ylim(-1.1, 0.5)
+                ax.set_xlim(-0.15, 1.1)
+                ax.set_ylim(-0.3, 1.1)
                 ax.tick_params(labelsize=6)
                 ax.set_title(f"{name}, slice {s}", fontsize=7)
         for ax in axes[-1]:
-            ax.set_xlabel("coordinate along e₁", fontsize=7)
+            ax.set_xlabel("along the non-fitting direction", fontsize=7)
         for ax in axes[:, 0]:
-            ax.set_ylabel("along the non-fitting direction", fontsize=7)
+            ax.set_ylabel("coordinate along e₁", fontsize=7)
         fig_legend(
             fig,
             [
@@ -1280,7 +1282,7 @@ What is that off-axis direction? Two checks say what it is and that it is real. 
 
 {arc_figure()}
 
-The figure draws that arc for three runs at seed 715: the low run, its twin, and the per-visit run. Each answer state is a unit vector, so in the plane of e₁ and the non-fitting direction a state that lies in the plane sits on the unit circle, and one that sits inside the circle has part of its length in other directions. The non-fitting examples gather at the bottom, where e₁ is near zero: on the circle at slice 3, and inside it at slice 2. The plane is a projection, so "arc" is a simplification: two non-fitting examples that land on the same point here can be far apart in the other directions, as the ones at slice 2 are, and the figure says nothing about whether an example that fits `lighten` and one that fits `mix` sit near each other. What it does say is that every fitting example has left the non-fitting direction by about as much as it has gained on e₁. The fitting examples spread along the circle toward e₁ = 1, further along at slice 3 than at slice 2, and at slice 3 the ones near the top sit at α close to 1. The three runs have the same shape; the fitting examples of the low run sit a little further from e₁ at slice 3, which is the small α gap in the table of E1. So the writer gives the readers much the same picture in a low run, its twin, and a per-visit run, which is the point of E1 seen from inside. A model trained without the anchor holds the same arc, found after training from the mean states of the two kinds of example, but a short one: in the eight controls at seeds 712 to 719 the two means lie a median of 21° apart at slice 3 (9° to 35°), where the per-visit runs put them 83° apart ([arc-in-controls probe](https://github.com/z0u/sca2/blob/main/docs/m2/arc-in-controls/experiment.py)). So the anchor stretches the arc and names one end of it in advance, which makes the arc quicker to read; it is there to be found without it.
+The figure draws that arc for three runs at seed 715: the low run, its twin, and the per-visit run. Each answer state is a unit vector, so in the plane of e₁ and the non-fitting direction a state that lies in the plane sits on the unit circle, and one that sits inside the circle has part of its length in other directions. The non-fitting examples gather on the right, where e₁ is near zero: on the circle at slice 3, and inside it at slice 2. The plane is a projection, so "arc" is a simplification: two non-fitting examples that land on the same point here can be far apart in the other directions, as the ones at slice 2 are, and the figure says nothing about whether an example that fits `lighten` and one that fits `mix` sit near each other. What it does say is that every fitting example has left the non-fitting direction by about as much as it has gained on e₁. The fitting examples spread up the circle toward e₁ = 1, further along at slice 3 than at slice 2, and at slice 3 the ones near the top sit at α close to 1. The three runs have the same shape; the fitting examples of the low run sit a little further from e₁ at slice 3, which is the small α gap in the table of E1. So the writer gives the readers much the same picture in a low run, its twin, and a per-visit run, which is the point of E1 seen from inside. A model trained without the anchor holds the same arc, found after training from the mean states of the two kinds of example, but a short one: in the eight controls at seeds 712 to 719 the two means lie a median of 21° apart at slice 3 (9° to 35°), where the per-visit runs put them 83° apart ([arc-in-controls probe](https://github.com/z0u/sca2/blob/main/docs/m2/arc-in-controls/experiment.py)). So the anchor stretches the arc and names one end of it in advance, which makes the arc quicker to read; it is there to be found without it.
 
 {controls_arc_figure()}
 
