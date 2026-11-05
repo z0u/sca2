@@ -673,29 +673,24 @@ def evidence_draw(data: dict, alt_text: str) -> str:
     return _plot()
 
 
-# The part of the unit disc an arc panel draws, in degrees from the horizontal axis: every state at the example
-# answers lies in it, in both arc figures.
-ARC_WEDGE = (-25, 105)
-
-
 def arc_bound(ax: plt.Axes, top: str, right: str, anchored: bool) -> None:
-    """A geometry panel for an arc (see style-fig): a wedge of the unit disc as the bound, the two axes drawn from the
-    centre and named at their ends, no ticks, and a solid triangle at e₁ when the top axis is the anchor.
+    """A geometry panel for an arc (see style-fig): the unit disc as the bound, cropped to the quarter the states lie
+    in so that the disc runs off the panel rather than ending at drawn radial edges, the two axes drawn from the centre
+    and named at their ends, no ticks, and a solid triangle at e₁ when the top axis is the anchor.
     """
-    from matplotlib.patches import Wedge
+    from matplotlib.patches import Circle
 
-    lo, hi = ARC_WEDGE
-    ax.add_patch(Wedge((0, 0), 1, lo, hi, facecolor=light_dark("#eee", "#1d1d1d"), lw=0, zorder=-10))
-    ax.add_patch(Wedge((0, 0), 1, lo, hi, facecolor="none", edgecolor=light_dark("#0005", "#fff5"), lw=0.8, zorder=10))
+    ax.add_patch(Circle((0, 0), 1, facecolor=light_dark("#eee", "#1d1d1d"), lw=0, zorder=-10))
+    ax.add_patch(Circle((0, 0), 1, facecolor="none", edgecolor=light_dark("#0005", "#fff5"), lw=0.8, zorder=10))
     ax.plot([0, 0], [0, 1], color=ghost(), lw=0.5, zorder=-5)
     ax.plot([0, 1], [0, 0], color=ghost(), lw=0.5, zorder=-5)
     if anchored:
         ax.plot([0], [1.06], marker="v", ms=5, color=rule(), clip_on=False, zorder=11)
     ax.text(0, 1.13 if anchored else 1.04, top, ha="center", va="bottom", fontsize=6.5)
-    ax.text(1.04, 0, right, ha="left", va="center", fontsize=6.5)
+    ax.text(1.04, 0, right, ha="left", va="center", fontsize=6.5, clip_on=False)
     ax.set_aspect("equal")
-    ax.set_xlim(-0.45, 1.4)
-    ax.set_ylim(-0.45, 1.25)
+    ax.set_xlim(-0.35, 1.4)
+    ax.set_ylim(-0.4, 1.25)
     ax.set_axis_off()
 
 
@@ -733,7 +728,7 @@ def arc_draw(data: dict, alt_text: str) -> str:
             the direction a non-fitting answer has (horizontal) and e₁ (vertical), as in the next figure: 400 fitting examples (red for
             the low run, blue for the others) and 400 non-fitting ones (grey) per panel. **Rows:** the low run at
             seed 715, its twin, and the per-visit run at the same seed. **Columns:** slice 2, slice 3. The states
-            are unit vectors, so a state that lies in this plane sits on the rim of the grey wedge of the unit disc;
+            are unit vectors, so a state that lies in this plane sits on the rim of the grey unit disc, shown cropped to the quarter the states lie in;
             one inside has part of its length in other directions. The triangle marks e₁, the anchor.
         """,
     )
@@ -883,7 +878,7 @@ def controls_arc_draw(data: dict, alt_text: str) -> str:
             **The arc without the anchor.** States at the example answers in the plane of the two class means, with
             no chosen axis: the direction of the non-fitting mean (horizontal) and the part of the fitting mean at
             right angles to it (vertical). 300 fitting examples (blue) and 300 non-fitting ones (grey) per panel,
-            on a wedge of the unit disc. **Top row:** the control at seed 715. **Middle row:** the per-visit run at
+            on the unit disc, cropped to the quarter the states lie in. **Top row:** the control at seed 715. **Middle row:** the per-visit run at
             the same seed, where the vertical axis found from the means is e₁ (the triangle marks the anchor). **Columns:** slice 2, slice 3. **Bottom:** the angle between the class means, one faded
             mark per run and the mean on top, for the eight controls (circles) and the eight per-visit runs
             (squares) at 712 to 719.
