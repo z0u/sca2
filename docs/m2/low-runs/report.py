@@ -673,6 +673,32 @@ def evidence_draw(data: dict, alt_text: str) -> str:
     return _plot()
 
 
+# The part of the unit disc an arc panel draws, in degrees from the horizontal axis: every state at the example
+# answers lies in it, in both arc figures.
+ARC_WEDGE = (-25, 105)
+
+
+def arc_bound(ax: plt.Axes, top: str, right: str, anchored: bool) -> None:
+    """A geometry panel for an arc (see style-fig): a wedge of the unit disc as the bound, the two axes drawn from the
+    centre and named at their ends, no ticks, and a solid triangle at e₁ when the top axis is the anchor.
+    """
+    from matplotlib.patches import Wedge
+
+    lo, hi = ARC_WEDGE
+    ax.add_patch(Wedge((0, 0), 1, lo, hi, facecolor=light_dark("#eee", "#1d1d1d"), lw=0, zorder=-10))
+    ax.add_patch(Wedge((0, 0), 1, lo, hi, facecolor="none", edgecolor=light_dark("#0005", "#fff5"), lw=0.8, zorder=10))
+    ax.plot([0, 0], [0, 1], color=ghost(), lw=0.5, zorder=-5)
+    ax.plot([0, 1], [0, 0], color=ghost(), lw=0.5, zorder=-5)
+    if anchored:
+        ax.plot([0], [1.06], marker="v", ms=5, color=rule(), clip_on=False, zorder=11)
+    ax.text(0, 1.13 if anchored else 1.04, top, ha="center", va="bottom", fontsize=6.5)
+    ax.text(1.04, 0, right, ha="left", va="center", fontsize=6.5)
+    ax.set_aspect("equal")
+    ax.set_xlim(-0.45, 1.4)
+    ax.set_ylim(-0.45, 1.25)
+    ax.set_axis_off()
+
+
 ARC_RUNS = (
     fl.label_of(715, None),
     fl.cross_label_of(715, 715),
@@ -707,33 +733,24 @@ def arc_draw(data: dict, alt_text: str) -> str:
             the direction a non-fitting answer has (horizontal) and e₁ (vertical), as in the next figure: 400 fitting examples (red for
             the low run, blue for the others) and 400 non-fitting ones (grey) per panel. **Rows:** the low run at
             seed 715, its twin, and the per-visit run at the same seed. **Columns:** slice 2, slice 3. The states
-            are unit vectors, so a state that lies in this plane sits on the dotted unit circle; one inside the
-            circle has part of its length in other directions.
+            are unit vectors, so a state that lies in this plane sits on the rim of the grey wedge of the unit disc;
+            one inside has part of its length in other directions. The triangle marks e₁, the anchor.
         """,
     )
     def _plot() -> plt.Figure:
-        fig, axes = plt.subplots(3, 2, figsize=(5.2, 7.0), layout="constrained", sharex=True, sharey=True)
-        t = np.linspace(0, 2 * np.pi, 400)
+        fig, axes = plt.subplots(3, 2, figsize=(5.2, 7.0), layout="constrained")
         for (name, low), pts, row in zip(data["runs"], data["points"], axes, strict=True):
             for s, ax in zip(("2", "3"), row, strict=True):
-                ax.plot(np.cos(t), np.sin(t), color=ghost(), lw=0.5, ls=":", zorder=1)
-                ax.axhline(0, color=ghost(), lw=0.4, zorder=1)
-                ax.axvline(0, color=ghost(), lw=0.4, zorder=1)
+                arc_bound(ax, "e₁", "non-fitting\ndirection", anchored=True)
                 nf = np.asarray(pts[s]["not"])
                 ff = np.asarray(pts[s]["fits"])
                 # Stored as (e₁, along v), with v pointing from the non-fitting mean toward the fitting one, so
                 # the non-fitting direction is -v: drawn with it across and e₁ up, as in the next figure.
                 ax.scatter(-nf[:, 1], nf[:, 0], s=3, color=ghost(), alpha=0.6, lw=0, zorder=2)
-                ax.scatter(-ff[:, 1], ff[:, 0], s=3, color=ink_low() if low else ink_normal(), alpha=0.7, lw=0, zorder=3)
-                ax.set_aspect("equal")
-                ax.set_xlim(-0.15, 1.1)
-                ax.set_ylim(-0.3, 1.1)
-                ax.tick_params(labelsize=6)
+                ax.scatter(
+                    -ff[:, 1], ff[:, 0], s=3, color=ink_low() if low else ink_normal(), alpha=0.7, lw=0, zorder=3
+                )
                 ax.set_title(f"{name}, slice {s}", fontsize=7)
-        for ax in axes[-1]:
-            ax.set_xlabel("along the non-fitting direction", fontsize=7)
-        for ax in axes[:, 0]:
-            ax.set_ylabel("coordinate along e₁", fontsize=7)
         fig_legend(
             fig,
             [
@@ -866,40 +883,30 @@ def controls_arc_draw(data: dict, alt_text: str) -> str:
             **The arc without the anchor.** States at the example answers in the plane of the two class means, with
             no chosen axis: the direction of the non-fitting mean (horizontal) and the part of the fitting mean at
             right angles to it (vertical). 300 fitting examples (blue) and 300 non-fitting ones (grey) per panel,
-            with the dotted unit circle. **Top row:** the control at seed 715. **Middle row:** the per-visit run at
-            the same seed. **Columns:** slice 2, slice 3. **Bottom:** the angle between the class means, one faded
+            on a wedge of the unit disc. **Top row:** the control at seed 715. **Middle row:** the per-visit run at
+            the same seed, where the vertical axis found from the means is e₁ (the triangle marks the anchor). **Columns:** slice 2, slice 3. **Bottom:** the angle between the class means, one faded
             mark per run and the mean on top, for the eight controls (circles) and the eight per-visit runs
-            (triangles) at 712 to 719.
+            (squares) at 712 to 719.
         """,
     )
     def _plot() -> plt.Figure:
         fig = plt.figure(figsize=(5.2, 7.4), layout="constrained")
         grid = fig.add_gridspec(3, 2, height_ratios=[1, 1, 0.55])
-        t = np.linspace(0, 2 * np.pi, 400)
         for i, (name, slices) in enumerate(data["rows"]):
             for j, s in enumerate(("2", "3")):
                 ax = fig.add_subplot(grid[i, j])
                 m = slices[s]["means"]
-                ax.plot(np.cos(t), np.sin(t), color=ghost(), lw=0.5, ls=":", zorder=1)
-                ax.axhline(0, color=ghost(), lw=0.4, zorder=1)
-                ax.axvline(0, color=ghost(), lw=0.4, zorder=1)
+                anchored = name != "control"
+                arc_bound(ax, "e₁" if anchored else "fitting mean", "non-fitting\nmean", anchored=anchored)
                 nf = np.asarray(m["points"]["not"])
                 ff = np.asarray(m["points"]["fits"])
                 ax.scatter(nf[:, 0], nf[:, 1], s=3, color=ghost(), alpha=0.6, lw=0, zorder=2)
                 ax.scatter(ff[:, 0], ff[:, 1], s=3, color=ink_normal(), alpha=0.7, lw=0, zorder=3)
-                ax.set_aspect("equal")
-                ax.set_xlim(-0.15, 1.1)
-                ax.set_ylim(-0.3, 1.1)
-                ax.tick_params(labelsize=6)
                 ax.set_title(f"{name} at {data['seed']}, slice {s}: {m['angle_between_means']:.0f}° apart", fontsize=7)
-                if i == 1:
-                    ax.set_xlabel("along the non-fitting mean", fontsize=7)
-                if j == 0:
-                    ax.set_ylabel("toward the fitting mean", fontsize=7)
         rng = np.random.default_rng(0)
         for j, s in enumerate(("2", "3")):
             ax = fig.add_subplot(grid[2, j])
-            for x, (kind, marker) in enumerate((("control", "o"), ("anchored", "^"))):
+            for x, (kind, marker) in enumerate((("control", "o"), ("anchored", "s"))):
                 v = np.asarray(data["angles"][kind][s])
                 ax.plot([x, x], [v.min(), v.max()], color=ghost(), lw=3, alpha=0.5, solid_capstyle="round", zorder=1)
                 ax.scatter(x + rng.uniform(-0.12, 0.12, len(v)), v, s=8, marker=marker, color=ink_normal(), alpha=0.45, lw=0, zorder=2)  # fmt: skip
