@@ -50,8 +50,8 @@ ALONG_EPOCHS = sorted(next(iter(ALONG.values())))
 ROUTES = {r["label"]: r for r in fetch_json(ex.ROUTES_REF)["runs"]}
 EVIDENCE = {r["label"]: r for r in fetch_json(ex.EVIDENCE_REF)["runs"]}
 TWINS = fetch_json(ex.TWINS_REF)
+# The arc drawn from the class means alone, in the controls and per-visit runs at 712 to 719 (arc-in-controls probe).
 CONTROLS_ARC = fetch_json("reports/m2/arc-in-controls/results")["runs"]
-"""The arc drawn from the class means alone, in the controls and per-visit runs at 712 to 719 (arc-in-controls probe)."""
 
 
 def net_of(drop) -> np.ndarray:
