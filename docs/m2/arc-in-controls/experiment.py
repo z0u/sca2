@@ -119,6 +119,7 @@ def _means(x: np.ndarray, fits: np.ndarray, u: np.ndarray) -> dict:
     pick = {k: rng.choice(np.flatnonzero(mk), size=min(SAMPLE, int(mk.sum())), replace=False) for k, mk in (("fits", fits), ("not", ~fits))}  # fmt: skip
     return {
         "auc_u": lr._auc(x @ u, fits),
+        "e1_cos": {"non_fitting_axis": float(n[0]), "fitting_axis": float(w[0])},
         "angle_between_means": float(np.degrees(np.arccos(np.clip(f @ n, -1, 1)))),
         "mean_length": {"fits": float(np.linalg.norm(mf)), "not": float(np.linalg.norm(mn))},
         "angle_auc": lr._auc(ang, fits),

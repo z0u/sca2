@@ -50,6 +50,8 @@ ALONG_EPOCHS = sorted(next(iter(ALONG.values())))
 ROUTES = {r["label"]: r for r in fetch_json(ex.ROUTES_REF)["runs"]}
 EVIDENCE = {r["label"]: r for r in fetch_json(ex.EVIDENCE_REF)["runs"]}
 TWINS = fetch_json(ex.TWINS_REF)
+CONTROLS_ARC = fetch_json("reports/m2/arc-in-controls/results")["runs"]
+"""The arc drawn from the class means alone, in the controls and per-visit runs at 712 to 719 (arc-in-controls probe)."""
 
 
 def net_of(drop) -> np.ndarray:
@@ -819,6 +821,101 @@ def distance_draw(data: dict, alt_text: str) -> str:
 # --- Numbers the prose quotes ----------------------------------------------------------------------------------
 
 
+def means_angle(kind: str, s: str) -> np.ndarray:
+    return np.array([r["slices"][s]["means"]["angle_between_means"] for r in CONTROLS_ARC if r["kind"] == kind])
+
+
+def means_e1(kind: str, s: str) -> np.ndarray:
+    return np.array([r["slices"][s]["means"]["e1_cos"]["fitting_axis"] for r in CONTROLS_ARC if r["kind"] == kind])
+
+
+def controls_arc_figure() -> str:
+    seed = 715
+    pick = {r["kind"]: r for r in CONTROLS_ARC if r["label"].endswith(f"s{seed}")}
+    data = {
+        "rows": [["control", pick["control"]["slices"]], ["per-visit", pick["anchored"]["slices"]]],
+        "angles": {k: {s: means_angle(k, s).tolist() for s in ("2", "3")} for k in ("control", "anchored")},
+        "seed": seed,
+    }
+    c3 = pick["control"]["slices"]["3"]["means"]["angle_between_means"]
+    a3 = pick["anchored"]["slices"]["3"]["means"]["angle_between_means"]
+    lo_c = min(min(means_angle("control", s)) for s in ("2", "3"))
+    hi_c = max(max(means_angle("control", s)) for s in ("2", "3"))
+    lo_a = min(min(means_angle("anchored", s)) for s in ("2", "3"))
+    hi_a = max(max(means_angle("anchored", s)) for s in ("2", "3"))
+    alt = f"""
+        The states at the example answers at seed {seed}, drawn in the plane of the two class means: the direction
+        of the non-fitting mean (horizontal) and the part of the fitting mean at right angles to it (vertical). Top
+        row, the control: the fitting examples sit in a tight group just above the non-fitting group, the two means
+        {c3:.0f}° apart at slice 3. Middle row, the per-visit run: the fitting examples spread along a quarter
+        circle up to the vertical axis, which here is e₁, the means {a3:.0f}° apart at slice 3. Bottom: the angle
+        between the means in each of the eight controls and eight per-visit runs, at slices 2 and 3; the controls
+        lie between {lo_c:.0f}° and {hi_c:.0f}°, the per-visit runs between {lo_a:.0f}° and {hi_a:.0f}°.
+    """
+    return controls_arc_draw(data, alt)
+
+
+@memo
+def controls_arc_draw(data: dict, alt_text: str) -> str:
+    @themed(
+        name="low-runs-controls-arc",
+        alt_text=alt_text,
+        caption="""
+            **The arc without the anchor.** States at the example answers in the plane of the two class means, with
+            no chosen axis: the direction of the non-fitting mean (horizontal) and the part of the fitting mean at
+            right angles to it (vertical). 300 fitting examples (blue) and 300 non-fitting ones (grey) per panel,
+            with the dotted unit circle. **Top row:** the control at seed 715. **Middle row:** the per-visit run at
+            the same seed. **Columns:** slice 2, slice 3. **Bottom:** the angle between the class means, one faded
+            mark per run and the mean on top, for the eight controls (circles) and the eight per-visit runs
+            (triangles) at 712 to 719.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig = plt.figure(figsize=(5.2, 7.4), layout="constrained")
+        grid = fig.add_gridspec(3, 2, height_ratios=[1, 1, 0.55])
+        t = np.linspace(0, 2 * np.pi, 400)
+        for i, (name, slices) in enumerate(data["rows"]):
+            for j, s in enumerate(("2", "3")):
+                ax = fig.add_subplot(grid[i, j])
+                m = slices[s]["means"]
+                ax.plot(np.cos(t), np.sin(t), color=ghost(), lw=0.5, ls=":", zorder=1)
+                ax.axhline(0, color=ghost(), lw=0.4, zorder=1)
+                ax.axvline(0, color=ghost(), lw=0.4, zorder=1)
+                nf = np.asarray(m["points"]["not"])
+                ff = np.asarray(m["points"]["fits"])
+                ax.scatter(nf[:, 0], nf[:, 1], s=3, color=ghost(), alpha=0.6, lw=0, zorder=2)
+                ax.scatter(ff[:, 0], ff[:, 1], s=3, color=ink_normal(), alpha=0.7, lw=0, zorder=3)
+                ax.set_aspect("equal")
+                ax.set_xlim(-0.15, 1.1)
+                ax.set_ylim(-0.3, 1.1)
+                ax.tick_params(labelsize=6)
+                ax.set_title(f"{name} at {data['seed']}, slice {s}: {m['angle_between_means']:.0f}° apart", fontsize=7)
+                if i == 1:
+                    ax.set_xlabel("along the non-fitting mean", fontsize=7)
+                if j == 0:
+                    ax.set_ylabel("toward the fitting mean", fontsize=7)
+        rng = np.random.default_rng(0)
+        for j, s in enumerate(("2", "3")):
+            ax = fig.add_subplot(grid[2, j])
+            for x, (kind, marker) in enumerate((("control", "o"), ("anchored", "^"))):
+                v = np.asarray(data["angles"][kind][s])
+                ax.plot([x, x], [v.min(), v.max()], color=ghost(), lw=3, alpha=0.5, solid_capstyle="round", zorder=1)
+                ax.scatter(x + rng.uniform(-0.12, 0.12, len(v)), v, s=8, marker=marker, color=ink_normal(), alpha=0.45, lw=0, zorder=2)  # fmt: skip
+                ax.scatter([x], [v.mean()], s=30, marker=marker, color=ink_normal(), edgecolor=rule(), lw=0.6, zorder=3)
+            ax.set_xticks([0, 1], ["controls", "per-visit"])
+            ax.set_xlim(-0.6, 1.6)
+            ax.set_ylim(0, 90)
+            ax.set_yticks([0, 30, 60, 90])
+            ax.tick_params(labelsize=6)
+            ax.set_title(f"slice {s}", fontsize=7)
+            if j == 0:
+                ax.set_ylabel("angle between means (°)", fontsize=7)
+        fig_legend(fig, [(ink_normal(), "o", "fitting examples"), (ghost(), "o", "non-fitting")], lines=False)
+        return fig
+
+    return _plot()
+
+
 @memo
 def n_fit_of() -> list[int]:
     """How many examples of each held-out `difference` context fit `difference`, from the corpus itself: the
@@ -1184,6 +1281,10 @@ What is that off-axis direction? Two checks say what it is and that it is real. 
 {arc_figure()}
 
 The figure draws that arc for three runs at seed 715: the low run, its twin, and the per-visit run. Each answer state is a unit vector, so in the plane of e₁ and the non-fitting direction a state that lies in the plane sits on the unit circle, and one that sits inside the circle has part of its length in other directions. The non-fitting examples gather at the bottom, where e₁ is near zero: on the circle at slice 3, and inside it at slice 2. The plane is a projection, so "arc" is a simplification: two non-fitting examples that land on the same point here can be far apart in the other directions, as the ones at slice 2 are, and the figure says nothing about whether an example that fits `lighten` and one that fits `mix` sit near each other. What it does say is that every fitting example has left the non-fitting direction by about as much as it has gained on e₁. The fitting examples spread along the circle toward e₁ = 1, further along at slice 3 than at slice 2, and at slice 3 the ones near the top sit at α close to 1. The three runs have the same shape; the fitting examples of the low run sit a little further from e₁ at slice 3, which is the small α gap in the table of E1. So the writer gives the readers much the same picture in a low run, its twin, and a per-visit run, which is the point of E1 seen from inside. A model trained without the anchor holds the same arc, found after training from the mean states of the two kinds of example, but a short one: in the eight controls at seeds 712 to 719 the two means lie a median of 21° apart at slice 3 (9° to 35°), where the per-visit runs put them 83° apart ([arc-in-controls probe](https://github.com/z0u/sca2/blob/main/docs/m2/arc-in-controls/experiment.py)). So the anchor stretches the arc and names one end of it in advance, which makes the arc quicker to read; it is there to be found without it.
+
+{controls_arc_figure()}
+
+The figure above draws the arc that way, from the class means alone, for a control and the per-visit run at seed 715. In the control the fitting examples sit in one tight group just off the non-fitting group, so a direction fitted after training finds both ends. In the per-visit run they spread along a quarter circle, and the end the plane finds from the means is e₁ itself (cosine {fmt(np.concatenate([means_e1("anchored", "2"), means_e1("anchored", "3")]))}), where in the controls the same axis lies nearly at right angles to e₁ ({fmt(np.concatenate([means_e1("control", "2"), means_e1("control", "3")]))}).
 
 So, to a first approximation, the evidence that an example fits is one vector with two parts. One component lies along e₁, where the anchor placed it. The other is how far the state has left the direction a non-fitting answer has, which the loss made on its own and the anchor never touched. Both parts are there in every run, low or not, and nothing in the end state of the writer (block 1) sets the low runs apart. What has to differ is how much the readers take from each part.
 """
