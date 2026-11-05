@@ -88,8 +88,8 @@ def _fetch(refs: list[str]) -> dict[str, dict[str, np.ndarray]]:
     from mini.store import project_store
 
     store = project_store()
-    got = store.get_refs(refs)
-    missing = [r for r, a in got.items() if a is None]
+    got = {r: a for r, a in store.get_refs(refs).items() if a is not None}
+    missing = [r for r in refs if r not in got]
     assert not missing, f"not published: {missing}"
     with tempfile.TemporaryDirectory() as tmp:
         paths = store.get_many([(got[r], Path(tmp) / f"{i}.npz") for i, r in enumerate(refs)])
@@ -108,7 +108,8 @@ def _results_body() -> dict:
     from mini.store import project_store
 
     store = project_store()
-    art = store.get_refs([ph.RESULTS_REF, ph.POOLED_REF])
+    art = {r: a for r, a in store.get_refs([ph.RESULTS_REF, ph.POOLED_REF]).items() if a is not None}
+    assert len(art) == 2, "post-hoc results not published"
     with tempfile.TemporaryDirectory() as tmp:
         p = store.get_many([(art[r], Path(tmp) / f"{i}.json") for i, r in enumerate(art)])
         return dict(zip(art, (json.loads(Path(x).read_text()) for x in p), strict=True))
