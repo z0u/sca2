@@ -672,4 +672,12 @@ With `τ_ℓ fixed` adopted, we gave it the full set of measurements and a refer
 
     <!-- mini:figures ./m2/low-runs/report.py -->
 
+- [When paired runs stop being alike](./m2/paired-runs/report.py)
+
+    How alike two runs at one seed stay under two conditions, score by score, from the stored runs of four experiments. Started together, they keep about half of their pairing in the task score through epoch 64, and in removal and spill they are little more alike than runs at different seeds. Carried on from one stored state, they stay alike in all three for hundreds of epochs.
+
+    <span class="tags">`reanalysis` `seeds` `methodology`</span>
+
+    <!-- mini:figures ./m2/paired-runs/report.py -->
+
 </details>
