@@ -19,6 +19,6 @@ The anchor term pulls the states of each labeled context toward the anchor axis.
 pooling_svg = Path(__file__).parent / "public" / "pooling.svg"
 pooling_url = pub.asset_url(pooling_svg, name="pooling.svg") if (pub := current_publisher()) else str(pooling_svg)
 figure_html(
-    f'<img src="{pooling_url}" alt="A training batch drawn as a cube with axes for position, slice, and batch. Two labeled sequences are shaded. Magenta lines pool each slice over the positions of a labeled sequence, a magenta line along the slice edge pools those results, and an orange line down the batch edge takes the mean.">',
+    f'<img src="{pooling_url}" alt="A training batch drawn as a cube with axes for position, slice, and batch. Two labeled sequences are shaded. Of five slices, the middle three each have a magenta line pooling over the positions of a labeled sequence, a magenta line along the slice edge pools those results, and an orange line down the batch edge takes the mean.">',
     caption="The anchor term pools the pull over positions, then over slices, then averages over the batch.",
 )
