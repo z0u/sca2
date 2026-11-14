@@ -1,0 +1,1789 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/8631a0271ecea325e6d3061534783d142473acd3/exports/m2/low-runs/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/m2/low-runs/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What the edit misses in the low runs</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The base sheet: tokens, type, code, tables, images, quotes, heading anchors. It reaches
+ * a page two ways: mini.lit.page inlines it ahead of lit.css (the page frame) into every
+ * page it renders, a report or a Markdown page; and VS Code's Markdown preview lists it
+ * with docs/md-prose.css and scripts/md.css (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and Markdown-only rules live in other sheets. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The faces, loaded by the one Google Fonts <link> every page shares
+   * (mini.lit.page.FONTS). Inline SVG figures read --font-mono too (src/subline). */
+  --font-sans: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", serif;
+  --font-mono:
+    "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* Prose lands at ~14.4px (a 90% base), the size the reports settled on. */
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  /* Lora at the regular weight rather than the browser-default bold, with ligatures
+   * on — otherwise the variable font shows its 700 master. */
+  font-weight: 400;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+  /* Keep a short label like "(H1)" from wrapping onto a line of its own. `pretty` does this best; browsers without
+     it (Firefox, for now) drop that line and keep `balance`. */
+  text-wrap-style: balance;
+  text-wrap-style: pretty;
+}
+h1 {
+  margin-top: 0;
+  font-size: 2.25em;
+}
+h2 {
+  margin-top: 4em;
+}
+p {
+  margin-block: 1em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background-color: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* A ```mermaid fence (mini.lit.page): it holds a diagram rather than code, so it drops the
+ * code-block frame; until the script has run it shows the diagram source. */
+pre.mermaid {
+  background: none;
+  border-left: none;
+  padding: 0;
+  text-align: center;
+}
+pre.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Anchor links on headings. */
+a.anchor-link {
+  opacity: 0;
+  color: var(--fg-muted);
+  transition: opacity 0.2s ease;
+}
+a.anchor-link::after {
+  content: "#";
+  font-size: 0.8em;
+  margin-inline: 0.4em;
+}
+:hover > a.anchor-link {
+  opacity: 1;
+}
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. Top-aligned: a row
+ * whose prose cell wraps to four lines would otherwise leave its short cells floating
+ * in the middle. */
+table {
+  border-collapse: collapse;
+  margin-block: 1.5em;
+  margin-inline: auto;
+}
+th,
+td {
+  padding: 0.35em 0.8em;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+}
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--rule);
+}
+thead > tr:last-child > :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5em;
+}
+tbody > tr:first-child > :is(th, td) {
+  padding-top: 0.5em;
+}
+tbody > tr:last-child > :is(th, td) {
+  border-bottom: 2px solid var(--rule);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
+ *
+ * Where the rest of the CSS lives, and how each reaches a page:
+ *   base.css (beside this)     tokens, type, code, tables; mini.lit.page inlines
+ *                              base + this + the Pygments styles into every page it renders
+ *   docs/report.css            report polish and the print block; inlined after this at
+ *                              render, export and site build (mini.reports.set_report_styles),
+ *                              so an edit there reaches published reports without a re-export
+ *   docs/md-prose.css          a Markdown page's prose: inlined after report.css into a
+ *                              Markdown page (mini.reports.report_styles), so a render, the
+ *                              live server, the site and every print show it
+ *   scripts/md.css             the site's Markdown pages only (the figure strips), inlined
+ *                              by scripts/build_site.py; VS Code's preview reads it with
+ *                              base.css and md-prose.css
+ *   mini/chips.css             the nav and provenance chips the site build injects
+ *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
+ *   subline/theme.css          inside each subline SVG, reading this page's tokens
+ */
+
+:root {
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 40rem;
+  --gutter: 1.5rem;
+  --subfigure-gap: 1.5rem;
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+/* Border-box, so a block with padding (a list's bullet indent, a blockquote, a code
+ * block) shares its right edge with the paragraphs, and so do the notes floated off it. */
+main.lit > * {
+  box-sizing: border-box;
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+  margin-block: 3rem;
+}
+/* Display math the same way: KaTeX centres it in its box, so an equation wider than the
+ * measure would start at the column's left edge and overhang to the right. */
+main.lit > div.arithmatex {
+  max-width: none;
+}
+
+/* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure {
+  margin-inline: 0; text-align: center;
+}
+figure img {
+  margin-inline: auto; display: block;
+}
+figure:has(> figure) {
+  display: flex;
+  flex-wrap: wrap;  /* for a browser without `balance` */
+  flex-wrap: balance;
+  justify-content: center;
+  gap: var(--subfigure-gap) 0.5rem;
+}
+figure:has(> figure) > figure {
+  margin: 0;
+}
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+/* The main caption of a sub-figure group is a flex item: a full row of its own (a
+ * `max-width` would cap the basis and let a sub-figure share the row, so the measure is
+ * padding here), and the row gap above it comes off, so it sits under the figures as
+ * any caption does. */
+figure:has(> figure) > figcaption {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  padding-inline: max(0px, calc((100% - var(--measure)) / 2));
+  margin-top: calc(0.6em - var(--subfigure-gap));
+}
+/* A caption rendered from Markdown arrives in a <p>; its margins would pad the caption. */
+figcaption > :is(:first-child, :last-child) {
+  margin-block: 0;
+}
+
+/* A themed figure (mini.vis.figures.themed) carries both renders of the plot, and the
+ * page shows one: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. The print rules in docs/report.css pin the
+ * light one. */
+.mini-themed-figure .mini-themed-img-dark { display: none; }
+.mini-themed-figure .mini-themed-img-light { display: block; }
+body[data-theme="dark"] .mini-themed-figure,
+body.dark .mini-themed-figure,
+body.dark-theme .mini-themed-figure {
+  .mini-themed-img-dark { display: block; }
+  .mini-themed-img-light { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .mini-themed-figure {
+    .mini-themed-img-dark { display: block; }
+    .mini-themed-img-light { display: none; }
+  }
+}
+
+/* Admonitions (pymdownx blocks) and details. Their side padding is --column-inset, so
+ * a margin note inside one can reach past it to the column's edge (Notes, below). */
+.admonition, details {
+  --column-inset: 1em;
+  margin-block: 1.5em;
+  padding: 0.6em var(--column-inset);
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :first-child { margin-top: 0; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Notes (mini.lit.notes): a footnote's text beside its marker, and a glossary term's
+ * definition at its first use in a section. Where a note shows depends on the room:
+ *   narrow screen   hidden until its marker is hovered or focused (tapped), then a box
+ *                   under the line, across the column; the footnote list stays too
+ *   wide screen     in the right margin, beside the line that cites it; the list keeps
+ *                   only what has no margin note
+ *   paper           in the margin as well, with the page geometry in docs/report.css
+ * Margin notes are right floats, each clearing the one before (`clear: right`), so a
+ * note that would overlap the one above slides down instead. A note in a table cell, a
+ * caption or a heading (`.popover`) cannot float out of its box, so it stays a hover
+ * box everywhere, and its footnote stays in the list. */
+/* How far a block's content sits in from the text column's right edge. Registered as a
+ * length so that `1em` resolves on the padded block, and not in the note's smaller type. */
+@property --column-inset {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+:root {
+  --note-width: 14rem;
+  --note-gap: 1.5rem;
+}
+main.lit { position: relative; }  /* what a hover box spans */
+sup.fnref > a { text-decoration: none; }
+/* A term with a note is marked by a small raised ring after it, drawn in docs/report.css
+ * (which the site re-inlines at build time, so it reaches reports exported before it). */
+dfn.term {
+  font-style: inherit;
+  cursor: help;
+}
+/* A line does not break between a term's last word and its ring, nor between the term
+ * (or the link that holds it), its note, and a stop right after them. The note and the
+ * term itself wrap as usual. */
+.term-end,
+.term-keep { white-space: nowrap; }
+.term-keep > * { white-space: normal; }
+/* A cited work (another experiment) is italic at every use; the dfn above marks the use
+ * that carries its note. */
+cite { font-style: italic; }
+.sidenote {
+  display: none;
+  position: absolute;
+  left: var(--gutter);
+  right: var(--gutter);
+  z-index: 10;
+  max-width: var(--measure);
+  margin-top: 0.3em;
+  margin-inline: auto;
+  padding: 0.5em 0.8em;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1.45;
+  text-align: left;
+  text-indent: 0;
+  color: var(--fg);
+}
+:is(sup.fnref, dfn.term, a:has(> dfn.term)):is(:hover, :focus, :focus-within) + .sidenote,
+.sidenote:is(:hover, :focus) {
+  display: block;
+}
+.sidenote-number { font-weight: 700; }
+.glossnote-term { font-weight: 700; }
+.glossnote-term::after { content: "."; }
+.sidenote .more > .sidenote-p { display: block; margin-top: 0.4em; }
+
+/* A note in the margin, on a wide screen (below) or on paper, is only its gloss until it
+ * opens, with an ellipsis that takes no width, so it never wraps onto a line of its own. */
+@media print, screen and (min-width: 74rem) {
+  .sidenote:not(.popover) {
+    & .more, & .lead-colon { display: none; }
+    &:has(> .more) > .gloss::after {
+      content: "…";
+      display: inline-block;
+      width: 0;
+      white-space: nowrap;
+    }
+  }
+}
+
+/* Wide enough for the centred column plus a note strip on each side:
+ * 40rem measure + 2 × (14rem note + 1.5rem gap) + 2 × 1.5rem gutter = 74rem. */
+@media screen and (min-width: 74rem) {
+  /* Figures and tables start below any note still running beside the text above them. */
+  main.lit > :is(figure, table, h2, hr, .footnote) { clear: right; }
+  .sidenote:not(.popover) {
+    display: block;
+    position: relative;
+    z-index: auto;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    max-width: none;
+    margin: 0.3em calc(-1 * (var(--note-width) + var(--note-gap) + var(--column-inset))) 0.8em 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+    font-size: 0.78rem;
+    color: var(--fg-muted);
+    text-align: justify;
+    hyphens: auto;
+    /* Only the gloss (mini.lit.notes) until the note or its marker is hovered, or
+     * focused: a click on either keeps it open. The rest then opens in a box over the
+     * notes below, so the float keeps its size and nothing else moves. */
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    & .more {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      padding-bottom: 0.4em;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+  }
+  :is(sup.fnref, dfn.term, a:has(> dfn.term)):is(:hover, :focus, :focus-within) + .sidenote:not(.popover),
+  .sidenote:not(.popover):is(:hover, :focus, :focus-within) {
+    opacity: 1;
+    z-index: 5;  /* over the notes below, which are positioned too */
+    & .more { display: block; }
+    & .lead-colon { display: inline; }
+    & > .gloss::after { content: none; }
+  }
+  .sidenote:focus { outline: none; }
+  .footnote li.sidenoted,
+  .footnote.all-sidenoted {
+    display: none;
+  }
+}
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+/* Print: only what the frame needs on its own. The page size, type and page breaks
+ * are docs/report.css's print block, which every rendered report carries. */
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+  /* Paper cannot hover, so a note shows only where a stylesheet gives it a margin
+   * (docs/report.css does); otherwise the footnote list carries them all. */
+  .sidenote { display: none; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body, {delimiters: [{left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true}]})"></script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* A glossary term or cited work with a note beside it (mini.lit.notes) carries a small
+ * raised ring, in place of the dotted underline that pages exported before this rule
+ * still bake in (hence the reset). The ring is a bordered box, so it is the same in every
+ * font. mini.lit.notes writes it as an element (.term-ring) beside the term's last word,
+ * so a line cannot break between the two; pages rendered before that draw it after the
+ * term instead. */
+main.lit dfn.term {
+  text-decoration: none;
+}
+main.lit .term-ring,
+main.lit dfn.term:not(:has(.term-ring))::after {
+  display: inline-block;
+  width: round(0.16em, 1px);
+  height: round(0.16em, 1px);
+  margin-left: 0.06em;
+  border: 0.06em solid color-mix(in srgb, var(--fg) 55%, transparent);
+  border-radius: 50%;
+  vertical-align: 0.6em;
+}
+main.lit dfn.term:not(:has(.term-ring))::after {
+  content: "";
+}
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+  &.decided {
+    color: #2b6cb0;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+    /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
+     * margins, where Chromium stops painting. A note stops --note-edge short of that,
+     * clear of the change bars and stamp of a review print, and overlaps the text by
+     * the rest. */
+    --note-width: 22mm;
+    --note-gap: 2mm;
+    --note-edge: 2mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
+   * text, in type small enough to leave the text alone (zoom in to read it). Floats that
+   * clear each other stack, so a note never overlaps the one before it; it slides down.
+   * A note is only its gloss here (mini.lit's sheet), so the footnote list keeps the whole
+   * of each note, and a report's own glossary the whole of each definition. */
+  main.lit > :is(figure, table, h2, hr, .footnote) {
+    clear: right;
+  }
+  main.lit .sidenote:not(.popover) {
+    display: block;
+    position: static;
+    max-width: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    margin-block: 0.4em;
+    margin-left: var(--note-gap);
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-edge), var(--note-width) + var(--note-gap)) - var(--column-inset));
+    font-family: var(--font-sans);
+    font-size: 6pt;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1.3;
+    text-indent: 0;
+    color: inherit;
+    text-align: left;  /* a narrow justified line opens wide gaps between words */
+    hyphens: auto;
+  }
+  .sidenote-number,
+  .glossnote-term {
+    font-weight: 700;
+  }
+  /* A term with its note beside it keeps its small raised ring (above), and a link in
+   * one, a link holding one, or one naming another experiment, takes no link underline of
+   * its own, so it does not read as a plain link (and the underline does not stop short
+   * at the ring). */
+  main.lit :is(dfn.term a, a:has(dfn.term), a:has(cite)):not(.footnote-backref) {
+    text-decoration: none;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* A glossary term or cited work with a note beside it (mini.lit.notes) carries a small
+ * raised ring, in place of the dotted underline that pages exported before this rule
+ * still bake in (hence the reset). The ring is a bordered box, so it is the same in every
+ * font. mini.lit.notes writes it as an element (.term-ring) beside the term's last word,
+ * so a line cannot break between the two; pages rendered before that draw it after the
+ * term instead. */
+main.lit dfn.term {
+  text-decoration: none;
+}
+main.lit .term-ring,
+main.lit dfn.term:not(:has(.term-ring))::after {
+  display: inline-block;
+  width: round(0.16em, 1px);
+  height: round(0.16em, 1px);
+  margin-left: 0.06em;
+  border: 0.06em solid color-mix(in srgb, var(--fg) 55%, transparent);
+  border-radius: 50%;
+  vertical-align: 0.6em;
+}
+main.lit dfn.term:not(:has(.term-ring))::after {
+  content: "";
+}
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+  &.decided {
+    color: #2b6cb0;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+    /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
+     * margins, where Chromium stops painting. A note stops --note-edge short of that,
+     * clear of the change bars and stamp of a review print, and overlaps the text by
+     * the rest. */
+    --note-width: 22mm;
+    --note-gap: 2mm;
+    --note-edge: 2mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
+   * text, in type small enough to leave the text alone (zoom in to read it). Floats that
+   * clear each other stack, so a note never overlaps the one before it; it slides down.
+   * A note is only its gloss here (mini.lit's sheet), so the footnote list keeps the whole
+   * of each note, and a report's own glossary the whole of each definition. */
+  main.lit > :is(figure, table, h2, hr, .footnote) {
+    clear: right;
+  }
+  main.lit .sidenote:not(.popover) {
+    display: block;
+    position: static;
+    max-width: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    margin-block: 0.4em;
+    margin-left: var(--note-gap);
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-edge), var(--note-width) + var(--note-gap)) - var(--column-inset));
+    font-family: var(--font-sans);
+    font-size: 6pt;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1.3;
+    text-indent: 0;
+    color: inherit;
+    text-align: left;  /* a narrow justified line opens wide gaps between words */
+    hyphens: auto;
+  }
+  .sidenote-number,
+  .glossnote-term {
+    font-weight: 700;
+  }
+  /* A term with its note beside it keeps its small raised ring (above), and a link in
+   * one, a link holding one, or one naming another experiment, takes no link underline of
+   * its own, so it does not read as a plain link (and the underline does not stop short
+   * at the ring). */
+  main.lit :is(dfn.term a, a:has(dfn.term), a:has(cite)):not(.footnote-backref) {
+    text-decoration: none;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/low-runs/report.py">Source</a><a href="https://z0u.github.io/sca2/m2/low-runs/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>arc-in-controls</strong> · <code>c0c7812-dirty</code> (dirty) · run 2026-11-04 · on NVIDIA L40S<div>via reports/m2/arc-in-controls/results</div></div><div><strong>fixed-confirm</strong> · <code>740ae8f</code> (dirty) · run 2026-10-27<div>via reports/m2/fixed-confirm/along, reports/m2/fixed-confirm/axes</div></div><div><strong>fixed-labels</strong> · <code>d1c66f9</code> (dirty) · run 2026-10-30<div>via reports/m2/fixed-labels/along, reports/m2/fixed-labels/axes, reports/m2/fixed-labels/cross/along, reports/m2/fixed-labels/cross/axes, reports/m2/fixed-labels/cross/trajectories, reports/m2/fixed-labels/finished-trajectories</div></div><div><strong>low-runs</strong> · <code>e071354-dirty</code> (dirty) · run 2026-11-01 · on NVIDIA L40S<div>via reports/m2/low-runs/along, reports/m2/low-runs/end, reports/m2/low-runs/evidence, reports/m2/low-runs/routes, reports/m2/low-runs/twins</div></div></details>
+<main class="lit">
+<h1 id="what-the-edit-misses-in-the-low-runs">What the edit misses in the low runs<a class="anchor-link" href="https://z0u.github.io/sca2/m2/low-runs/#what-the-edit-misses-in-the-low-runs" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- lede -->
+<p>A few fixed-label runs end with the edit removing much less of <code>difference</code> than the rest, and nothing that training sees sets them apart. A run trained again from the same labels, seed, and batches matches a low run in loss and in <span class="term-keep"><dfn class="term" tabindex="0"><span class="term-end">alignment<span aria-hidden="true" class="term-ring"></span></span></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Alignment</span> <span class="gloss">How far a state points along e₁<span class="lead-colon">:</span></span><span class="more"> the cosine between the state and e₁, which for a unit-length state is its component along e₁; 1 on the anchor direction and 0 off it.</span></span>,</span> and still removes the op well. The difference is in what the later blocks read. In every run, the evidence that an example fits <code>difference</code> lies partly on the anchored axis and partly off it. In a low run, the blocks that read this evidence take more of it from the off-axis part, which the edit never touches.</p>
+</div>
+<p>The <a href="https://z0u.github.io/sca2/m2/fixed-labels/"><dfn class="term"><cite><span class="term-end">fixed-labels<span aria-hidden="true" class="term-ring"></span></span></cite></dfn></a><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/m2/fixed-labels/">fixed-labels</a></cite></span> <span class="gloss">With one label draw held for the run, the anchor settles at every rate, but a few runs in eight end well below the rest in removal, and which runs do so moves when a run is trained again with slightly different arithmetic.</span></span> experiment found that holding one label draw for a run leaves a few runs in eight well below the rest in <span class="term-keep"><dfn class="term" tabindex="0"><span class="term-end">removal<span aria-hidden="true" class="term-ring"></span></span></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Removal</span> <span class="gloss">How much of <code>difference</code> the full e₁ edit removes, beyond what the same edit removes along a typical other axis, as the fixed-labels experiment scores it.</span><span class="more"> The full edit removes e₁ at every slice and position. Its drop on <code>difference</code> is taken as a share of the way from the clean score to the target null, less the median drop under the same edit along each of the other 63 axes. Higher is better.</span></span>.</span> Most of them never reach the level of the others, their label sets look like any other, and retraining moves which runs end low (E2 to E5 of that report). This page scores the stored checkpoints of all 48 runs of that experiment and of the <a href="https://z0u.github.io/sca2/m2/fixed-confirm/"><dfn class="term"><cite><span class="term-end">fixed-confirm<span aria-hidden="true" class="term-ring"></span></span></cite></dfn></a><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/m2/fixed-confirm/">fixed-confirm</a></cite></span> <span class="gloss"><code>τ_ℓ fixed</code>, with the per-visit label draw, keeps the anchor on all eight runs at seeds 712 to 719 with removal near 0.9, and is the recipe of record for D2.2.</span></span> experiment, with no new training. It asks what a low run does differently with the op.</p>
+<h2 id="observations">Observations<a class="anchor-link" href="https://z0u.github.io/sca2/m2/low-runs/#observations" title="Link to this heading">&para;</a></h2>
+<ul>
+<li><a href="https://z0u.github.io/sca2/m2/low-runs/#twins-that-split-e1">Twins that split (E1)</a>: two label sets were each trained twice from the same seed and batches, and each pair ended with one run low and one not. Within a pair, validation loss and <dfn class="term" tabindex="0"><span class="term-end">α<span aria-hidden="true" class="term-ring"></span></span></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">α</span> <span class="gloss">Alignment with e₁<span class="lead-colon">:</span></span><span class="more"> the e₁ component of the unit-norm state at the example answers of the held-out <code>difference</code> contexts, at slice 3.</span></span> at the example answers stay within a hundredth of each other for the whole run. <dfn class="term" tabindex="0"><span class="term-end">Removal<span aria-hidden="true" class="term-ring"></span></span></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Removal</span> <span class="gloss">How much of <code>difference</code> the full e₁ edit removes, beyond what the same edit removes along a typical other axis, as the fixed-labels experiment scores it.</span><span class="more"> The full edit removes e₁ at every slice and position. Its drop on <code>difference</code> is taken as a share of the way from the clean score to the target null, less the median drop under the same edit along each of the other 63 axes. Higher is better.</span></span> parts ways early in one pair and late in the other. By the first checkpoint, the weights of a twin pair are already most of the way to unrelated. So the last bits of the arithmetic make two different runs that happen to share a function.</li>
+<li><a href="https://z0u.github.io/sca2/m2/low-runs/#what-survives-the-edit-e2">What survives the edit (E2)</a>: after the edit, the model still gets right the contexts whose three examples all fit <code>difference</code>. Unexpectedly, the low runs keep several times as many of them. In every run, the evidence that an example fits has two parts, one on e₁ and one along a single direction off it, the direction a non-fitting answer has, and a linear probe reads either part about as well.</li>
+<li><a href="https://z0u.github.io/sca2/m2/low-runs/#where-the-edit-misses-e3">Where the edit misses (E3)</a>: before any baseline, the e₁ edit leaves a fifth of the way in the low runs, against a twentieth in the rest. Removing e₁ at the three example answers alone removes as much as the full edit. In half the low runs, block 4 also reads the answers, through their off-axis content. In the other half, the usual reader, block 3, takes part of the evidence from off the axis. Clearing the answers or the other example positions on top of the full edit lifts most low runs toward the rest, and which of the two does so differs by run.</li>
+<li><a href="https://z0u.github.io/sca2/m2/low-runs/#peak-and-slide-e4">Peak and slide (E4)</a>: the low runs peak lower than the rest, and give back a little more after the peak while the anti weight anneals. The off-axis evidence is in place early in every run, low or not. The two groups do not separate in removal until after epoch 200.</li>
+</ul>
+<h2 id="scope-and-method">Scope and method<a class="anchor-link" href="https://z0u.github.io/sca2/m2/low-runs/#scope-and-method" title="Link to this heading">&para;</a></h2>
+<p>This is an exploratory re-analysis of 48 stored runs, with no preregistration and no gate. They are the 24 fixed-label runs of the <dfn class="term" tabindex="0"><cite><span class="term-end">fixed-labels<span aria-hidden="true" class="term-ring"></span></span></cite></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/m2/fixed-labels/">fixed-labels</a></cite></span> <span class="gloss">With one label draw held for the run, the anchor settles at every rate, but a few runs in eight end well below the rest in removal, and which runs do so moves when a run is trained again with slightly different arithmetic.</span></span> experiment (three rates at seeds 712 to 719), its 16 crossed runs (the 1/50 sets of four seeds, each trained at all four), and the eight per-visit runs of the fixed confirmation. All use the recipe of record, <code>τ_ℓ fixed</code>, trained for 400 epochs.</p>
+<p>Four of the crossed runs pair a label set with its own seed. Each repeats a <cite>fixed-labels</cite> run from the same initialization, on the same batches, with the same labels. The one difference is the card: the <cite>fixed-labels</cite> runs trained on L4s and the crossed runs on L40S cards. XLA, the compiler that turns the model into GPU code, compiles a different program for each card model, and a sum taken in a different order differs in its last bits. So the two runs of a pair see the same gradients to within rounding, and part by a little on the first step. We call them twins. Two of the four pairs ended with one run low and one not.</p>
+<p>A run is low when its <dfn class="term" tabindex="0"><span class="term-end">removal<span aria-hidden="true" class="term-ring"></span></span></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Removal</span> <span class="gloss">How much of <code>difference</code> the full e₁ edit removes, beyond what the same edit removes along a typical other axis, as the fixed-labels experiment scores it.</span><span class="more"> The full edit removes e₁ at every slice and position. Its drop on <code>difference</code> is taken as a share of the way from the clean score to the target null, less the median drop under the same edit along each of the other 63 axes. Higher is better.</span></span> ends below 0.8, under the lowest per-visit run, as the <cite>fixed-labels</cite> report drew the line. That makes 10 low runs: the five of the <cite>fixed-labels</cite> report, and five of its crossed runs. No per-visit run is low. Removal spreads by about 0.07 over the eight per-visit seeds, so a gap of 0.2 between a low run and its twin is well outside the seed range.</p>
+<p>Every pass uses the 14,000 held-out contexts of <span class="term-keep"><dfn class="term" tabindex="0"><cite><span class="term-end">ex-2.2.21<span aria-hidden="true" class="term-ring"></span></span></cite></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/m2/ex-2.2.21/">ex-2.2.21</a></cite></span> <span class="gloss">The in-context grammar with three examples and its held-out set of 14,000 contexts, 2,000 per op.</span></span>,</span> 2,000 per op, and the probes score on half of them. Restricted edits (one slice, or one set of positions) are scored without the median-over-axes baseline, which would need 63 more passes per edit. The baseline takes about a tenth off the full edit in every run. So a restricted edit can be compared with the full edit scored the same way, and only loosely with removal. The slide and peak of E4 use the kept checkpoints of the <cite>fixed-labels</cite> experiment and the fixed confirmation, scored there.</p>
+<h2 id="the-measurements">The measurements<a class="anchor-link" href="https://z0u.github.io/sca2/m2/low-runs/#the-measurements" title="Link to this heading">&para;</a></h2>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/low-runs-sites-light.png" alt="A stack of four smooth-step profiles, one per slice after a block, showing the alignment with e₁ by position in a context, on `difference` contexts and on the other ops. On `difference` contexts the alignment is high at the three example answers from slice 1 on, and near zero everywhere else, the query `=` included. On the other ops it is near zero at every position. The example answers are marked as the sites the fits probe reads, and the query `=` as the site the query probe reads." width="626" height="347" style="max-width: 100%; height: auto;" data-asset-name="low-runs-sites" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/low-runs-sites-dark.png" alt="A stack of four smooth-step profiles, one per slice after a block, showing the alignment with e₁ by position in a context, on `difference` contexts and on the other ops. On `difference` contexts the alignment is high at the three example answers from slice 1 on, and near zero everywhere else, the query `=` included. On the other ops it is near zero at every position. The example answers are marked as the sites the fits probe reads, and the query `=` as the site the query probe reads." width="626" height="347" style="max-width: 100%; height: auto;" data-asset-name="low-runs-sites" />
+<figcaption><p><strong>Where the probes read.</strong> Alignment with e₁ (α) by position in a held-out context, one panel per slice
+after a block, on one run (fixed 1/50, retrained at 715). The <code>difference</code> contexts are solid and the mean over the
+other ops is dashed. Circles mark the three example answers <span class="arithmatex">\(y_1\)</span> to <span class="arithmatex">\(y_3\)</span>, where the anchor pulls and the
+fits probe reads the state (with e₁ zeroed, or e₁ alone). A square marks the query <code>=</code>, where the query
+probe reads. Between one panel and the next sits one block: attention, then its MLP.</p></figcaption></figure>
+
+<dl>
+<dt>Removal</dt>
+<dd>How much of <code>difference</code> the full e₁ edit removes, beyond what the same edit removes along a typical other axis, as the fixed-labels experiment scores it. The full edit removes e₁ at every slice and position. Its drop on <code>difference</code> is taken as a share of the way from the clean score to the target null, less the median drop under the same edit along each of the other 63 axes. Higher is better.</dd>
+<dt>Edit share</dt>
+<dd>How much of <code>difference</code> an edit removes, with no baseline: its drop on <code>difference</code> as a share of the way from the clean score to the target null. The edit is the full edit, one slice of it, or an edit that removes every direction but e₁ (or the whole state, with no renormalization) at a set of positions.</dd>
+<dt>Fits probe</dt>
+<dd>Whether an example fits <code>difference</code>, decoded from the state at its answer. An example fits when its answer is one <code>difference</code> gives for its operands. The others carry replacement op noise. The probe is a ridge (regularized linear) probe on that state with the e₁ coordinate zeroed, fitted on half the held-out contexts of every op and scored on the rest by AUC: the chance that it ranks a fitting example above one that does not fit, so 0.5 is chance and 1 is perfect. It is shown beside the AUC of the e₁ coordinate alone. The figure above shows where the probe reads. E2 also scores one fixed off-axis direction, the one between the mean states of fitting and non-fitting examples, on the zeroed state and on the zeroed state renormalized to unit length.</dd>
+<dt>Query probe</dt>
+<dd>Whether the op of a context is <code>difference</code>: the same probe on the state at the query <code>=</code>.</dd>
+<dt>Edited match</dt>
+<dd>How often the edited model still gets the query right: the expected exact match on the query answer of a held-out <code>difference</code> context after the full edit, split by how many examples of the context fit <code>difference</code>. Lower means more of the op removed.</dd>
+<dt>α</dt>
+<dd>Alignment with e₁: the e₁ component of the unit-norm state at the example answers of the held-out <code>difference</code> contexts, at slice 3.</dd>
+</dl>
+<h2 id="twins-that-split-e1">Twins that split (E1)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/low-runs/#twins-that-split-e1" title="Link to this heading">&para;</a></h2>
+<p>Does a low run look different to training? The twins give the cleanest test. Two of the four pairs ended one low and one not, at seeds 715 and 719. If a low run went a different way on the task or on the anchor, its loss or its <dfn class="term" tabindex="0"><span class="term-end">α<span aria-hidden="true" class="term-ring"></span></span></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">α</span> <span class="gloss">Alignment with e₁<span class="lead-colon">:</span></span><span class="more"> the e₁ component of the unit-norm state at the example answers of the held-out <code>difference</code> contexts, at slice 3.</span></span> would show it somewhere along the run.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/low-runs-twins-light.png" alt="In each of the two split twin pairs, the validation loss and α at the example answers of the two runs stay within a hundredth of each other for the whole run. Removal under the full edit parts ways: seed 715: 0.66 against 0.86; seed 719: 0.60 against 0.87. At seed 719 the two removal curves separate by epoch 32 and never meet. At seed 715 they run together until about epoch 100, and then the low run slides." width="664" height="376" style="max-width: 100%; height: auto;" data-asset-name="low-runs-twins" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/low-runs-twins-dark.png" alt="In each of the two split twin pairs, the validation loss and α at the example answers of the two runs stay within a hundredth of each other for the whole run. Removal under the full edit parts ways: seed 715: 0.66 against 0.86; seed 719: 0.60 against 0.87. At seed 719 the two removal curves separate by epoch 32 and never meet. At seed 715 they run together until about epoch 100, and then the low run slides." width="664" height="376" style="max-width: 100%; height: auto;" data-asset-name="low-runs-twins" />
+<figcaption><p><strong>The two twin pairs that split, along training.</strong> Each row is one label set at one seed, trained twice:
+once in the fixed-labels experiment and once in its crossed retraining. The two runs differ only in the
+last bits of the arithmetic. The low run of the pair is in red, the other in blue. <strong>Left:</strong> validation loss. <strong>Middle:</strong>
+α at the example answers of the <code>difference</code> probe contexts, at slice 3. <strong>Right:</strong> removal under the full
+edit at the kept checkpoints, net of the median over the other 63 axes.</p></figcaption></figure>
+
+<p>They do not. In both pairs, the validation loss and α at the example answers stay close for the whole run, while <dfn class="term" tabindex="0"><span class="term-end">removal<span aria-hidden="true" class="term-ring"></span></span></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Removal</span> <span class="gloss">How much of <code>difference</code> the full e₁ edit removes, beyond what the same edit removes along a typical other axis, as the fixed-labels experiment scores it.</span><span class="more"> The full edit removes e₁ at every slice and position. Its drop on <code>difference</code> is taken as a share of the way from the clean score to the target null, less the median drop under the same edit along each of the other 63 axes. Higher is better.</span></span> under the full edit separates by about 0.2. The loss curves do part a little in places. Averaged over any 40 epochs, the two runs of a split pair differ by at most 0.014, sometimes in favor of the low run and sometimes against it. But the two pairs that did not split differ by as much (0.013), so these gaps are the ordinary difference between any two runs. Over the last hundred epochs, α in the low run ends a few hundredths under its twin, less than the spread across seeds. At seed 719 the two removal curves part by epoch 32 and never meet again. At seed 715 they run together until about epoch 100, and then the low run slides while its twin keeps climbing.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>run</th><th class=num>val loss ↓</th><th class=num>α, answers</th><th class=num>removal ↑</th><th class=num>full edit</th><th class=num>e₁, slice 2</th><th class=num>e₁, slice 3</th><th class=num>all but e₁, answers</th><th class=num>full, then answers cleared</th><th class=num>full, then others cleared</th></tr></thead><tbody><tr><td>fixed 1/50 at 715 (low)</td><td class=num>2.181</td><td class=num>0.61</td><td class=num>0.66</td><td class=num>0.74</td><td class=num>0.82</td><td class=num>0.04</td><td class=num>−0.15</td><td class=num>0.88</td><td class=num>0.79</td></tr><tr><td>fixed 1/50, retrained at 715</td><td class=num>2.180</td><td class=num>0.66</td><td class=num>0.86</td><td class=num>0.94</td><td class=num>0.96</td><td class=num>0.02</td><td class=num>−0.18</td><td class=num>0.87</td><td class=num>0.92</td></tr><tr><td>fixed 1/50 at 719 (low)</td><td class=num>2.191</td><td class=num>0.62</td><td class=num>0.60</td><td class=num>0.69</td><td class=num>0.72</td><td class=num>0.03</td><td class=num>−0.22</td><td class=num>0.62</td><td class=num>0.84</td></tr><tr><td>fixed 1/50, retrained at 719</td><td class=num>2.195</td><td class=num>0.65</td><td class=num>0.87</td><td class=num>0.94</td><td class=num>0.95</td><td class=num>0.06</td><td class=num>−0.17</td><td class=num>0.87</td><td class=num>0.93</td></tr></tbody></table><figcaption><p><strong>The two split pairs at epoch 400.</strong> Validation loss and α at the example answers (slice 3) are what training
+sees, and the rest are edits. Removal is net of the median over the other axes. The other columns are shares of
+the way with no baseline: under the e₁ edit at every slice, at slice 2 or 3 alone, with every direction but e₁
+removed at the answers after block 2, and under the full edit with the whole state then removed at the answers,
+or at the other example positions, after block 2.</p></figcaption></figure>
+
+<p>So the low state costs nothing on the task and nothing on the anchor term. That fits what the <dfn class="term" tabindex="0"><cite><span class="term-end">fixed-labels<span aria-hidden="true" class="term-ring"></span></span></cite></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/m2/fixed-labels/">fixed-labels</a></cite></span> <span class="gloss">With one label draw held for the run, the anchor settles at every rate, but a few runs in eight end well below the rest in removal, and which runs do so moves when a run is trained again with slightly different arithmetic.</span></span> experiment found about label sets and seeds: training is indifferent to which way a run goes on this. What differs between twins has to be something the edit sees and the loss does not. The rest of the table narrows it a little. In both pairs, the e₁ edit at slice 2 alone already misses more in the low run, so the twins part at the reader at block 3. (The <dfn class="term" tabindex="0"><cite><span class="term-end">block1-edit<span aria-hidden="true" class="term-ring"></span></span></cite></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/m2/block1-edit/">block1-edit</a></cite></span> <span class="gloss">Block 1 writes the evidence for the op onto e₁ at the example answers, one later block reads it from the query <code>=</code> through attention, and an edit removes the op when it sits between the two.</span></span> experiment found the reader at various later blocks on other seeds, and E3 covers those.) Where the reader still finds the evidence differs by pair. At seed 719, clearing the other example positions on top of the full edit brings the low run most of the way to its twin, and clearing the answers does nothing. At seed 715 it is the other way round. E3 follows this up across all the low runs.</p>
+<p>How can the last bits of the arithmetic decide this? Twins part early and keep parting, so they are two different runs rather than one run with a small change at the end. The distance figure measures how far apart the weights of a pair are, as a share of their size. On that scale, two unrelated runs sit at √2 ≈ 1.41, and the <cite>fixed-labels</cite> runs at different seeds sit at 1.40 (1.40 to 1.41) at every checkpoint. By epoch 16 the twins are already 0.90 (0.81 to 1.00) apart, most of the way to unrelated, and the gap keeps widening to 1.29 (1.26 to 1.33) at epoch 400.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/low-runs-distance-light.png" alt="The relative distance between the weights of the two runs of each twin pair along training, with the distances between fixed-labels runs at different seeds as grey lines for scale. At epoch 16 the twins are already 0.90 (0.81 to 1.00) apart. The distance grows through the run to 1.29 (1.26 to 1.33) at epoch 400, close to the 1.40 (1.40 to 1.41) between different seeds. The two pairs that split are no further apart than the two that did not." width="414" height="260" style="max-width: 100%; height: auto;" data-asset-name="low-runs-distance" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/low-runs-distance-dark.png" alt="The relative distance between the weights of the two runs of each twin pair along training, with the distances between fixed-labels runs at different seeds as grey lines for scale. At epoch 16 the twins are already 0.90 (0.81 to 1.00) apart. The distance grows through the run to 1.29 (1.26 to 1.33) at epoch 400, close to the 1.40 (1.40 to 1.41) between different seeds. The two pairs that split are no further apart than the two that did not." width="414" height="260" style="max-width: 100%; height: auto;" data-asset-name="low-runs-distance" />
+<figcaption><p><strong>How far apart the twins drift.</strong> The distance between the weights of the two runs of a twin pair, as a
+share of their norm, at each kept checkpoint and at the end. One line per pair: the pairs that split in
+red (circles, seeds 715 and 719) and the pairs that did not in blue (squares, seeds 712 and 718). The
+grey lines are the same distance between the fixed-labels runs at two different seeds.</p></figcaption></figure>
+
+<p>So by the end, a twin pair is nearly as far apart in weight space as two seeds, while its loss and α agree to a hundredth. The pairs that split are no further apart than the pairs that did not. Twins are different runs that share a function, so a split needs no rare tipping point for a last bit to cross. Which side of the line each run lands on is drawn afresh, with odds that these seeds put near even. Training is known to be sensitive to any perturbation at all. What is new here is which quantity the perturbation changes.</p>
+<h2 id="what-survives-the-edit-e2">What survives the edit (E2)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/low-runs/#what-survives-the-edit-e2" title="Link to this heading">&para;</a></h2>
+<p>Which contexts does the edited model still get right, and what does the model know about <code>difference</code> that is not on e₁? In the <dfn class="term" tabindex="0"><cite><span class="term-end">block1-edit<span aria-hidden="true" class="term-ring"></span></span></cite></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/m2/block1-edit/">block1-edit</a></cite></span> <span class="gloss">Block 1 writes the evidence for the op onto e₁ at the example answers, one later block reads it from the query <code>=</code> through attention, and an edit removes the op when it sits between the two.</span></span> account, block 1 writes the evidence that an example fits <code>difference</code> onto e₁ at the answer, and a later block reads it. The edit removes the op by clearing that coordinate. If the evidence also had a part off the axis, the reader could take it from there, and the edit would miss that part.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/low-runs-survivors-light.png" alt="Left: after the full edit, the expected exact match on `difference` rises with the number of fitting examples in every run, and far more steeply in the low runs. On contexts where all three examples fit, the edited low runs still score 0.32 on average, against 0.06 for the rest. Right: with e₁ zeroed, a linear probe on the state at the answer decodes whether an example fits `difference` at AUC above 0.98 in every run, low or not. The e₁ coordinate alone does about as well." width="626" height="241" style="max-width: 100%; height: auto;" data-asset-name="low-runs-survivors" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/low-runs-survivors-dark.png" alt="Left: after the full edit, the expected exact match on `difference` rises with the number of fitting examples in every run, and far more steeply in the low runs. On contexts where all three examples fit, the edited low runs still score 0.32 on average, against 0.06 for the rest. Right: with e₁ zeroed, a linear probe on the state at the answer decodes whether an example fits `difference` at AUC above 0.98 in every run, low or not. The e₁ coordinate alone does about as well." width="626" height="241" style="max-width: 100%; height: auto;" data-asset-name="low-runs-survivors" />
+<figcaption><p><strong>What survives the edit, and what the probes find.</strong> <strong>Left:</strong> expected exact match on the held-out
+<code>difference</code> contexts under the full edit, by how many of the three examples in the context fit
+<code>difference</code> (the rest carry replacement op noise), one line per run: the low runs in red, the others in blue. <strong>Right:</strong>
+AUC of a linear probe for whether an example fits <code>difference</code>, from the state at its answer at slice 3
+with e₁ zeroed (x), against the AUC of the e₁ coordinate alone (y), one mark per run.</p></figcaption></figure>
+
+<p>After the full edit, the expected match rises in every run with how many of the three examples fit <code>difference</code>, and far more steeply in the low runs. On contexts where all three fit, the edited low runs still score 0.32 (0.20 to 0.45) against 0.06 (0.02 to 0.14) for the rest. On the noisier contexts both groups are near the floor. So what the edit misses comes from the examples that fit.</p>
+<p>The evidence is also written off e₁, in every run. With the e₁ coordinate zeroed, a linear probe on the state at an example answer at slice 3 tells a fitting example from one that does not fit at AUC 0.98 or above in all 48 runs. That is about as well as the e₁ coordinate alone does (0.99 (0.97 to 1.00)). The low runs sit among the rest on both. The op at the query <code>=</code> is off-axis too, at AUC 0.88 (0.65 to 0.94), as <cite>block1-edit</cite> found: the anchor never held it there.</p>
+<p>How many directions does the off-axis evidence take? Few. Here the probe is given only the top principal components of the off-axis state. At slice 2 it needs a median of 2 components to reach AUC 0.95, though a handful of runs need 8 or more, and one never gets there. At slice 3, one component is enough in 46 of 48 runs. A single fixed direction, the one between the mean states of fitting and non-fitting examples, scores 0.99 (0.94 to 1.00) at slice 2 and 0.99 (0.95 to 1.00) at slice 3. By squared length, that mean difference lies 0.75 (0.64 to 0.82) along e₁ at slice 2 and 0.58 (0.53 to 0.66) at slice 3, with the rest along one off-axis direction.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/low-runs-evidence-light.png" alt="AUC of the fits probe against how many principal components of the off-axis answer state it is given, one line per run, at slice 2 (left) and slice 3 (right). At slice 2, one component gives about chance in most runs, and two give most of the way to the ceiling. At slice 3, one component is already near the ceiling. The low runs are among the rest. A single off-axis direction, the one between the class means, scores 0.99 (0.94 to 1.00) at slice 2 and 0.99 (0.95 to 1.00) at slice 3. By squared length, e₁ holds 0.75 (0.64 to 0.82) of the difference between the class means at slice 2 and 0.58 (0.53 to 0.66) at slice 3." width="626" height="232" style="max-width: 100%; height: auto;" data-asset-name="low-runs-evidence" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/low-runs-evidence-dark.png" alt="AUC of the fits probe against how many principal components of the off-axis answer state it is given, one line per run, at slice 2 (left) and slice 3 (right). At slice 2, one component gives about chance in most runs, and two give most of the way to the ceiling. At slice 3, one component is already near the ceiling. The low runs are among the rest. A single off-axis direction, the one between the class means, scores 0.99 (0.94 to 1.00) at slice 2 and 0.99 (0.95 to 1.00) at slice 3. By squared length, e₁ holds 0.75 (0.64 to 0.82) of the difference between the class means at slice 2 and 0.58 (0.53 to 0.66) at slice 3." width="626" height="232" style="max-width: 100%; height: auto;" data-asset-name="low-runs-evidence" />
+<figcaption><p><strong>How many directions the off-axis evidence takes.</strong> AUC of the fits probe given only the top principal
+components of the state at the example answers with e₁ zeroed, by number of components. One line per
+run: the low runs in red, the rest in blue. <strong>Left:</strong> slice 2. <strong>Right:</strong> slice 3.</p></figcaption></figure>
+
+<p>What is that off-axis direction? Two checks say what it is and that it is real. First, the states are unit vectors, so a large e₁ coordinate leaves less length for everything else, and a probe on the zeroed state could be reading that shadow of e₁ rather than a direction. Renormalizing the zeroed states removes the shadow. The direction between the renormalized class means still scores AUC 0.98 (0.94 to 1.00) at slice 3, where the reader reads, and 0.93 (0.78 to 0.98) at slice 2, so the off-axis evidence is a direction the state has. Second, along that direction a non-fitting example sits at −0.86 (−0.93 to −0.75) and a fitting one at −0.21 (−0.35 to −0.08) at slice 3: the direction is the one an answer state has when its example does not fit, and a fitting example has moved away from it, toward e₁. Among the fitting examples the e₁ coordinate and this coordinate move together (r = 0.66 (0.48 to 0.86)), so examples do not divide into some that fit in one respect, written on e₁, and others that fit in another, written elsewhere. They lie along one arc, from the non-fitting state to e₁, and differ in how far along it they sit.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/low-runs-arc-light.png" alt="The states at the example answers of three runs at seed 715 (the low run, its twin, and the per-visit run, one per row), at slice 2 (left) and slice 3 (right), drawn in the plane of the direction a non-fitting answer has (horizontal) and e₁ (vertical), a few hundred examples of each kind. The states are unit vectors, so a state that lies in this plane sits on the unit circle. Non-fitting examples cluster on the right, at e₁ near zero, on the circle at slice 3 and inside it at slice 2; fitting examples spread along the arc from there up toward e₁ = 1 at the top, further along at slice 3 than at slice 2. The three runs have the same shape, with the fitting examples of the low run a little further from e₁ at slice 3." width="472" height="682" style="max-width: 100%; height: auto;" data-asset-name="low-runs-arc" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/low-runs-arc-dark.png" alt="The states at the example answers of three runs at seed 715 (the low run, its twin, and the per-visit run, one per row), at slice 2 (left) and slice 3 (right), drawn in the plane of the direction a non-fitting answer has (horizontal) and e₁ (vertical), a few hundred examples of each kind. The states are unit vectors, so a state that lies in this plane sits on the unit circle. Non-fitting examples cluster on the right, at e₁ near zero, on the circle at slice 3 and inside it at slice 2; fitting examples spread along the arc from there up toward e₁ = 1 at the top, further along at slice 3 than at slice 2. The three runs have the same shape, with the fitting examples of the low run a little further from e₁ at slice 3." width="472" height="682" style="max-width: 100%; height: auto;" data-asset-name="low-runs-arc" />
+<figcaption><p><strong>The arc from the non-fitting direction to e₁.</strong> States at the example answers in the plane spanned by
+the direction a non-fitting answer has (horizontal) and e₁ (vertical), as in the next figure: 400 fitting examples (red for
+the low run, blue for the others) and 400 non-fitting ones (grey) per panel. <strong>Rows:</strong> the low run at
+seed 715, its twin, and the per-visit run at the same seed. <strong>Columns:</strong> slice 2, slice 3. The states
+are unit vectors, so a state that lies in this plane sits on the rim of the grey unit disc, shown cropped to the quarter the states lie in;
+one inside has part of its length in other directions. The triangle marks e₁, the anchor.</p></figcaption></figure>
+
+<p>The figure draws that arc for three runs at seed 715: the low run, its twin, and the per-visit run. Each answer state is a unit vector, so in the plane of e₁ and the non-fitting direction a state that lies in the plane sits on the unit circle, and one that sits inside the circle has part of its length in other directions. The non-fitting examples gather on the right, where e₁ is near zero: on the circle at slice 3, and inside it at slice 2. The plane is a projection, so "arc" is a simplification: two non-fitting examples that land on the same point here can be far apart in the other directions, as the ones at slice 2 are, and the figure says nothing about whether an example that fits <code>lighten</code> and one that fits <code>mix</code> sit near each other. What it does say is that every fitting example has left the non-fitting direction by about as much as it has gained on e₁. The fitting examples spread up the circle toward e₁ = 1, further along at slice 3 than at slice 2, and at slice 3 the ones near the top sit at <dfn class="term" tabindex="0"><span class="term-end">α<span aria-hidden="true" class="term-ring"></span></span></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">α</span> <span class="gloss">Alignment with e₁<span class="lead-colon">:</span></span><span class="more"> the e₁ component of the unit-norm state at the example answers of the held-out <code>difference</code> contexts, at slice 3.</span></span> close to 1. The three runs have the same shape; the fitting examples of the low run sit a little further from e₁ at slice 3, which is the small α gap in the table of E1. So the writer gives the readers much the same picture in a low run, its twin, and a per-visit run, which is the point of E1 seen from inside.</p>
+<p>A model trained without the anchor holds the same arc, found after training from the mean states of the two kinds of example, but a short one: in the eight controls at seeds 712 to 719 the two means lie a median of 21° apart at slice 3 (9° to 35°), where the per-visit runs put them 83° apart (<a href="https://github.com/z0u/sca2/blob/main/docs/m2/arc-in-controls/experiment.py">arc-in-controls probe</a>). So the anchor stretches the arc and names one end of it in advance, which makes the arc quicker to read; it is there to be found without it.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/low-runs-controls-arc-light.png" alt="The states at the example answers at seed 715, drawn in the plane of the two class means: the direction of the non-fitting mean (horizontal) and the part of the fitting mean at right angles to it (vertical). Top row, the control: the fitting examples sit in a tight group just above the non-fitting group, the two means 16° apart at slice 3. Middle row, the per-visit run: the fitting examples spread along a quarter circle up to the vertical axis, which here is e₁, the means 82° apart at slice 3. Bottom: the angle between the means in each of the eight controls and eight per-visit runs, at slices 2 and 3; the controls lie between 9° and 37°, the per-visit runs between 54° and 86°." width="510" height="721" style="max-width: 100%; height: auto;" data-asset-name="low-runs-controls-arc" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/low-runs-controls-arc-dark.png" alt="The states at the example answers at seed 715, drawn in the plane of the two class means: the direction of the non-fitting mean (horizontal) and the part of the fitting mean at right angles to it (vertical). Top row, the control: the fitting examples sit in a tight group just above the non-fitting group, the two means 16° apart at slice 3. Middle row, the per-visit run: the fitting examples spread along a quarter circle up to the vertical axis, which here is e₁, the means 82° apart at slice 3. Bottom: the angle between the means in each of the eight controls and eight per-visit runs, at slices 2 and 3; the controls lie between 9° and 37°, the per-visit runs between 54° and 86°." width="510" height="721" style="max-width: 100%; height: auto;" data-asset-name="low-runs-controls-arc" />
+<figcaption><p><strong>The arc without the anchor.</strong> States at the example answers in the plane of the two class means, with
+no chosen axis: the direction of the non-fitting mean (horizontal) and the part of the fitting mean at
+right angles to it (vertical); a tick on the rim marks the fitting mean itself. 300 fitting examples (blue) and 300 non-fitting ones (grey) per panel,
+on the unit disc, cropped to the quarter the states lie in. <strong>Top row:</strong> the control at seed 715. <strong>Middle row:</strong> the per-visit run at
+the same seed, where the vertical axis found from the means is e₁ (the triangle marks the anchor). <strong>Columns:</strong> slice 2, slice 3. <strong>Bottom:</strong> the angle between the class means, one faded
+mark per run and the mean on top, for the eight controls (circles) and the eight per-visit runs
+(squares) at 712 to 719.</p></figcaption></figure>
+
+<p>The figure above draws the arc that way, from the class means alone, for a control and the per-visit run at seed 715. In the control the fitting examples sit in one tight group just off the non-fitting group, so a direction fitted after training finds both ends. In the per-visit run they spread along a quarter circle, and the end the plane finds from the means is e₁ itself (cosine 0.99 (0.98 to 1.00)), where in the controls the same axis lies nearly at right angles to e₁ (0.04 (−0.19 to 0.24)).</p>
+<p>So, to a first approximation, the evidence that an example fits is one vector with two parts. One component lies along e₁, where the anchor placed it. The other is how far the state has left the direction a non-fitting answer has, which the loss made on its own and the anchor never touched. Both parts are there in every run, low or not, and nothing in the end state of the writer (block 1) sets the low runs apart. What has to differ is how much the readers take from each part.</p>
+<h2 id="where-the-edit-misses-e3">Where the edit misses (E3)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/low-runs/#where-the-edit-misses-e3" title="Link to this heading">&para;</a></h2>
+<p>Where does the reader take the rest of the evidence from in a low run? The edits here change the full edit in two ways. Some narrow it to one slice. Others go further than e₁ at one set of positions after block 2. One of these removes every direction but e₁ at the example answers, so the next block sees the answers through e₁ alone. The other two apply the full edit and then remove the whole state at the answers or at the other example positions, so whatever the full edit left there is gone too. Where that last kind lifts a low run toward the normal runs under the same edit, the leftover was reaching the reader from those positions. Clearing a whole state is a diagnostic, too costly to use as an intervention: it costs the other ops up to 0.63 in expected match, against 0.10 at most under the full edit.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/low-runs-routes-light.png" alt="The e₁ edit at every slice removes 0.77 (0.68 to 0.87) of the way in the low runs, against 0.95 (0.90 to 0.98) in the rest, before netting. No single slice accounts for the gap. The slice that removes most differs by run, and in several low runs two slices each remove most of it. Removing all but e₁ at the answers after block 2 costs half the low runs and almost no normal run. Clearing the answers or the other example positions on top of the full edit lifts most low runs into the range of the normal runs under the same edit. Which of the two does so differs by run." width="644" height="260" style="max-width: 100%; height: auto;" data-asset-name="low-runs-routes" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/low-runs-routes-dark.png" alt="The e₁ edit at every slice removes 0.77 (0.68 to 0.87) of the way in the low runs, against 0.95 (0.90 to 0.98) in the rest, before netting. No single slice accounts for the gap. The slice that removes most differs by run, and in several low runs two slices each remove most of it. Removing all but e₁ at the answers after block 2 costs half the low runs and almost no normal run. Clearing the answers or the other example positions on top of the full edit lifts most low runs into the range of the normal runs under the same edit. Which of the two does so differs by run." width="644" height="260" style="max-width: 100%; height: auto;" data-asset-name="low-runs-routes" />
+<figcaption><p><strong>Where the edit reaches the evidence, by run.</strong> The drop on <code>difference</code> under each edit, as a share of
+the way from the clean score to the target null, before netting against the other axes. One mark per
+run: the low runs in red and the rest in blue, with a thin grey line joining the edits of each low run.
+The first four edits remove e₁ at the slice named, at every position. The fifth removes every direction
+but e₁ at the example answers after block 2. The last two apply the full edit and then remove the whole
+state (every direction, no renormalization) at the example answers, or at the other example positions,
+after block 2.</p></figcaption></figure>
+
+<p>Before any baseline, the full edit misses more in the low runs. It takes 0.77 (0.68 to 0.87) of the way against 0.95 (0.90 to 0.98) in the rest, so the baseline is not what sets the groups apart. Removing e₁ at the three example answers alone removes as much as the full edit in every run, to within 0.02. So the e₁ that the full edit takes off the other positions makes no difference. No single slice accounts for the gap either. In most runs, low or not, the e₁ edit at slice 2 alone removes nearly as much as the full edit. That is the reader at block 3 of the <dfn class="term" tabindex="0"><cite><span class="term-end">block1-edit<span aria-hidden="true" class="term-ring"></span></span></cite></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/m2/block1-edit/">block1-edit</a></cite></span> <span class="gloss">Block 1 writes the evidence for the op onto e₁ at the example answers, one later block reads it from the query <code>=</code> through attention, and an edit removes the op when it sits between the two.</span></span> account. A few runs, all at seed 712, read at block 2 instead, and the edit at slice 1 removes the op in them.</p>
+<p>The low runs come in two shapes. In 5 of the 10, the e₁ edit at slice 3 alone also removes much of the op, so block 4 reads it from the answers as well. Keeping only e₁ at the answers after block 2 costs these runs 0.67 (0.44 to 0.85) of the way, so that reader uses the off-axis content of the answer states. The other 5 look like normal runs in where the op is read (slice 2, block 3) and under the all-but-e₁ edit, which costs them nothing: block 3 takes e₁ when it is there. The clearing edits below show where both shapes get their leftover.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>run</th><th class=num>removal ↑</th><th class=num>full edit</th><th class=num>e₁, slice 3</th><th class=num>all but e₁, answers</th><th class=num>full, then answers cleared</th><th class=num>full, then others cleared</th></tr></thead><tbody><tr><td>set of 718 at 719</td><td class=num>0.60</td><td class=num>0.68</td><td class=num>0.65</td><td class=num>0.68</td><td class=num>0.83</td><td class=num>0.90</td></tr><tr><td>fixed 1/50 at 719</td><td class=num>0.60</td><td class=num>0.69</td><td class=num>0.03</td><td class=num>−0.22</td><td class=num>0.62</td><td class=num>0.84</td></tr><tr><td>fixed 1/50 at 715</td><td class=num>0.66</td><td class=num>0.74</td><td class=num>0.04</td><td class=num>−0.15</td><td class=num>0.88</td><td class=num>0.79</td></tr><tr><td>fixed 1/10 at 717</td><td class=num>0.66</td><td class=num>0.74</td><td class=num>0.74</td><td class=num>0.79</td><td class=num>0.96</td><td class=num>0.98</td></tr><tr><td>set of 712 at 718</td><td class=num>0.68</td><td class=num>0.77</td><td class=num>0.52</td><td class=num>0.60</td><td class=num>0.90</td><td class=num>0.81</td></tr><tr><td>set of 719 at 718</td><td class=num>0.70</td><td class=num>0.78</td><td class=num>0.79</td><td class=num>0.44</td><td class=num>0.96</td><td class=num>0.88</td></tr><tr><td>fixed 1/10 at 718</td><td class=num>0.72</td><td class=num>0.81</td><td class=num>0.91</td><td class=num>0.85</td><td class=num>0.88</td><td class=num>0.93</td></tr><tr><td>set of 712 at 715</td><td class=num>0.74</td><td class=num>0.82</td><td class=num>0.03</td><td class=num>−0.18</td><td class=num>0.75</td><td class=num>0.78</td></tr><tr><td>fixed 1/10 at 719</td><td class=num>0.75</td><td class=num>0.83</td><td class=num>0.07</td><td class=num>−0.30</td><td class=num>0.60</td><td class=num>0.89</td></tr><tr><td>set of 718 at 715</td><td class=num>0.79</td><td class=num>0.87</td><td class=num>0.03</td><td class=num>−0.24</td><td class=num>0.78</td><td class=num>0.96</td></tr><tr><td>the normal runs</td><td class=num>0.87 (0.82 to 0.91)</td><td class=num>0.95 (0.90 to 0.98)</td><td class=num>0.12 (0.02 to 0.93)</td><td class=num>−0.11 (−0.28 to 0.75)</td><td class=num>0.88 (0.74 to 0.98)</td><td class=num>0.96 (0.85 to 1.00)</td></tr></tbody></table><figcaption><p><strong>The low runs under the edits of this section, at epoch 400</strong>, lowest removal first, with the mean and range of
+the 38 normal runs in the last row. The columns are as in the table of E1. A run is counted as lifted
+by a clearing when its share rises by 0.1 or more over the full edit; no normal run rises by more than
+0.08 under either.</p></figcaption></figure>
+
+<p>In the twins, clearing the answers on top of the full edit brings the low run at seed 715 level with its twin, and clearing the other example positions does not. At seed 719 it is the other way round. Across the ten low runs, one clearing or the other lifts the full edit by a tenth or more in 7 (5 by the answers, 5 by the other positions, and 3 by both). In the normal runs neither clearing lifts it by more than 0.08. The 3 low runs that neither clearing lifts are the 3 with the smallest shortfall. So the leftover sits in the off-axis content of the example positions, at the answers or at the others depending on the run. The e₁ edit leaves it because it was never on e₁.</p>
+<p>A reader after block 3 does not make a run low on its own: 2 normal runs have one too, and remove the op well. What the low runs share is that their readers take enough of the evidence from off the axis for the e₁ edit to leave about a fifth of the op in place.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>measurement</th><th class=num>low (10 runs)</th><th class=num>the rest (38 runs)</th></tr></thead><tbody><tr><td>removal</td><td class=num>0.69 (0.60 to 0.79)</td><td class=num>0.87 (0.82 to 0.91)</td></tr><tr><td>full edit, share of the way</td><td class=num>0.77 (0.68 to 0.87)</td><td class=num>0.95 (0.90 to 0.98)</td></tr><tr><td>e₁ edit at slice 2 alone</td><td class=num>0.76 (0.54 to 0.92)</td><td class=num>0.87 (0.07 to 0.98)</td></tr><tr><td>e₁ edit at slice 3 alone</td><td class=num>0.38 (0.03 to 0.91)</td><td class=num>0.12 (0.02 to 0.93)</td></tr><tr><td>all but e₁ removed at the answers, slice 2</td><td class=num>0.23 (−0.30 to 0.85)</td><td class=num>−0.11 (−0.28 to 0.75)</td></tr><tr><td>whole state removed at the answers, slice 2</td><td class=num>0.70 (0.53 to 0.86)</td><td class=num>0.77 (0.02 to 0.93)</td></tr><tr><td>whole state removed at the other example positions, slice 2</td><td class=num>0.42 (0.01 to 0.84)</td><td class=num>0.19 (−0.08 to 0.59)</td></tr><tr><td>full edit, then the answers cleared, slice 2</td><td class=num>0.82 (0.60 to 0.96)</td><td class=num>0.88 (0.74 to 0.98)</td></tr><tr><td>full edit, then the other example positions cleared, slice 2</td><td class=num>0.88 (0.78 to 0.98)</td><td class=num>0.96 (0.85 to 1.00)</td></tr><tr><td>fits probe, e₁ zeroed, slice 3</td><td class=num>0.99 (0.99 to 1.00)</td><td class=num>0.99 (0.98 to 1.00)</td></tr><tr><td>fits probe, e₁ alone, slice 3</td><td class=num>0.99 (0.98 to 1.00)</td><td class=num>0.99 (0.97 to 1.00)</td></tr><tr><td>query probe, e₁ zeroed, slice 3</td><td class=num>0.85 (0.72 to 0.92)</td><td class=num>0.89 (0.65 to 0.94)</td></tr><tr><td>α at the example answers, slice 3</td><td class=num>0.65 (0.59 to 0.70)</td><td class=num>0.67 (0.60 to 0.74)</td></tr><tr><td>edited match on contexts whose three examples fit</td><td class=num>0.32 (0.20 to 0.45)</td><td class=num>0.06 (0.02 to 0.14)</td></tr><tr><td>edited match on the other contexts</td><td class=num>0.10 (0.06 to 0.15)</td><td class=num>0.03 (0.02 to 0.06)</td></tr><tr><td>peak removal along training</td><td class=num>0.78 (0.64 to 0.85)</td><td class=num>0.90 (0.84 to 0.93)</td></tr><tr><td>slide from the peak</td><td class=num>0.09 (0.02 to 0.16)</td><td class=num>0.03 (0.00 to 0.09)</td></tr></tbody></table><figcaption><p><strong>End-of-training measurements, low runs against the rest.</strong> Mean and range over the runs of each group.
+Removal is net of the median over the other axes. Every other edit is the share of the way from the clean
+score to the target null, with no baseline. The probes are AUCs on held-out contexts of every op. The match
+is the expected exact match on the query answer after the full edit. The low runs are the 10 of the 48 that
+end below 0.8 in removal.</p></figcaption></figure>
+
+<h2 id="peak-and-slide-e4">Peak and slide (E4)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/low-runs/#peak-and-slide-e4" title="Link to this heading">&para;</a></h2>
+<p>When does a run become low? The <dfn class="term" tabindex="0"><cite><span class="term-end">fixed-labels<span aria-hidden="true" class="term-ring"></span></span></cite></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/m2/fixed-labels/">fixed-labels</a></cite></span> <span class="gloss">With one label draw held for the run, the anchor settles at every rate, but a few runs in eight end well below the rest in removal, and which runs do so moves when a run is trained again with slightly different arithmetic.</span></span> report saw most low runs stay under the rest from early on, and one slide after its peak. The kept checkpoints let us follow <dfn class="term" tabindex="0"><span class="term-end">removal<span aria-hidden="true" class="term-ring"></span></span></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Removal</span> <span class="gloss">How much of <code>difference</code> the full e₁ edit removes, beyond what the same edit removes along a typical other axis, as the fixed-labels experiment scores it.</span><span class="more"> The full edit removes e₁ at every slice and position. Its drop on <code>difference</code> is taken as a share of the way from the clean score to the target null, less the median drop under the same edit along each of the other 63 axes. Higher is better.</span></span> and the off-axis evidence together, with the term weights beside them.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/low-runs-along-light.png" alt="Top left: removal under the full edit along training, for all 48 runs. The low runs, in red, mostly sit under the rest from the first checkpoints after the anchor lands, and the two groups separate fully only after epoch 200. Top right: the probe for whether an example fits `difference`, with e₁ zeroed, is above 0.9 by epoch 32 in 47 of 48 runs and climbs toward 1. The means over the low runs and over the rest are drawn as thick lines, and lie close together throughout. Below: the anchor weight and the anti weight at slice 3 along training." width="664" height="298" style="max-width: 100%; height: auto;" data-asset-name="low-runs-along" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/low-runs-along-dark.png" alt="Top left: removal under the full edit along training, for all 48 runs. The low runs, in red, mostly sit under the rest from the first checkpoints after the anchor lands, and the two groups separate fully only after epoch 200. Top right: the probe for whether an example fits `difference`, with e₁ zeroed, is above 0.9 by epoch 32 in 47 of 48 runs and climbs toward 1. The means over the low runs and over the rest are drawn as thick lines, and lie close together throughout. Below: the anchor weight and the anti weight at slice 3 along training." width="664" height="298" style="max-width: 100%; height: auto;" data-asset-name="low-runs-along" />
+<figcaption><p><strong>Along training, every run.</strong> <strong>Top left:</strong> removal under the full edit at the kept checkpoints, net of
+the median over the other 63 axes, one line per run: the low runs in red, the rest in blue. <strong>Top
+right:</strong> AUC of the probe for whether an example fits <code>difference</code>, from the state at its answer at slice 3
+with e₁ zeroed, one thin line per run and the mean of each group as a thick line. <strong>Bottom:</strong> the anchor weight <span class="arithmatex">\(\lambda_a\)</span> and the anti weight <span class="arithmatex">\(\lambda_{\bar s}\)</span> at
+slice 3, on the same epoch axis.</p></figcaption></figure>
+
+<p>Mostly through a lower peak. The low runs peak at 0.78 (0.64 to 0.85), against 0.90 (0.84 to 0.93) for the rest, and the ranges barely touch. But the lines are hard to tell apart early on, and the two groups separate for good only from epoch 224. Before that, some normal runs are still climbing from a late start, below where some low runs will end. One or two low runs are still rising at the end.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/low-runs-peak-light.png" alt="Removal at the end of training against its peak along training, one mark per run. Every run lies on or under the diagonal. The low runs, in red, peak at 0.78 (0.64 to 0.85) and the rest at 0.90 (0.84 to 0.93). Of the low runs, 3 lie more than 0.1 under the diagonal, and no normal run does." width="299" height="280" style="max-width: 100%; height: auto;" data-asset-name="low-runs-peak" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/low-runs-peak-dark.png" alt="Removal at the end of training against its peak along training, one mark per run. Every run lies on or under the diagonal. The low runs, in red, peak at 0.78 (0.64 to 0.85) and the rest at 0.90 (0.84 to 0.93). Of the low runs, 3 lie more than 0.1 under the diagonal, and no normal run does." width="299" height="280" style="max-width: 100%; height: auto;" data-asset-name="low-runs-peak" />
+<figcaption><p><strong>Peak against end.</strong> Removal under the full edit at epoch 400 against its highest value at any kept
+checkpoint, one mark per run: the low runs in red, the rest in blue. The solid line is where a run ends at
+its peak, and the dashed line is a tenth under it.</p></figcaption></figure>
+
+<p>The slide is small, and the peak-against-end figure shows it better than the lines do. The low runs give back about a tenth from their peak, against a few hundredths for the rest. Of the 10 low runs, 3 give back more than a tenth, and no normal run does. The give-back happens while the anti weight anneals down and the anchor weight decays. The one run the <cite>fixed-labels</cite> report saw slide, seed 715 at 1/50, peaks with the rest and is the clearest case.</p>
+<p>The off-axis evidence is not what changes. The <dfn class="term" tabindex="0">fits <span class="term-end">probe<span aria-hidden="true" class="term-ring"></span></span></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Fits probe</span> <span class="gloss">Whether an example fits <code>difference</code>, decoded from the state at its answer.</span><span class="more"> An example fits when its answer is one <code>difference</code> gives for its operands. The others carry replacement op noise. The probe is a ridge (regularized linear) probe on that state with the e₁ coordinate zeroed, fitted on half the held-out contexts of every op and scored on the rest by AUC: the chance that it ranks a fitting example above one that does not fit, so 0.5 is chance and 1 is perfect. It is shown beside the AUC of the e₁ coordinate alone. The figure above shows where the probe reads. E2 also scores one fixed off-axis direction, the one between the mean states of fitting and non-fitting examples, on the zeroed state and on the zeroed state renormalized to unit length.</span></span> with e₁ zeroed is above 0.9 by epoch 32 in 47 of 48 runs (the exception learns the task late), and above 0.95 in every run from epoch 160. So the loss writes the evidence off e₁ about as early as the anchor settles, in low and normal runs alike. The mean over the low runs and the mean over the rest lie close together throughout (at epoch 64, 0.98 against 0.97). So the low runs hold no more off-axis evidence than the rest. They read more of it. What moves during the anneal is how much the readers take from e₁. Once the anti weight no longer presses on the other positions, nothing in the loss or the anchor term holds that where it was.</p>
+<h2 id="discussion">Discussion<a class="anchor-link" href="https://z0u.github.io/sca2/m2/low-runs/#discussion" title="Link to this heading">&para;</a></h2>
+<p>As far as the loss and the anchor term can see, a low run and its twin are the same solution. They have the same loss and the same <span class="term-keep"><dfn class="term" tabindex="0"><span class="term-end">alignment<span aria-hidden="true" class="term-ring"></span></span></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Alignment</span> <span class="gloss">How far a state points along e₁<span class="lead-colon">:</span></span><span class="more"> the cosine between the state and e₁, which for a unit-length state is its component along e₁; 1 on the anchor direction and 0 off it.</span></span>,</span> and a different outcome under the edit. The difference is inside the reader blocks. The evidence that an example fits <code>difference</code> is one vector with two parts: a part along e₁, which the anchor put there, and a part along one other direction, how far the state has left the direction a non-fitting answer has, which the loss made on its own. A reader can look for <code>difference</code>-ness along e₁ or for the absence of not-<code>difference</code>-ness along the other direction, and the readers of the low runs do more of the second. These edits cannot tell whether that is a different weighting of the same two inputs or a reader built a little differently. Either way, it is something we are not optimizing for, and the model has to settle it one way or the other.</p>
+<p>The anchor term asks for the e₁ part, and the anti term keeps e₁ off the other positions. But no term asks the readers to use e₁, so training is flat along that choice. A run settles somewhere on it early, as the twins show, and then stays or drifts during the anneal. That fits the <dfn class="term" tabindex="0"><cite><span class="term-end">fixed-labels<span aria-hidden="true" class="term-ring"></span></span></cite></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term"><cite><a href="https://z0u.github.io/sca2/m2/fixed-labels/">fixed-labels</a></cite></span> <span class="gloss">With one label draw held for the run, the anchor settles at every rate, but a few runs in eight end well below the rest in removal, and which runs do so moves when a run is trained again with slightly different arithmetic.</span></span> finding that neither the label set nor the seed decides which runs end low.</p>
+<p>None of this is special to the fixed-label runs. The off-axis evidence is there in the per-visit runs too, and their readers also take some of it: the full edit leaves a few hundredths of the way in every run. The fixed-label runs lean on it more often, and more heavily. The per-visit draw may spread less because the pull reaches nearly every <code>difference</code> context over a run. The e₁ part is then written on the whole corpus, and the readers have less reason to prefer the other part. A fixed set leaves most contexts with only the off-axis part during training. That is a guess, and this re-analysis does not test it.</p>
+<p>If it holds, the lever is on the readers rather than on the writer. The most targeted term would make the prediction depend on e₁. On the labelled contexts, it would run a second forward pass with e₁ removed, and train it toward the answer that the absence of the op would give (the <span class="term-keep"><dfn class="term" tabindex="0">target <span class="term-end">null<span aria-hidden="true" class="term-ring"></span></span></dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Target null</span> <span class="gloss">Where a removal should land<span class="lead-colon">:</span></span><span class="more"> what an ideal predictor that had lost one op and nothing else would answer. It is the Bayes posterior over ops given the examples, with the removed op set to zero and the rest renormalized, so it still weighs the other ops by how well they fit.</span></span>).</span> A run that reads from off the axis would then pay for it. That costs one forward pass per labelled context, or less: the edit can be applied to a random fraction of the labelled contexts inside the ordinary forward pass, with the target null as their target, so a context and its edited copy can sit in one batch. Either way it needs nothing but the labels, so it would carry over to real text. It would need its own experiment. Another option is a second anchored direction for the off-axis part, since the evidence has about two directions. But an earlier multi-axis anchor did not pay off, and the reader could still prefer a third direction.</p>
+<p>As for scoring, the low state is invisible to the signals that the loss-rate screen uses, so an early call cannot catch it. The e₁ edit cannot catch it either until about half-way through training (epoch 224 on these runs), since some normal runs start late and sit under the low ones before then.</p>
+<h2 id="references">References<a class="anchor-link" href="https://z0u.github.io/sca2/m2/low-runs/#references" title="Link to this heading">&para;</a></h2>
+<dl>
+<dt><a href="https://z0u.github.io/sca2/m2/fixed-labels/">fixed-labels</a></dt>
+<dd>With one label draw held for the run, the anchor settles at every rate, but a few runs in eight end well below the rest in removal, and which runs do so moves when a run is trained again with slightly different arithmetic.</dd>
+<dt><a href="https://z0u.github.io/sca2/m2/fixed-confirm/">fixed-confirm</a></dt>
+<dd><code>τ_ℓ fixed</code>, with the per-visit label draw, keeps the anchor on all eight runs at seeds 712 to 719 with removal near 0.9, and is the recipe of record for D2.2.</dd>
+<dt><a href="https://z0u.github.io/sca2/m2/block1-edit/">block1-edit</a></dt>
+<dd>Block 1 writes the evidence for the op onto e₁ at the example answers, one later block reads it from the query <code>=</code> through attention, and an edit removes the op when it sits between the two.</dd>
+<dt><a href="https://z0u.github.io/sca2/m2/ex-2.2.21/">ex-2.2.21</a></dt>
+<dd>The in-context grammar with three examples and its held-out set of 14,000 contexts, 2,000 per op.</dd>
+</dl>
+</main>
+</body>
+</html>

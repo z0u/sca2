@@ -1,0 +1,221 @@
+<title>Equations as images</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one grid holds the whole context. Controls that change every row (colors, op) sit at the top; controls
+   that change only the query (second image, temperature, answer) sit just above it. Example rows are cropped to a
+   band half the query's height, and a vertical label names each block. Panels show at their native size (--pw)
+   and shrink on narrow screens. */
+:root {
+  --bg: #f7f8fa;
+  --fg: #1d2330;
+  --muted: #5d6677;
+  --chip: #e8ebf1;
+  --accent: #2d5bd7;
+  --accent-fg: #ffffff;
+  --pw: 192px;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151b; --fg: #e3e7ef; --muted: #98a1b2; --chip: #222833;
+    --accent: #7ea2ff; --accent-fg: #0e1320; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151b; --fg: #e3e7ef; --muted: #98a1b2; --chip: #222833;
+  --accent: #7ea2ff; --accent-fg: #0e1320; color-scheme: dark;
+}
+body {
+  background: var(--bg); color: var(--fg); font: 15px/1.45 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px;
+}
+.wrap { max-width: 760px; margin: 0 auto; display: grid; gap: 8px; justify-items: start; }
+
+.eqs {
+  display: grid; gap: 1px 4px; align-items: center; max-width: 100%;
+  grid-template-columns: 1.3em minmax(0, var(--pw)) 1.6em minmax(0, var(--pw)) 1.6em minmax(0, var(--pw));
+}
+.side {
+  grid-column: 1; writing-mode: vertical-rl; transform: rotate(180deg); text-align: center;
+  font-size: 12px; color: var(--muted); align-self: stretch;
+}
+.sym { text-align: center; font-size: 18px; color: var(--muted); }
+.eqs figure { margin: 0; position: relative; }
+.eqs img {
+  display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; image-rendering: pixelated;
+  background: var(--chip);
+}
+.eqs .example img { aspect-ratio: 3 / 1; }
+.eqs figcaption {
+  position: absolute; left: 0; bottom: 0; padding: 0 4px; font-size: 12px; line-height: 16px;
+  background: #000; color: #fff;
+}
+
+.controls {
+  grid-column: 2 / -1; display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 10px 4px; padding-block: 10px 6px;
+}
+.group { display: contents; }
+.spacer { width: 4px; height: 4px; border-radius: 50%; background: var(--muted); opacity: 0.4; margin-inline: 4px; }
+.controls button {
+  position: relative; font: inherit; font-size: 12.5px; line-height: 1.3; border: 0; border-radius: 999px;
+  padding: 3px 9px; background: var(--chip); color: var(--fg); cursor: pointer;
+}
+.controls button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+.controls button.anchored::before {
+  content: ""; position: absolute; left: 50%; top: -8px; transform: translateX(-50%);
+  border: 5px solid transparent; border-bottom: 0; border-top: 5px solid var(--fg);
+}
+.controls button:disabled { opacity: 0.4; cursor: default; }
+.controls button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.caption { color: var(--muted); font-size: 13px; max-width: 65ch; margin: 0; }
+.caption code { font-family: var(--font-mono); font-size: 12.5px; }
+</style>
+
+<div class="wrap" id="app">
+  <div class="eqs" id="eqs"></div>
+  <p class="caption" id="caption" aria-live="polite"></p>
+</div>
+
+<script>
+const BASE = document.documentElement.dataset.panels ?? "panels/";
+const ANCHORED = "difference";
+const EXAMPLES = [["hats", "huelight"], ["barn", "ramp"], ["bikes", "rafting"]];
+const WALK = "in-sync";
+// Each control: [group name, [[value, chip label, full name for screen readers and the tooltip], ...]].
+const CHOICES = {
+  render: ["Colors", [
+    ["posterized", "posterize", "Posterized: each channel of a and b rounded to the nearest of the model's six levels"],
+    ["dithered", "dither", "Dithered: a and b diffused onto the model's colors (Floyd\u2013Steinberg)"]]],
+  op: ["Hidden op", [
+    ["mix", "mix", "Hidden op: mix"], ["lighten", "lighten", "Hidden op: lighten"],
+    ["darken", "darken", "Hidden op: darken"], ["difference", "diff.", "Hidden op: difference (the anchored op)"],
+    ["hue-hsv", "hue", "Hidden op: hue-hsv"], ["sat-hsv", "sat.", "Hidden op: sat-hsv"],
+    ["value-hsv", "value", "Hidden op: value-hsv"]]],
+  b: ["Second image of the query", [
+    ["ramp", "gray", "Query b: a gray ramp"], ["huelight", "color", "Query b: hue across, lightness down"]]],
+  pick: ["Model color", [
+    ["argmax", "T = 0", "Temperature 0: the model's most likely color at each pixel"],
+    ["sample", "T = 1", "Temperature 1: one color drawn from the model's answer at each pixel"]]],
+  model: ["Answer", [
+    ["clean", "clean", "Answer from the unedited model"],
+    ["edited", "edited", "Answer from the model with the op's axis edited out"],
+    ["truth", "true", "The true answer under the op"]]],
+};
+const TOP = ["render", "op"], QUERY = ["b", "pick", "model"];
+const state = { op: "difference", model: "clean", b: "ramp", pick: "argmax", render: "posterized" };
+
+const src = name => window.PANELS?.[name] ?? BASE + name + ".png";
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+function panel(cls, caption) {
+  const f = el("figure", cls), i = el("img");
+  f.append(i);
+  if (caption) { const c = el("figcaption", null, caption); c.setAttribute("aria-hidden", "true"); f.append(c); }
+  return [f, i];
+}
+function controls(keys) {
+  const box = el("div", "controls");
+  keys.forEach((k, n) => {
+    if (n) { const s = el("span", "spacer"); s.setAttribute("aria-hidden", "true"); box.append(s); }
+    const [label, opts] = CHOICES[k];
+    const g = el("div", "group");
+    g.id = k; g.setAttribute("role", "group"); g.setAttribute("aria-label", label);
+    for (const [value, text, full] of opts) {
+      const btn = el("button", null, text);
+      btn.type = "button"; btn.value = value; btn.id = `${k}-${value}`; btn.title = full;
+      btn.setAttribute("aria-label", full);
+      if (k === "op" && value === ANCHORED) btn.classList.add("anchored");
+      btn.addEventListener("click", () => { state[k] = value; render(); });
+      g.append(btn);
+    }
+    box.append(g);
+  });
+  return box;
+}
+
+// The grid is built once; a change of state only swaps image sources.
+const slots = [];  // [img, state => panel name, state => alt text]
+const box = document.getElementById("eqs");
+box.append(controls(TOP));
+const side = el("div", "side", "examples");
+side.style.gridRow = `2 / span ${EXAMPLES.length}`;
+box.append(side);
+for (const [a, b] of EXAMPLES) {
+  const pa = panel("example"), pb = panel("example"), py = panel("example");
+  slots.push([pa[1], s => `operand-${s.render}-${a}`, () => a],
+             [pb[1], s => `operand-${s.render}-${b}`, () => b],
+             [py[1], s => `example-${s.render}-${a}-${b}-${s.op}`, s => `${a} ${s.op} ${b}`]);
+  box.append(pa[0], el("span", "sym", "&"), pb[0], el("span", "sym", "="), py[0]);
+}
+box.append(controls(QUERY));
+const qa = panel("query", "a"), qb = panel("query", "b"), qy = panel("query", "y");
+box.append(el("div", "side", "query"), qa[0], el("span", "sym", "&"), qb[0], el("span", "sym", "="), qy[0]);
+const NAMES = { clean: "clean", edited: "edited", truth: "true" };
+function answerName(s) {
+  if (s.model === "truth") return `truth-${s.render}-${s.b}-${s.op}`;
+  return `answer-${WALK}-${s.render}-${s.b}-${s.op}-${s.model}-${s.pick}`;
+}
+slots.push([qa[1], s => `operand-${s.render}-parrots`, () => "a: parrots"],
+           [qb[1], s => `operand-${s.render}-${s.b}`, s => `b: ${s.b === "ramp" ? "gray ramp" : "hue and lightness"}`],
+           [qy[1], answerName, s => `y: ${CHOICES.model[1].find(o => o[0] === s.model)[2].toLowerCase()}`]);
+
+// Panels are fetched ahead: those one click away once a view is up, and the new view's before it is shown, so a
+// slow fetch leaves the previous picture in place rather than an empty box.
+const fetched = new Map();
+function fetchPanel(name) {
+  if (!fetched.has(name)) {
+    const i = new Image();
+    i.src = src(name);
+    fetched.set(name, i.decode().catch(() => {}));
+  }
+  return fetched.get(name);
+}
+function prefetchNeighbors() {
+  for (const [k, [, opts]] of Object.entries(CHOICES))
+    for (const [value] of opts)
+      if (value !== state[k]) for (const [, name] of slots) fetchPanel(name({ ...state, [k]: value }));
+}
+const idle = window.requestIdleCallback ?? (f => setTimeout(f, 200));
+
+const RENDER = {
+  posterized: "each channel of a and b is rounded to the nearest of its six levels",
+  dithered: "a and b are dithered onto those colors",
+};
+let shown = 0;
+function render() {
+  const s = { ...state }, ticket = ++shown;
+  const names = slots.map(([, name]) => name(s));
+  Promise.race([Promise.all(names.map(fetchPanel)), new Promise(r => setTimeout(r, 1500))]).then(() => {
+    if (ticket !== shown) return;
+    slots.forEach(([img, , alt], n) => { img.src = src(names[n]); img.alt = alt(s); });
+    qy[0].querySelector("figcaption").textContent = `y (${NAMES[s.model]})`;
+    idle(prefetchNeighbors);
+  });
+
+  const op = `<code>${s.op}</code>`;
+  const answer = s.model === "truth"
+    ? `Here y is the true answer under ${op}.`
+    : `Here y is the answer of the ${s.model === "clean" ? "unedited model" : "model with the op's axis edited out"}, ` +
+      (s.pick === "sample" ? "with one color drawn from its answer at each pixel (T = 1)." : "with its most likely color at each pixel (T = 0).") +
+      " Each pixel of y is its own context: the three example pixels at the same position, then the query pair.";
+  document.getElementById("caption").innerHTML =
+    `Three examples of the hidden op ${op}, cropped to their middle band, then a query. ${answer} ` +
+    `The model knows only the 216 colors of its grid, so ${RENDER[s.render]}. ` +
+    `The op marked &#9660; is the one anchored in training, and the one the edit takes out.`;
+
+  for (const k of Object.keys(CHOICES))
+    for (const btn of document.querySelectorAll(`#${k} button`)) btn.setAttribute("aria-pressed", String(btn.value === s[k]));
+  for (const btn of document.querySelectorAll("#pick button")) btn.disabled = s.model === "truth";
+}
+render();
+</script>
