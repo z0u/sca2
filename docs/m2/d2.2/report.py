@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
+from matplotlib import patheffects
 import numpy as np
 
 from mini.lit import memo
@@ -167,9 +168,9 @@ def alpha_slice_draw(data: dict, alt_text: str) -> str:
     return _plot()
 
 
-def training_figure() -> str:
+def training_data() -> dict:
     t0 = TRAJS[SEEDS[0]]
-    data = {
+    return {
         "epoch": EPOCHS.tolist(),
         "loss": [TRAJS[s]["val_loss"].tolist() for s in SEEDS],
         "eem": [TRAJS[s]["eem_per_op"].tolist() for s in SEEDS],
@@ -181,91 +182,159 @@ def training_figure() -> str:
         "tau": t0["tau"].tolist(),
         "anti": t0["anti_weight"].tolist(),
     }
-    eem_end = np.array([TRAJS[s]["eem_per_op"][-1] for s in SEEDS]).mean(0)
-    alt = f"""
-        Six stacked panels over 400 epochs. Validation loss falls steeply in the first 30 epochs and slowly after.
-        The task score of each op rises at its own pace: the HSV ops learn later than the others, and `mix` stays
-        lowest, ending near {eem_end[OPS.index("mix")]:.2f} where the best op ends near {eem_end.max():.2f}. The
-        learning rate warms up over the first few epochs and then decays on a cosine. The pull weight ramps up to
-        its peak by about epoch 40 and holds there. The position temperature τ_p sharpens from
-        1 to 0.1 by epoch 40 while τ_ℓ stays at 0.1. The anti weight starts at 0.25 on every slice and anneals to a
-        hold that falls with depth, between 0.2 at the embedding and 0.03 at slice 4.
+
+
+SCHEDULE_ALT = """
+    The pull weight λ_a ramps up to its peak of 0.1 by about epoch 40 and holds there. The anti weight starts at 0.25
+    on every slice and anneals to a hold that falls with depth, from 0.2 at the embedding to 0.03 at slice 4, so the
+    pull weight sits above the anti weight at slices 3 and 4 by the end. The position temperature τ_p sharpens from 1
+    to 0.1 by epoch 40, while τ_ℓ stays at 0.1.
+"""
+
+
+def training_figure(view: str) -> str:
+    """The task score along training with the schedules under it. *view* is `per-op` (a line for each op) or `mean`
+    (the mean over ops, with every op of every run behind it as a hairline).
     """
-    return training_draw(data, alt)
+    data = training_data() | {"view": view}
+    eem_end = np.array([TRAJS[s]["eem_per_op"][-1] for s in SEEDS])
+    if view == "per-op":
+        task = f"""
+            The task score of each op rises at its own pace: the HSV ops learn later than the others, and `mix` stays
+            lowest, ending near {eem_end.mean(0)[OPS.index("mix")]:.2f}, close to its ceiling, where the best op ends
+            near {eem_end.mean(0).max():.2f}.
+        """
+    else:
+        task = f"""
+            The task score, averaged over the ops, rises quickly over the first 40 epochs and slowly after, ending
+            near {eem_end.mean():.2f}, a little under the mean ceiling of {np.mean(CEILINGS):.2f}. The ops of every
+            run spread out behind it between about 0.3 and 0.75.
+        """
+    return training_draw(data, f"Three stacked panels over 400 epochs. {task} {SCHEDULE_ALT}")
+
+
+TASK_CAPTION = {
+    "per-op": """the task score (expected exact match) of each op on held-out contexts, as the mean over the eight
+        runs, with bars spanning the runs, staggered a little so the ops don't overlap. The ticks past the end of
+        training mark the Bayes ceiling of each op, the score of an ideal predictor on the same contexts.""",
+    "mean": """the task score (expected exact match) on held-out contexts: the mean over ops and runs, with a band
+        spanning the runs, and each op of each run behind it as a hairline. The tick past the end of training marks
+        the Bayes ceiling, the score of an ideal predictor on the same contexts.""",
+}
 
 
 @memo
 def training_draw(data: dict, alt_text: str) -> str:
+    view = data["view"]
+
     @themed(
-        name="d22-training",
+        name=f"d22-training-{view}",
         alt_text=alt_text,
-        caption="""
-            **Training the recipe of record.** **Top two panels:** validation loss and the task score (expected exact
-            match) of each op on held-out contexts, as the mean over the eight runs; the band and the bars span the
-            runs. The bars are staggered a little so the ops don't overlap, and the ticks past the end of training mark the
-            Bayes ceiling of each op, the score of an ideal predictor on the same contexts. **Below:** the schedules, which are the
-            same for every run: the learning rate, the pull weight $\\lambda_a$, the pooling temperatures $\\tau_p$
-            (over positions) and $\\tau_\\ell$ (over slices), and the anti-subspace weight $\\lambda_{\\bar s}$ at
-            each slice.
+        caption=f"""
+            **Training the recipe of record.** **Top:** {TASK_CAPTION[view]} **Middle:** the pull weight
+            $\\lambda_a$ and the anti-subspace weight $\\lambda_{{\\bar s}}$ at each slice, with the middle slices
+            thinner. **Bottom:** the pooling temperatures $\\tau_p$ (over positions) and $\\tau_\\ell$ (over slices).
+            The schedules are the same for every run.
         """,
     )
     def _plot() -> plt.Figure:
         ep = np.asarray(data["epoch"])
-        fig, axes = plt.subplots(
-            6,
-            1,
-            figsize=(5.6, 6.8),
-            layout="constrained",
-            sharex=True,
-            gridspec_kw={"height_ratios": [1.6, 2.6, 0.8, 0.8, 0.8, 1.1]},
+        fig, (eem_ax, lam_ax, tau_ax) = plt.subplots(
+            3, 1, figsize=(5.6, 4.2), layout="constrained", sharex=True, gridspec_kw={"height_ratios": [2.6, 1.3, 0.8]}
         )
-        loss_ax, eem_ax, lr_ax, lam_ax, tau_ax, anti_ax = axes
         main = light_dark("#222", "#ddd")
-
-        loss = np.asarray(data["loss"])
-        loss_ax.fill_between(ep, loss.min(0), loss.max(0), color=light_dark(*GHOST), alpha=0.35, lw=0, zorder=1)
-        loss_ax.plot(ep, loss.mean(0), color=main, lw=1, zorder=2)
-        loss_ax.set_ylabel("val. loss", fontsize=7)
-
+        bg = plt.rcParams["axes.facecolor"]
         eem = np.asarray(data["eem"])  # (seed, record, op)
-        n_ops = len(data["ops"])
-        marks = "osDpPXh"  # no triangles: in this project they mark regularizer targets
-        bar_at = [int(np.abs(ep - e).argmin()) for e in range(50, int(ep[-1]) + 1, 50)]
         ceil = np.asarray(data["ceilings"])
-        # The ops keep their colors and markers, but draw and list in the order of their final score.
-        for o in np.argsort(-eem[:, -1].mean(0)):
-            name = data["ops"][o]
-            color = f"C{o}"
-            anchored = o == data["anchored"]
-            ax_lw = 1.6 if anchored else 0.9
-            eem_ax.plot(ep, eem[:, :, o].mean(0), color=color, lw=ax_lw, marker=marks[o], ms=3, markevery=bar_at, label=name, zorder=3 if anchored else 2)  # fmt: skip
-            dx = (o - (n_ops - 1) / 2) * 2.2
-            eem_ax.vlines(ep[bar_at] + dx, eem[:, bar_at, o].min(0), eem[:, bar_at, o].max(0), color=color, lw=1, alpha=0.6, zorder=1)  # fmt: skip
-            # The ceiling of the op, as a short tick past the end of training.
-            eem_ax.plot([ep[-1] + 6, ep[-1] + 20], [ceil[o]] * 2, color=color, lw=1.6, clip_on=False, zorder=3)
+        tick = [ep[-1] + 6, ep[-1] + 20]  # a ceiling, as a short tick past the end of training
+        if view == "per-op":
+            n_ops = len(data["ops"])
+            marks = "osDpPXh"  # no triangles: in this project they mark regularizer targets
+            bar_at = [int(np.abs(ep - e).argmin()) for e in range(50, int(ep[-1]) + 1, 50)]
+            # The ops keep their colors and markers, but draw and list in the order of their final score.
+            for o in np.argsort(-eem[:, -1].mean(0)):
+                color = f"C{o}"
+                anchored = o == data["anchored"]
+                eem_ax.plot(ep, eem[:, :, o].mean(0), color=color, lw=1.6 if anchored else 0.9, marker=marks[o], ms=3, markevery=bar_at, label=data["ops"][o], zorder=3 if anchored else 2)  # fmt: skip
+                dx = (o - (n_ops - 1) / 2) * 2.2
+                eem_ax.vlines(ep[bar_at] + dx, eem[:, bar_at, o].min(0), eem[:, bar_at, o].max(0), color=color, lw=1, alpha=0.6, zorder=1)  # fmt: skip
+                eem_ax.plot(tick, [ceil[o]] * 2, color=color, lw=1.6, clip_on=False, zorder=3)
+            eem_ax.legend(fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.06, 0.5))
+        else:
+            for s in range(eem.shape[0]):
+                for o in range(eem.shape[2]):
+                    eem_ax.plot(ep, eem[s, :, o], color=light_dark(*GHOST), lw=0.3, alpha=0.6, zorder=1)
+            mean = eem.mean(axis=2)  # (seed, record): the mean over ops of each run
+            eem_ax.fill_between(ep, mean.min(0), mean.max(0), color=light_dark(*GHOST), alpha=0.45, lw=0, zorder=2)
+            eem_ax.plot(ep, mean.mean(0), color=main, lw=1.4, zorder=3, label="mean over ops")
+            eem_ax.plot(tick, [ceil.mean()] * 2, color=main, lw=1.6, clip_on=False, zorder=3)
+            eem_ax.plot([], [], color=light_dark(*GHOST), lw=0.6, label="each op, each run")
+            eem_ax.legend(fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.06, 0.5))
         eem_ax.set_ylim(0, 1)
         eem_ax.set_ylabel("task score\n(EEM)", fontsize=7)
-        eem_ax.legend(fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.06, 0.5))
 
-        lr_ax.plot(ep, np.asarray(data["lr"]) * 1e3, color=main, lw=1)
-        lr_ax.set_ylabel("LR (×10⁻³)", fontsize=7)
-        lam_ax.plot(ep, data["weight"], color=light_dark("#c2185b", "#f06292"), lw=1)
-        lam_ax.set_ylabel("$\\lambda_a$", fontsize=7)
+        anti = np.asarray(data["anti"])
+        n = len(SLICE_NAMES)
+        for i, name in enumerate(SLICE_NAMES):
+            edge = i in (0, n - 1)
+            lam_ax.plot(ep, anti[:, i], color=ink(i, n), lw=1.2 if edge else 0.5, label=f"$\\lambda_{{\\bar s}}$, {name}", zorder=1)  # fmt: skip
+        halo = [patheffects.Stroke(linewidth=4.2, foreground=bg), patheffects.Normal()]
+        lam_ax.plot(ep, data["weight"], color=light_dark("#c2185b", "#f06292"), lw=1.4, path_effects=halo, label="$\\lambda_a$", zorder=3)  # fmt: skip
+        lam_ax.set_ylim(0, 0.27)
+        lam_ax.set_ylabel("weight", fontsize=7)
+        handles, labels = lam_ax.get_legend_handles_labels()
+        lam_ax.legend(handles[-1:] + handles[:-1], labels[-1:] + labels[:-1], fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.01, 0.5))  # fmt: skip
+
         tau = np.asarray(data["tau"])
         tau_ax.plot(ep, tau[:, 0], color=main, lw=1, label="$\\tau_p$")
         tau_ax.plot(ep, tau[:, 1], color=main, lw=1, ls="--", label="$\\tau_\\ell$")
         tau_ax.set_ylim(0, 1.05)
         tau_ax.set_ylabel("τ", fontsize=7)
         tau_ax.legend(fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.01, 0.5))
-        anti = np.asarray(data["anti"])
-        for i, name in enumerate(SLICE_NAMES):
-            anti_ax.plot(ep, anti[:, i], color=ink(i, len(SLICE_NAMES)), lw=1, label=name)
-        anti_ax.set_ylim(0, 0.27)
-        anti_ax.set_ylabel("$\\lambda_{\\bar s}$", fontsize=7)
-        anti_ax.legend(fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.01, 0.5), title="slice", title_fontsize=6)  # fmt: skip
-        anti_ax.set_xlabel("epoch", fontsize=7)
-        anti_ax.set_xlim(0, ep[-1])
-        for ax in axes:
+        tau_ax.set_xlabel("epoch", fontsize=7)
+        tau_ax.set_xlim(0, ep[-1])
+        for ax in (eem_ax, lam_ax, tau_ax):
+            ax.tick_params(labelsize=6)
+        return fig
+
+    return _plot()
+
+
+def basics_figure() -> str:
+    data = training_data()
+    alt = """
+        Two stacked panels over 400 epochs. Validation loss falls steeply in the first 30 epochs and slowly after,
+        and the eight runs stay close together. The learning rate warms up over the first few epochs and then decays
+        on a cosine to near zero.
+    """
+    return basics_draw(data, alt)
+
+
+@memo
+def basics_draw(data: dict, alt_text: str) -> str:
+    @themed(
+        name="d22-loss-lr",
+        alt_text=alt_text,
+        caption="""
+            **Loss and learning rate.** **Top:** validation loss, the mean over the eight runs with a band spanning
+            them. **Bottom:** the learning rate, the same for every run.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        ep = np.asarray(data["epoch"])
+        fig, (loss_ax, lr_ax) = plt.subplots(
+            2, 1, figsize=(4.6, 2.4), layout="constrained", sharex=True, gridspec_kw={"height_ratios": [1.6, 1]}
+        )
+        main = light_dark("#222", "#ddd")
+        loss = np.asarray(data["loss"])
+        loss_ax.fill_between(ep, loss.min(0), loss.max(0), color=light_dark(*GHOST), alpha=0.35, lw=0, zorder=1)
+        loss_ax.plot(ep, loss.mean(0), color=main, lw=1, zorder=2)
+        loss_ax.set_ylabel("val. loss", fontsize=7)
+        lr_ax.plot(ep, np.asarray(data["lr"]) * 1e3, color=main, lw=1)
+        lr_ax.set_ylabel("LR (×10⁻³)", fontsize=7)
+        lr_ax.set_xlabel("epoch", fontsize=7)
+        lr_ax.set_xlim(0, ep[-1])
+        for ax in (loss_ax, lr_ax):
             ax.tick_params(labelsize=6)
         return fig
 
@@ -304,4 +373,16 @@ r"""
 The training record of the same runs, with the schedules underneath on the same epoch axis.
 """
 
-training_figure()
+training_figure("mean")
+
+r"""
+The same figure with a line for each op:
+"""
+
+training_figure("per-op")
+
+r"""
+Loss and learning rate, which the training figure leaves out:
+"""
+
+basics_figure()
