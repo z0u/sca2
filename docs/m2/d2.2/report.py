@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
+from matplotlib import colors as mcolors
 from matplotlib import patheffects
 import numpy as np
 
@@ -223,6 +224,20 @@ TASK_CAPTION = {
 }
 
 
+def draw_phases(phase_ax: plt.Axes, end: float, bg: Any, note: dict) -> None:
+    """The phases of training in *phase_ax*, as a ramp with no hard edges, over epochs 0 to *end*."""
+    # The keyframes of the schedules are at 10% and 90% of
+    # the run (the pull at full weight and τ_p sharp by epoch 40; the anti weight settled by about 360).
+    keys = [(0.0, light_dark("#f77", "#c55")), (0.1, bg), (1.0, light_dark("#88f", "#66c"))]
+    ramp = mcolors.LinearSegmentedColormap.from_list("phase", keys)
+    phase_ax.imshow(np.linspace(0, 1, 256)[None, :], cmap=ramp, aspect="auto", extent=(0, end, 0, 1))
+    phase_ax.set_yticks([])
+    for spine in ("left", "right", "top"):
+        phase_ax.spines[spine].set_visible(False)
+    for x, label in ((0.0, "nascent"), (0.1, "malleable"), (0.9, "crystallized")):
+        phase_ax.text(x * end, 1.25, label, ha="center", va="bottom", clip_on=False, **note)
+
+
 @memo
 def training_draw(data: dict, alt_text: str) -> str:
     view = data["view"]
@@ -234,13 +249,19 @@ def training_draw(data: dict, alt_text: str) -> str:
             **Training the recipe of record.** **Top:** {TASK_CAPTION[view]} **Middle:** the pull weight
             $\\lambda_a$ and the anti-subspace weight $\\lambda_{{\\bar s}}$ at each slice, with the middle slices
             thinner. **Bottom:** the pooling temperatures $\\tau_p$ (over positions) and $\\tau_\\ell$ (over slices).
-            The schedules are the same for every run.
+            The schedules are the same for every run. The ramp underneath names the phases of training, with labels at
+            the keyframes of the schedules.
         """,
     )
     def _plot() -> plt.Figure:
         ep = np.asarray(data["epoch"])
-        fig, (eem_ax, lam_ax, tau_ax) = plt.subplots(
-            3, 1, figsize=(5.6, 4.2), layout="constrained", sharex=True, gridspec_kw={"height_ratios": [2.6, 1.3, 0.8]}
+        fig, (eem_ax, lam_ax, tau_ax, phase_ax) = plt.subplots(
+            4,
+            1,
+            figsize=(5.6, 4.6),
+            layout="constrained",
+            sharex=True,
+            gridspec_kw={"height_ratios": [2.6, 1.3, 0.8, 0.12]},
         )
         main = light_dark("#222", "#ddd")
         bg = plt.rcParams["axes.facecolor"]
@@ -282,19 +303,27 @@ def training_draw(data: dict, alt_text: str) -> str:
         halo = [patheffects.Stroke(linewidth=4.2, foreground=bg), patheffects.Normal()]
         lam_ax.plot(ep, data["weight"], color=light_dark("#c2185b", "#f06292"), lw=1.4, path_effects=halo, label="$\\lambda_a$", zorder=3)  # fmt: skip
         lam_ax.set_ylim(0, 0.27)
+        note = {"fontsize": 6, "color": main}
+        lam_ax.text(14, 0.238, "push", va="top", **note)
+        lam_ax.text(38, 0.108, "pull", va="bottom", **note)
         lam_ax.set_ylabel("weight", fontsize=7)
         handles, labels = lam_ax.get_legend_handles_labels()
-        lam_ax.legend(handles[-1:] + handles[:-1], labels[-1:] + labels[:-1], fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.01, 0.5))  # fmt: skip
+        lam_leg = lam_ax.legend(handles[-1:] + handles[:-1], labels[-1:] + labels[:-1], fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.01, 0.5))  # fmt: skip
+        for h in lam_leg.get_lines():  # the halo is for crossings in the plot, not the key
+            h.set_path_effects([])
 
         tau = np.asarray(data["tau"])
         tau_ax.plot(ep, tau[:, 0], color=main, lw=1, label="$\\tau_p$")
         tau_ax.plot(ep, tau[:, 1], color=main, lw=1, ls="--", label="$\\tau_\\ell$")
         tau_ax.set_ylim(0, 1.05)
+        tau_ax.text(14, 0.92, "(soft)", va="center", **note)
+        tau_ax.text(38, 0.14, "(sharp)", va="bottom", **note)
         tau_ax.set_ylabel("τ", fontsize=7)
         tau_ax.legend(fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.01, 0.5))
-        tau_ax.set_xlabel("epoch", fontsize=7)
-        tau_ax.set_xlim(0, ep[-1])
-        for ax in (eem_ax, lam_ax, tau_ax):
+        draw_phases(phase_ax, ep[-1], bg, note)
+        phase_ax.set_xlabel("epoch", fontsize=7)
+        phase_ax.set_xlim(0, ep[-1])
+        for ax in (eem_ax, lam_ax, tau_ax, phase_ax):
             ax.tick_params(labelsize=6)
         return fig
 
