@@ -215,7 +215,7 @@ def training_figure(view: str) -> str:
 
 TASK_CAPTION = {
     "per-op": """the task score (expected exact match) of each op on held-out contexts, as the mean over the eight
-        runs, with bars spanning the runs, staggered a little so the ops don't overlap. The ticks past the end of
+        runs, with each run behind it as a hairline in the same color. The ticks past the end of
         training mark the Bayes ceiling of each op, the score of an ideal predictor on the same contexts.""",
     "mean": """the task score (expected exact match) on held-out contexts: the mean over ops and runs, with a band
         spanning the runs, and each op of each run behind it as a hairline. The tick past the end of training marks
@@ -248,7 +248,6 @@ def training_draw(data: dict, alt_text: str) -> str:
         ceil = np.asarray(data["ceilings"])
         tick = [ep[-1] + 6, ep[-1] + 20]  # a ceiling, as a short tick past the end of training
         if view == "per-op":
-            n_ops = len(data["ops"])
             marks = "osDpPXh"  # no triangles: in this project they mark regularizer targets
             bar_at = [int(np.abs(ep - e).argmin()) for e in range(50, int(ep[-1]) + 1, 50)]
             # The ops keep their colors and markers, but draw and list in the order of their final score.
@@ -256,8 +255,8 @@ def training_draw(data: dict, alt_text: str) -> str:
                 color = f"C{o}"
                 anchored = o == data["anchored"]
                 eem_ax.plot(ep, eem[:, :, o].mean(0), color=color, lw=1.6 if anchored else 0.9, marker=marks[o], ms=3, markevery=bar_at, label=data["ops"][o], zorder=3 if anchored else 2)  # fmt: skip
-                dx = (o - (n_ops - 1) / 2) * 2.2
-                eem_ax.vlines(ep[bar_at] + dx, eem[:, bar_at, o].min(0), eem[:, bar_at, o].max(0), color=color, lw=1, alpha=0.6, zorder=1)  # fmt: skip
+                for r in eem[:, :, o]:  # each run of the op, as a hairline in its color
+                    eem_ax.plot(ep, r, color=color, lw=0.35, alpha=0.45, zorder=1)
                 eem_ax.plot(tick, [ceil[o]] * 2, color=color, lw=1.6, clip_on=False, zorder=3)
             eem_ax.legend(fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.06, 0.5))
         else:
