@@ -38,7 +38,9 @@ def fetch_json(ref: str) -> Any:
         return json.loads(Path(store.get(art, Path(tmp) / "body.json")).read_text())
 
 
-# The recipe of record is `τ_ℓ fixed`; its runs of record are the fixed confirmation's, at seeds 712 to 719.
+# The recipe of record is `τ_ℓ fixed`, drawn without its end anneal (the cooldown): the `no-cooldown` arm of the
+# cooldown experiment (docs/m2/cooldown), which carries the fixed confirmation's runs at seeds 712 to 719 on from
+# their epoch-64 resume states with the anneal taken out. That experiment found the edit and the task unchanged.
 fc = _load_sibling("fixed-confirm", "d22_figures_fc")
 SEEDS: tuple[int, ...] = fc.SEEDS
 OPS: tuple[str, ...] = fc.OP_NAMES
@@ -46,7 +48,8 @@ D = OPS.index(fc.ANCHORED_OP)
 SLICE_NAMES = ["emb", "1", "2", "3", "4"]
 PULLED = (1, 2, 3)  # the slices the pull acts on (design doc, the recipe of record)
 FALLOFF_HOLDS: tuple[float, ...] = fc.sps.FALLOFF_HOLDS
-_TRAJ = fetch_json(fc.FINISHED_TRAJ_REF)
+COOLDOWN_TRAJ_REF = "reports/m2/cooldown/trajectories"  # `TRAJ_REF` of docs/m2/cooldown/experiment.py
+_TRAJ = fetch_json(COOLDOWN_TRAJ_REF)
 
 
 def ceilings() -> list[float]:
@@ -72,7 +75,7 @@ def traj(s: int) -> dict[str, np.ndarray]:
     """The training record of the run at seed *s*, one row per record. The last record repeats epoch 400 (the end of
     training is recorded twice, with the same values), so it is dropped.
     """
-    t = _TRAJ[fc.label_of(s, None)]["traj"]
+    t = _TRAJ[f"cooldown-no-cooldown-s{s}"]["traj"]
     ep = np.asarray(t["epoch"], float)
     keep = np.r_[True, ep[1:] != ep[:-1]]
     return {k: np.asarray(v, float)[keep] for k, v in t.items() if k in KEYS}
@@ -184,9 +187,9 @@ def training_figure() -> str:
         The task score of each op rises at its own pace: the HSV ops learn later than the others, and `mix` stays
         lowest, ending near {eem_end[OPS.index("mix")]:.2f} where the best op ends near {eem_end.max():.2f}. The
         learning rate warms up over the first few epochs and then decays on a cosine. The pull weight ramps up to
-        its peak by about epoch 40 and cools down over the last 40 epochs. The position temperature τ_p sharpens from
+        its peak by about epoch 40 and holds there. The position temperature τ_p sharpens from
         1 to 0.1 by epoch 40 while τ_ℓ stays at 0.1. The anti weight starts at 0.25 on every slice and anneals to a
-        hold that falls with depth, then cools down with the pull.
+        hold that falls with depth, between 0.2 at the embedding and 0.03 at slice 4.
     """
     return training_draw(data, alt)
 
@@ -290,7 +293,7 @@ figure_html(
 r"""
 ## Where the op sits
 
-The figures from here on are drawn from the eight runs of the recipe of record in the [fixed confirmation](../fixed-confirm/report.py), at seeds 712 to 719. α is the cosine between a state and the anchored axis e₁, averaged over the probe contexts of an op. Below, it is taken at whichever position is highest at each slice; from slice 1 on, that is the query answer on every run.
+The figures from here on are drawn from eight runs of the recipe of record at seeds 712 to 719, without the end anneal of the pull and anti weights: the [cooldown](../cooldown/report.py) experiment carried the runs of the [fixed confirmation](../fixed-confirm/report.py) on with the anneal taken out, and found that it changes neither the edit nor the task. α is the cosine between a state and the anchored axis e₁, averaged over the probe contexts of an op. Below, it is taken at whichever position is highest at each slice; from slice 1 on, that is the query answer on every run.
 """
 
 alpha_slice_figure()
