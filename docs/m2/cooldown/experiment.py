@@ -6,12 +6,11 @@ branching two arms from one stored state per seed, so that the cooldown is the o
 
 - the stem: each of the fixed confirmation's runs at seeds 712 to 719, carried on from its stored epoch-64 resume
   state to epoch 360, where the cooldown would start, and stopped there with a resume state of its own;
-- `cooldown`: the recipe as it is, carried on from the stem to 400. On the same card type as the fixed confirmation
-  (L4), this arm should repeat the stored runs, which the report checks;
+- `cooldown`: the recipe as it is, carried on from the stem to 400;
 - `no cooldown`: the same, with the end anneal taken out of both terms (`floor` 1), so the pull and the anti weight
   hold their epoch-360 values to the end.
 
-Both arms train on the same card type (L4) and are scored as the fixed confirmation's finished runs are: the axis
+Stems and arms all train on one card type (L40S) and are scored as the fixed confirmation's finished runs are: the axis
 scoring (removal, spill and the task change), the full edit restricted to each slice set (block 1), and the
 embedding lean. The arms share a state from epoch 360, so they are compared seed by seed.
 
@@ -61,7 +60,7 @@ ARMS: tuple[str, ...] = ("cooldown", "no-cooldown")
 
 BUDGET_USD = 6
 """From the fixed confirmation on L4 cards (eight runs carried from 64 to 400 for about \\$2, their end scoring about
-\\$1): the stems (296 epochs each), the two arms (40 epochs each), the scoring of sixteen finished runs, and room for a
+\\$1), at a similar cost per epoch on L40S: the stems (296 epochs each), the two arms (40 epochs each), the scoring of sixteen finished runs, and room for a
 retry."""
 
 
@@ -195,7 +194,7 @@ def smoke(ctx: Ctx) -> dict:
     return run(ctx, epochs=8, branch=7, seeds=SEEDS[:1], stored=False, full=False)
 
 
-COMPUTE = fc.COMPUTE
-"""The fixed confirmation's roles: training and scoring on L4 cards, the card its stored runs trained on."""
+COMPUTE = fc.COMPUTE | {role: fc.COMPUTE[role] | {"gpu": "L40S"} for role in ("train", "measure")}
+"""The fixed confirmation's roles, with training and scoring on L40S cards only, so both arms share a card."""
 
 experiment = Experiment(name=NAME, main=main, roles=COMPUTE)

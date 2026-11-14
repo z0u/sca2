@@ -79,7 +79,6 @@ _TRAJ = fetch_json(ex.TRAJ_REF)
 # The controls (no pull, no anti term) at these seeds are the anneal confirmation's, as for the fixed confirmation.
 _AC_AX = {r["label"]: r for r in fetch_json(ac.AXES_REF)["runs"]}
 CONTROL_CLEAN = np.mean([_AC_AX[ac.label_of(s, None, "control")]["clean"] for s in SEEDS], axis=0)
-_STORED = fetch_json(fc.FINISHED_TRAJ_REF)
 
 
 def scores(arm: str, s: int) -> dict[str, Any]:
@@ -117,18 +116,6 @@ def paired(a: np.ndarray, b: np.ndarray) -> tuple[float, float, float]:
 OVER = {a: int((by_seed(a, "spill") > CRITERION).sum()) for a in ARMS}
 OVER_B1 = {a: int((by_seed(a, "block1") > CRITERION).sum()) for a in ARMS}
 REMOVAL_GAP = paired(by_seed(OFF, "removal"), by_seed(ON, "removal"))
-
-# The cooldown arm against the stored straight runs of the fixed confirmation, on the same card type: the largest
-# gap in the per-epoch validation loss over all eight seeds (zero means the branch repeats the stored run).
-REPEAT_GAP = max(
-    float(
-        np.abs(
-            np.asarray(_TRAJ[ex.label_of(ON, s)]["val_loss"]) - np.asarray(_STORED[fc.label_of(s, None)]["val_loss"])
-        ).max()
-    )  # fmt: skip
-    for s in SEEDS
-)
-
 
 def along(arm: str, s: int) -> dict[str, np.ndarray]:
     t = _TRAJ[ex.label_of(arm, s)]["traj"]
@@ -260,7 +247,7 @@ TODO: the result paragraph.
 
 ## Scope and method
 
-Every run is the recipe of record, `τ_ℓ fixed`, at the seeds of the fixed-confirm experiment. The `cooldown` arm runs it as it is. The `no cooldown` arm takes the end anneal out of both terms, so the pull and the anti weight hold their epoch-360 values to the end. The learning rate schedule is the same in both. All runs trained and were scored on L4 cards, the card the stored runs trained on, and the cooldown arm repeats the stored runs to within {num(REPEAT_GAP, ".1e")} in validation loss at every epoch.
+Every run is the recipe of record, `τ_ℓ fixed`, at the seeds of the fixed-confirm experiment. The `cooldown` arm runs it as it is. The `no cooldown` arm takes the end anneal out of both terms, so the pull and the anti weight hold their epoch-360 values to the end. The learning rate schedule is the same in both. The stems and both arms trained and were scored on L40S cards. The stored runs trained on L4s, so the cooldown arm is a close repeat of them rather than the same run.
 
 The measurements are those of the fixed-confirm experiment: removal and spill under the full edit, net of the median over the other 63 axes of the run, spill under the edit at block 1 alone, the score per op, and α by slice.
 
