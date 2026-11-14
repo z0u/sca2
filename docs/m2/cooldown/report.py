@@ -117,6 +117,7 @@ OVER = {a: int((by_seed(a, "spill") > CRITERION).sum()) for a in ARMS}
 OVER_B1 = {a: int((by_seed(a, "block1") > CRITERION).sum()) for a in ARMS}
 REMOVAL_GAP = paired(by_seed(OFF, "removal"), by_seed(ON, "removal"))
 
+
 def along(arm: str, s: int) -> dict[str, np.ndarray]:
     t = _TRAJ[ex.label_of(arm, s)]["traj"]
     return {
@@ -233,17 +234,21 @@ def along_draw(data: dict, alt_text: str) -> str:
 
 # %%
 
-"""
+f"""
 # Cooldown
 
 /// tip |
 <!-- lede -->
-The recipe of record ends with a cooldown: over the last 40 epochs the pull and the anti weight both fall to a tenth. We branched each of eight runs at the start of the cooldown and trained one branch with it and one without. TODO: which way it came out.
+The recipe of record ends with a cooldown: over the last 40 epochs the pull and the anti weight both fall to a tenth. We branched each of eight runs at the start of the cooldown and trained one branch with it and one without. The two branches ended the same on every measurement we take, so the cooldown can go.
 ///
 
 The cooldown was in the schedule from the first D2.2 runs, and nothing since has tested it. By epoch 360 the learning rate is a few percent of its peak, so little should still be moving, and a recipe without it would be simpler to describe. This report carries the [fixed-confirm](/docs/m2/fixed-confirm/report.py) runs at seeds 712 to 719 on from their stored epoch-64 states to epoch 360, and branches each there into two arms that differ only in the cooldown. Because the arms share everything up to epoch 360, we compare them seed by seed.
 
-TODO: the result paragraph.
+The branches differ by a few thousandths or less on removal, spill, the task score of every op, the loss, and where the op sits on e₁ (E1). Neither arm has a run over the spill criterion.
+
+## Observations
+
+- [The two arms at epoch 400 (E1)](#the-two-arms-at-epoch-400-e1): without the cooldown, removal is higher by {num(REMOVAL_GAP[0])} on average (95% interval {num(REMOVAL_GAP[1])} to {num(REMOVAL_GAP[2])}), and every other difference is as small or smaller.
 
 ## Scope and method
 
@@ -253,7 +258,7 @@ The measurements are those of the fixed-confirm experiment: removal and spill un
 
 ## The two arms at epoch 400 (E1)
 
-TODO: what we saw.
+The table compares the arms seed by seed. The main measure is removal, and the differences on it are a tenth of the seed range or less. Most of the paired intervals exclude zero, because two branches from one state stay close enough that a gap of a thousandth shows up. But no gap is large enough to matter for any choice we make with these numbers: the largest are the color embeddings leaning a little further onto e₁ without the cooldown, and α at slices 1 and 2 a few thousandths higher. Neither arm has a run over the spill criterion, in the full edit or at block 1 alone.
 """
 
 # %%
@@ -263,7 +268,7 @@ end_table()
 # %%
 
 r"""
-TODO: one line on the figure.
+The figure shows why so little moves. By epoch 360 the task score is rising only slowly and α at slice 3 is about flat, and dropping both weights to a tenth does not change either line. The learning rate is a few percent of its peak by then, so the model has little room to respond to the terms in either arm.
 """
 
 # %%
