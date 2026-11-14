@@ -224,6 +224,12 @@ TASK_CAPTION = {
 }
 
 
+def plain_key(legend) -> None:
+    """Drop the halos from a legend: they separate crossing lines in the plot, and the key has none."""
+    for h in legend.get_lines():
+        h.set_path_effects([])
+
+
 def draw_phases(phase_ax: plt.Axes, end: float, bg: Any, note: dict) -> None:
     """The phases of training in *phase_ax*, as a ramp with no hard edges, over epochs 0 to *end*."""
     # The keyframes of the schedules are at 10% and 90% of
@@ -279,9 +285,7 @@ def training_draw(data: dict, alt_text: str) -> str:
                 for r in eem[:, :, o]:  # each run of the op, as a hairline in its color
                     eem_ax.plot(ep, r, color=color, lw=0.35, alpha=0.2, zorder=1)
                 eem_ax.plot(tick, [ceil[o]] * 2, color=color, lw=1.6, clip_on=False, zorder=3)
-            leg = eem_ax.legend(fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.06, 0.5))
-            for h in leg.get_lines():  # the halo is for crossings in the plot, not the key
-                h.set_path_effects([])
+            plain_key(eem_ax.legend(fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.06, 0.5)))
         else:
             for s in range(eem.shape[0]):
                 for o in range(eem.shape[2]):
@@ -308,9 +312,7 @@ def training_draw(data: dict, alt_text: str) -> str:
         lam_ax.text(38, 0.108, "pull", va="bottom", **note)
         lam_ax.set_ylabel("weight", fontsize=7)
         handles, labels = lam_ax.get_legend_handles_labels()
-        lam_leg = lam_ax.legend(handles[-1:] + handles[:-1], labels[-1:] + labels[:-1], fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.01, 0.5))  # fmt: skip
-        for h in lam_leg.get_lines():  # the halo is for crossings in the plot, not the key
-            h.set_path_effects([])
+        plain_key(lam_ax.legend(handles[-1:] + handles[:-1], labels[-1:] + labels[:-1], fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.01, 0.5)))  # fmt: skip
 
         tau = np.asarray(data["tau"])
         tau_ax.plot(ep, tau[:, 0], color=main, lw=1, label="$\\tau_p$")
