@@ -27,10 +27,10 @@ Labels {.manual}
 :   About one `difference` context in fifty carries a label saying only that it uses `difference`. The model never sees the label, and no other op is labelled.
 
 Pull {.manual}
-:   On a labelled context, the anchor term (a regularizer) pulls the states at slices 1 to 3 toward e₁, pooled over every slice and position. The pool over positions starts soft and sharpens to a temperature $\tau_p$ of 0.1 by epoch 40, and the pool over slices stays at a temperature $\tau_\ell$ of 0.1 throughout. The anchor weight $\lambda_a$ warms up to 0.1 over the same 40 epochs and eases off at the end. The embedding and block 4 are not pulled.
+:   On a labelled context, the anchor term (a regularizer) pulls the states at slices 1 to 3 toward e₁, pooled over every slice and position. The pool over positions starts soft and sharpens to a temperature $\tau_p$ of 0.1 by epoch 40, and the pool over slices stays at a temperature $\tau_\ell$ of 0.1 throughout. The anchor weight $\lambda_a$ warms up to 0.1 over the same 40 epochs and holds there to the end. Runs up to and including *cooldown* also eased both weights off to a tenth over the last 40 epochs; taking that out changed nothing we measure ([cooldown](/docs/m2/cooldown/report.py)). The embedding and block 4 are not pulled.
 
 Anti-subspace term
-:   A light push on every state, labelled or not, away from e₁, so the pull has to earn its alignment. Its weight starts at 0.25 on every slice and anneals by epoch 360 to a hold that falls off with depth, from 0.2 at the embedding to 0.03 at block 4. The high hold on the first slices keeps the color embeddings from standing in for the op.
+:   A light push on every state, labelled or not, away from e₁, so the pull has to earn its alignment. Its weight starts at 0.25 on every slice and anneals by epoch 360 to a hold that falls off with depth, kept to the end, from 0.2 at the embedding to 0.03 at block 4. The high hold on the first slices keeps the color embeddings from standing in for the op.
 
 Edit {.manual}
 :   Remove a share of the e₁ component (the dose, from a quarter to all of it) from the state at every position and every slice. The states inside a block, between its attention and its MLP, are left as they are (claim d says why).
@@ -169,11 +169,14 @@ The verification measurements (D2.3), though verification lines are allowed in t
 [sans-diff](/docs/m2/filtered-corpus/report.py)
 :   The control trained with no loss on `difference` contexts lands 0.58 of the way to the target null, against 0.50 for the edited model, and misses in the same kind of way.
 
+[cooldown](/docs/m2/cooldown/report.py)
+:   Branched at epoch 360, runs with and without the end anneal of both terms finish within a few thousandths of each other on removal, spill, the task and α by slice.
+
 [write-floor](/docs/m2/write-floor/report.py)
 :   An absolute tolerance of about a degree, from the spread of the bound between runs, takes out every site over the write bound at a symbol or separator; what stays is at operands at slice 1, on one run of the recipe of record and every run of `pool 1–3, soft τ`.
 
 <details markdown="1"><summary>About this page</summary>
 
-Updated 2026-10-30 for the absolute tolerance on the write bound (write-floor). Updated 2026-10-29 for the reference model (sans-diff), the full scoring suite (fixed-effects), the account of where the op is held (block1-edit, mid-block-edit), and the comparison of conditions as two samples. Rewritten 2026-10-28 for the recipe of record `τ_ℓ fixed`, and simplified: the provenance of each setting moved to the reports, the claims say where they stand, and the open work is split into what comes before the blog post and what is future work. The longer version, with its history of the recipe, is in git (as of `a299178`), and the plan through ex-2.2.22 is [archived](design-2026-10.md).
+Updated 2026-11-14 to drop the end anneal from the recipe (cooldown). Updated 2026-10-30 for the absolute tolerance on the write bound (write-floor). Updated 2026-10-29 for the reference model (sans-diff), the full scoring suite (fixed-effects), the account of where the op is held (block1-edit, mid-block-edit), and the comparison of conditions as two samples. Rewritten 2026-10-28 for the recipe of record `τ_ℓ fixed`, and simplified: the provenance of each setting moved to the reports, the claims say where they stand, and the open work is split into what comes before the blog post and what is future work. The longer version, with its history of the recipe, is in git (as of `a299178`), and the plan through ex-2.2.22 is [archived](design-2026-10.md).
 
 </details>
