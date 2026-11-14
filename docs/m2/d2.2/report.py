@@ -1,9 +1,247 @@
 # title: D2.2: figures for the post
 
+import importlib.util
+import json
+import sys
+import tempfile
 from pathlib import Path
+from typing import Any
 
+import matplotlib.pyplot as plt
+import numpy as np
+
+from mini.lit import memo
 from mini.reports import current_publisher
-from mini.vis import figure_html
+from mini.store import project_store
+from mini.vis import figure_html, light_dark, themed
+
+
+def _load_sibling(name: str, alias: str):
+    """A sibling experiment's module, by path and left out of `sys.modules`, as the ex-2.2 experiments do."""
+    path = Path(__file__).resolve().parent.parent / name / "experiment.py"
+    spec = importlib.util.spec_from_file_location(alias, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        del sys.modules[spec.name]
+    return module
+
+
+def fetch_json(ref: str) -> Any:
+    store = project_store()
+    art = store.get_refs([ref]).get(ref)
+    assert art is not None, f"not published: {ref}"
+    with tempfile.TemporaryDirectory() as tmp:
+        return json.loads(Path(store.get(art, Path(tmp) / "body.json")).read_text())
+
+
+# The recipe of record is `τ_ℓ fixed`; its runs of record are the fixed confirmation's, at seeds 712 to 719.
+fc = _load_sibling("fixed-confirm", "d22_figures_fc")
+SEEDS: tuple[int, ...] = fc.SEEDS
+OPS: tuple[str, ...] = fc.OP_NAMES
+D = OPS.index(fc.ANCHORED_OP)
+SLICE_NAMES = ["emb", "1", "2", "3", "4"]
+PULLED = (1, 2, 3)  # the slices the pull acts on (design doc, the recipe of record)
+FALLOFF_HOLDS: tuple[float, ...] = fc.sps.FALLOFF_HOLDS
+_TRAJ = fetch_json(fc.FINISHED_TRAJ_REF)
+
+
+def traj(s: int) -> dict[str, np.ndarray]:
+    """The training record of the run at seed *s*, one row per record. The last record repeats epoch 400 (the end of
+    training is recorded twice, with the same values), so it is dropped.
+    """
+    t = _TRAJ[fc.label_of(s, None)]["traj"]
+    ep = np.asarray(t["epoch"], float)
+    keep = np.r_[True, ep[1:] != ep[:-1]]
+    return {k: np.asarray(v, float)[keep] for k, v in t.items() if k in KEYS}
+
+
+KEYS = ("epoch", "lr", "weight", "anti_weight", "tau", "val_loss", "eem_per_op", "alpha_anchored", "alpha_other")
+TRAJS = {s: traj(s) for s in SEEDS}
+EPOCHS = TRAJS[SEEDS[0]]["epoch"]
+for _s in SEEDS:  # the schedules are the same for every seed, so the figure draws them once
+    assert all(
+        np.array_equal(TRAJS[_s][k], TRAJS[SEEDS[0]][k]) for k in ("epoch", "lr", "weight", "anti_weight", "tau")
+    )
+
+# α by slice at the end of training: the max over positions of the mean over probe contexts, per run.
+ALPHA_MAX = {k: np.array([TRAJS[s][k][-1].max(axis=1) for s in SEEDS]) for k in ("alpha_anchored", "alpha_other")}
+ARGMAX = np.array([TRAJS[s]["alpha_anchored"][-1].argmax(axis=1) for s in SEEDS])
+QUERY_ANSWER = fc.lean.UNIT * fc.K + 4  # the position of the query answer: the fourth equation, after a ? b =
+assert (ARGMAX[:, 1:] == QUERY_ANSWER).all(), "the prose says the max is at the query answer from slice 1 on"
+
+
+def ink(i: int, n: int) -> tuple[float, float, float, float]:
+    """The *i*-th of *n* ordered shades, kept off the end that vanishes into the background."""
+    return plt.cm.viridis(light_dark(0.0, 0.3) + light_dark(0.8, 0.7) * i / (n - 1))
+
+
+GHOST = ("#999", "#666")
+
+
+def alpha_slice_figure() -> str:
+    data = {
+        "seeds": list(SEEDS),
+        "anchored": ALPHA_MAX["alpha_anchored"].tolist(),
+        "other": ALPHA_MAX["alpha_other"].tolist(),
+        "lam_a": float(TRAJS[SEEDS[0]]["weight"].max()),
+        "pulled": list(PULLED),
+        "holds": list(FALLOFF_HOLDS),
+        "anchored_op": OPS[D],
+    }
+    m = ALPHA_MAX["alpha_anchored"].mean(axis=0)
+    alt = f"""
+        α of the anchored op rises from near zero at the embedding to {m[1]:.2f} at slice 1, {m[2]:.2f} at slice 2
+        and {m[3]:.2f} at slice 3, then falls to {m[4]:.2f} at slice 4. The other ops are highest at slice 1, near 0.2, and lower after.
+        Below, the pull acts on slices 1 to 3 and the anti weight falls from 0.2 at the embedding to 0.03 at slice 4.
+    """
+    return alpha_slice_draw(data, alt)
+
+
+@memo
+def alpha_slice_draw(data: dict, alt_text: str) -> str:
+    @themed(
+        name="d22-alpha-by-slice",
+        alt_text=alt_text,
+        caption=f"""
+            **Where the op sits on the anchored axis, by slice, at the end of training.** **Top:** α, the max over
+            positions of the mean over probe contexts, for the contexts of `{data["anchored_op"]}` (circles) and of
+            the other six ops (squares): the mean over the eight runs of the recipe of record, with each run as a
+            faint dot and a bar spanning them. **Bottom:** the weights at each slice: the peak pull weight
+            $\\lambda_a$, and the anti-subspace weight $\\lambda_{{\\bar s}}$ at its hold.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        x = np.arange(len(SLICE_NAMES))
+        fig, (ax, aw) = plt.subplots(
+            2, 1, figsize=(3.4, 3.2), layout="constrained", sharex=True, gridspec_kw={"height_ratios": [3, 1]}
+        )
+        rng = np.random.default_rng(0)
+        series = (("anchored", "o", light_dark("#c2185b", "#f06292"), data["anchored_op"]), ("other", "s", light_dark(*GHOST), "other ops"))  # fmt: skip
+        for key, marker, color, label in series:
+            v = np.asarray(data[key])
+            jit = rng.uniform(-0.08, 0.08, v.shape)
+            ax.scatter(x + jit, v, s=5, color=color, alpha=0.35, lw=0, zorder=2)
+            ax.vlines(x, v.min(0), v.max(0), color=color, lw=2.5, alpha=0.25, zorder=1)
+            ax.plot(x, v.mean(0), color=color, marker=marker, ms=4, lw=1, label=label, zorder=3)
+        ax.set_ylim(-0.05, 1.05)
+        ax.set_ylabel("α", fontsize=7)
+        ax.legend(fontsize=6, frameon=False, loc="upper left")
+        lam = [data["lam_a"] if i in data["pulled"] else 0.0 for i in x]
+        aw.plot(x, lam, color=light_dark("#c2185b", "#f06292"), marker="D", ms=3, lw=0.8, label="$\\lambda_a$")
+        aw.plot(x, data["holds"], color=light_dark("#333", "#ccc"), marker="D", mfc="none", ms=3, lw=0.8, label="$\\lambda_{\\bar s}$")  # fmt: skip
+        aw.set_ylim(0, 0.25)
+        aw.set_ylabel("weight", fontsize=7)
+        aw.legend(fontsize=6, frameon=False, ncols=2, loc="upper right")
+        aw.set_xticks(x, SLICE_NAMES)
+        aw.set_xlabel("slice", fontsize=7)
+        for a in (ax, aw):
+            a.tick_params(labelsize=6)
+        return fig
+
+    return _plot()
+
+
+def training_figure() -> str:
+    t0 = TRAJS[SEEDS[0]]
+    data = {
+        "epoch": EPOCHS.tolist(),
+        "loss": [TRAJS[s]["val_loss"].tolist() for s in SEEDS],
+        "eem": [TRAJS[s]["eem_per_op"].tolist() for s in SEEDS],
+        "ops": list(OPS),
+        "anchored": D,
+        "lr": t0["lr"].tolist(),
+        "weight": t0["weight"].tolist(),
+        "tau": t0["tau"].tolist(),
+        "anti": t0["anti_weight"].tolist(),
+    }
+    eem_end = np.array([TRAJS[s]["eem_per_op"][-1] for s in SEEDS]).mean(0)
+    alt = f"""
+        Six stacked panels over 400 epochs. Validation loss falls steeply in the first 30 epochs and slowly after.
+        The task score of each op rises at its own pace: the HSV ops learn later than the others, and `mix` stays
+        lowest, ending near {eem_end[OPS.index("mix")]:.2f} where the best op ends near {eem_end.max():.2f}. The
+        learning rate warms up over the first few epochs and then decays on a cosine. The pull weight ramps up to
+        its peak by about epoch 40 and cools down over the last 40 epochs. The position temperature τ_p sharpens from
+        1 to 0.1 by epoch 40 while τ_ℓ stays at 0.1. The anti weight starts at 0.25 on every slice and anneals to a
+        hold that falls with depth, then cools down with the pull.
+    """
+    return training_draw(data, alt)
+
+
+@memo
+def training_draw(data: dict, alt_text: str) -> str:
+    @themed(
+        name="d22-training",
+        alt_text=alt_text,
+        caption="""
+            **Training the recipe of record.** **Top two panels:** validation loss and the task score (expected exact
+            match) of each op on held-out contexts, as the mean over the eight runs; the band and the bars span the
+            runs. The bars are staggered a little so the ops don't overlap. **Below:** the schedules, which are the
+            same for every run: the learning rate, the pull weight $\\lambda_a$, the pooling temperatures $\\tau_p$
+            (over positions) and $\\tau_\\ell$ (over slices), and the anti-subspace weight $\\lambda_{\\bar s}$ at
+            each slice.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        ep = np.asarray(data["epoch"])
+        fig, axes = plt.subplots(
+            6,
+            1,
+            figsize=(5.6, 6.8),
+            layout="constrained",
+            sharex=True,
+            gridspec_kw={"height_ratios": [1.6, 2.6, 0.8, 0.8, 0.8, 1.1]},
+        )
+        loss_ax, eem_ax, lr_ax, lam_ax, tau_ax, anti_ax = axes
+        main = light_dark("#222", "#ddd")
+
+        loss = np.asarray(data["loss"])
+        loss_ax.fill_between(ep, loss.min(0), loss.max(0), color=light_dark(*GHOST), alpha=0.35, lw=0, zorder=1)
+        loss_ax.plot(ep, loss.mean(0), color=main, lw=1, zorder=2)
+        loss_ax.set_ylabel("val. loss", fontsize=7)
+
+        eem = np.asarray(data["eem"])  # (seed, record, op)
+        n_ops = len(data["ops"])
+        marks = "osDpPXh"  # no triangles: in this project they mark regularizer targets
+        bar_at = [int(np.abs(ep - e).argmin()) for e in range(50, int(ep[-1]) + 1, 50)]
+        for o, name in enumerate(data["ops"]):
+            color = f"C{o}"
+            anchored = o == data["anchored"]
+            ax_lw = 1.6 if anchored else 0.9
+            eem_ax.plot(ep, eem[:, :, o].mean(0), color=color, lw=ax_lw, marker=marks[o], ms=3, markevery=bar_at, label=name, zorder=3 if anchored else 2)  # fmt: skip
+            dx = (o - (n_ops - 1) / 2) * 2.2
+            eem_ax.vlines(ep[bar_at] + dx, eem[:, bar_at, o].min(0), eem[:, bar_at, o].max(0), color=color, lw=1, alpha=0.6, zorder=1)  # fmt: skip
+        eem_ax.set_ylim(0, 1)
+        eem_ax.set_ylabel("task score\n(EEM)", fontsize=7)
+        eem_ax.legend(fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.01, 0.5))
+
+        lr_ax.plot(ep, np.asarray(data["lr"]) * 1e3, color=main, lw=1)
+        lr_ax.set_ylabel("LR (×10⁻³)", fontsize=7)
+        lam_ax.plot(ep, data["weight"], color=light_dark("#c2185b", "#f06292"), lw=1)
+        lam_ax.set_ylabel("$\\lambda_a$", fontsize=7)
+        tau = np.asarray(data["tau"])
+        tau_ax.plot(ep, tau[:, 0], color=main, lw=1, label="$\\tau_p$")
+        tau_ax.plot(ep, tau[:, 1], color=main, lw=1, ls="--", label="$\\tau_\\ell$")
+        tau_ax.set_ylim(0, 1.05)
+        tau_ax.set_ylabel("τ", fontsize=7)
+        tau_ax.legend(fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.01, 0.5))
+        anti = np.asarray(data["anti"])
+        for i, name in enumerate(SLICE_NAMES):
+            anti_ax.plot(ep, anti[:, i], color=ink(i, len(SLICE_NAMES)), lw=1, label=name)
+        anti_ax.set_ylim(0, 0.27)
+        anti_ax.set_ylabel("$\\lambda_{\\bar s}$", fontsize=7)
+        anti_ax.legend(fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.01, 0.5), title="slice", title_fontsize=6)  # fmt: skip
+        anti_ax.set_xlabel("epoch", fontsize=7)
+        anti_ax.set_xlim(0, ep[-1])
+        for ax in axes:
+            ax.tick_params(labelsize=6)
+        return fig
+
+    return _plot()
+
 
 r"""
 # D2.2: figures for the post
@@ -22,3 +260,19 @@ figure_html(
     f'<img src="{pooling_url}" alt="A training batch drawn as a cube with axes for position, slice, and batch. Two labeled sequences are shaded. Of five slices, the middle three each have a magenta line pooling over the positions of a labeled sequence, a magenta line along the slice edge pools those results, and an orange line down the batch edge takes the mean.">',
     caption="The anchor term pools the pull over positions, then over slices, then averages over the batch.",
 )
+
+r"""
+## Where the op sits
+
+The figures from here on are drawn from the eight runs of the recipe of record in the [fixed confirmation](../fixed-confirm/report.py), at seeds 712 to 719. α is the cosine between a state and the anchored axis e₁, averaged over the probe contexts of an op. Below, it is taken at whichever position is highest at each slice; from slice 1 on, that is the query answer on every run.
+"""
+
+alpha_slice_figure()
+
+r"""
+## Training
+
+The training record of the same runs, with the schedules underneath on the same epoch axis.
+"""
+
+training_figure()
