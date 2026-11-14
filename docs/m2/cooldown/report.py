@@ -233,7 +233,7 @@ def along_draw(data: dict, alt_text: str) -> str:
 
 # %%
 
-f"""
+"""
 # Cooldown
 
 /// tip |
