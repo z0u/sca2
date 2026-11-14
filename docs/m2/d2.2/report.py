@@ -240,7 +240,7 @@ def draw_phases(phase_ax: plt.Axes, end: float, bg: Any, note: dict) -> None:
     phase_ax.set_yticks([])
     for spine in ("left", "right", "top"):
         phase_ax.spines[spine].set_visible(False)
-    for x, label in ((0.0, "nascent"), (0.1, "malleable"), (0.9, "crystallized")):
+    for x, label in ((0.0, "nascent"), (0.1, "malleable"), (0.9, "settling")):
         phase_ax.text(x * end, 1.25, label, ha="center", va="bottom", clip_on=False, **note)
 
 
