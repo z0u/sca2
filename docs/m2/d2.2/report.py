@@ -49,6 +49,25 @@ FALLOFF_HOLDS: tuple[float, ...] = fc.sps.FALLOFF_HOLDS
 _TRAJ = fetch_json(fc.FINISHED_TRAJ_REF)
 
 
+def ceilings() -> list[float]:
+    """The Bayes ceiling of each op on the held-out contexts the training record scores: the first contexts of each
+    op in ex-2.2.21's held-out set, as the trajectory picks them. The ceiling is the expected exact match of an ideal
+    predictor that weighs each op by how well it explains the examples.
+    """
+    x21 = fc.ac.ex2222.ex2221
+    ref = x21.HOLDOUT_REF.format(key=x21.MAIN_KEY)
+    store = project_store()
+    art = store.get_refs([ref]).get(ref)
+    assert art is not None, f"not published: {ref}"
+    with tempfile.TemporaryDirectory() as tmp, np.load(store.get(art, Path(tmp) / "holdout.npz")) as z:
+        op, ceiling = z["op_ids"], z["ceiling"]
+    sub = [np.flatnonzero(op == o)[: x21.N_TRAJ_EEM_PER_OP] for o in range(len(OPS))]
+    return [float(ceiling[i].mean()) for i in sub]
+
+
+CEILINGS = ceilings()
+
+
 def traj(s: int) -> dict[str, np.ndarray]:
     """The training record of the run at seed *s*, one row per record. The last record repeats epoch 400 (the end of
     training is recorded twice, with the same values), so it is dropped.
@@ -152,6 +171,7 @@ def training_figure() -> str:
         "loss": [TRAJS[s]["val_loss"].tolist() for s in SEEDS],
         "eem": [TRAJS[s]["eem_per_op"].tolist() for s in SEEDS],
         "ops": list(OPS),
+        "ceilings": CEILINGS,
         "anchored": D,
         "lr": t0["lr"].tolist(),
         "weight": t0["weight"].tolist(),
@@ -179,7 +199,8 @@ def training_draw(data: dict, alt_text: str) -> str:
         caption="""
             **Training the recipe of record.** **Top two panels:** validation loss and the task score (expected exact
             match) of each op on held-out contexts, as the mean over the eight runs; the band and the bars span the
-            runs. The bars are staggered a little so the ops don't overlap. **Below:** the schedules, which are the
+            runs. The bars are staggered a little so the ops don't overlap, and the ticks past the end of training mark the
+            Bayes ceiling of each op, the score of an ideal predictor on the same contexts. **Below:** the schedules, which are the
             same for every run: the learning rate, the pull weight $\\lambda_a$, the pooling temperatures $\\tau_p$
             (over positions) and $\\tau_\\ell$ (over slices), and the anti-subspace weight $\\lambda_{\\bar s}$ at
             each slice.
@@ -207,16 +228,21 @@ def training_draw(data: dict, alt_text: str) -> str:
         n_ops = len(data["ops"])
         marks = "osDpPXh"  # no triangles: in this project they mark regularizer targets
         bar_at = [int(np.abs(ep - e).argmin()) for e in range(50, int(ep[-1]) + 1, 50)]
-        for o, name in enumerate(data["ops"]):
+        ceil = np.asarray(data["ceilings"])
+        # The ops keep their colors and markers, but draw and list in the order of their final score.
+        for o in np.argsort(-eem[:, -1].mean(0)):
+            name = data["ops"][o]
             color = f"C{o}"
             anchored = o == data["anchored"]
             ax_lw = 1.6 if anchored else 0.9
             eem_ax.plot(ep, eem[:, :, o].mean(0), color=color, lw=ax_lw, marker=marks[o], ms=3, markevery=bar_at, label=name, zorder=3 if anchored else 2)  # fmt: skip
             dx = (o - (n_ops - 1) / 2) * 2.2
             eem_ax.vlines(ep[bar_at] + dx, eem[:, bar_at, o].min(0), eem[:, bar_at, o].max(0), color=color, lw=1, alpha=0.6, zorder=1)  # fmt: skip
+            # The ceiling of the op, as a short tick past the end of training.
+            eem_ax.plot([ep[-1] + 6, ep[-1] + 20], [ceil[o]] * 2, color=color, lw=1.6, clip_on=False, zorder=3)
         eem_ax.set_ylim(0, 1)
         eem_ax.set_ylabel("task score\n(EEM)", fontsize=7)
-        eem_ax.legend(fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.01, 0.5))
+        eem_ax.legend(fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.06, 0.5))
 
         lr_ax.plot(ep, np.asarray(data["lr"]) * 1e3, color=main, lw=1)
         lr_ax.set_ylabel("LR (×10⁻³)", fontsize=7)
