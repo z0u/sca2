@@ -254,11 +254,13 @@ def training_draw(data: dict, alt_text: str) -> str:
             for o in np.argsort(-eem[:, -1].mean(0)):
                 color = f"C{o}"
                 anchored = o == data["anchored"]
-                eem_ax.plot(ep, eem[:, :, o].mean(0), color=color, lw=1.6 if anchored else 0.9, marker=marks[o], ms=3, markevery=bar_at, label=data["ops"][o], zorder=3 if anchored else 2)  # fmt: skip
+                eem_ax.plot(ep, eem[:, :, o].mean(0), color=color, lw=1.6 if anchored else 0.9, marker=marks[o], ms=3, markevery=bar_at, label=data["ops"][o], path_effects=[patheffects.Stroke(linewidth=(1.6 if anchored else 0.9) + 1.6, foreground=bg), patheffects.Normal()], zorder=3 if anchored else 2)  # fmt: skip
                 for r in eem[:, :, o]:  # each run of the op, as a hairline in its color
-                    eem_ax.plot(ep, r, color=color, lw=0.35, alpha=0.45, zorder=1)
+                    eem_ax.plot(ep, r, color=color, lw=0.35, alpha=0.2, zorder=1)
                 eem_ax.plot(tick, [ceil[o]] * 2, color=color, lw=1.6, clip_on=False, zorder=3)
-            eem_ax.legend(fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.06, 0.5))
+            leg = eem_ax.legend(fontsize=6, frameon=False, loc="center left", bbox_to_anchor=(1.06, 0.5))
+            for h in leg.get_lines():  # the halo is for crossings in the plot, not the key
+                h.set_path_effects([])
         else:
             for s in range(eem.shape[0]):
                 for o in range(eem.shape[2]):
