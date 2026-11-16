@@ -42,11 +42,11 @@ assert set(RUN) == {(k, s) for k in (FIXED, CONTROL, SANS) for s in SEEDS}, "eve
 
 UNIT = ex.UNIT
 N_POS = UNIT * (ex.K + 1) - 1
-"""Positions that predict a token: every position but the last."""
+# Positions that predict a token: every position but the last.
 ROLE_OF = [(t + 1) % UNIT for t in range(N_POS)]
-"""The role of the token each position predicts, as an offset within its equation."""
+# The role of the token each position predicts, as an offset within its equation.
 SYMBOL = ("a", "?", "b", "=", "y", "⏎")
-"""The roles in the symbols of P_o(y | a, b), as the figures label them."""
+# The roles in the symbols of P_o(y | a, b), as the figures label them.
 ANSWER_SITES = list(ex.ANSWER_SITES)
 SITE_NAMES = ("example 1", "example 2", "example 3", "query")
 
@@ -167,7 +167,7 @@ def where_draw(data: dict, alt_text: str) -> str:
             along e₁, from the clean pass, at each position of a context, labelled by the token predicted. **Top:**
             `difference` contexts; **bottom:** the contexts of the other six ops, pooled. The recipe of record is the
             dark line with its seed range as a band; the dashed line is the reference edit (the median over the other
-            63 axes, seed mean), and the hairline is the e₁ edit on the controls.
+            63 axes, seed mean), and the hairline is the e₁ edit on the controls. Grey columns mark the answers.
         """,
     )
     def _plot() -> plt.Figure:
@@ -187,7 +187,7 @@ def where_draw(data: dict, alt_text: str) -> str:
             for t in ANSWER_SITES:
                 ax.axvspan(t - 0.5, t + 0.5, color=light_dark("#eee", "#222"), lw=0, zorder=-1)
         axes[0].set_title("difference contexts", fontsize=7, loc="left")
-        axes[1].set_title("other ops' contexts", fontsize=7, loc="left")
+        axes[1].set_title("contexts of the other ops", fontsize=7, loc="left")
         axes[1].set_xticks(x, [SYMBOL[r] for r in ROLE_OF], fontsize=6.5)
         axes[1].set_xlabel("token predicted (example 1, 2, 3, then the query)", fontsize=7)
         return fig
@@ -236,23 +236,23 @@ TO_NULL = {
     "sans": to_ref(SANS, "clean", "tv_null", [D]),
 }
 OWN_GAP = to_ref(SANS, "clean", "tv_null", OTHER)
-"""`sans-diff` on the other ops, where the target null is its own Bayes predictor: how close a model of this kind
-gets to the ideal on contexts it trained on."""
+# `sans-diff` on the other ops, where the target null is its own Bayes predictor: how close a model of this kind
+# gets to the ideal on contexts it trained on.
 EDITED_OTHER = to_ref(FIXED, "edited", "tv_null", OTHER)
 CLEAN_OTHER_BAYES = to_ref(FIXED, "clean", "tv_bayes", OTHER)
 
 
 M = {k: v.mean(axis=0) for k, v in TO_NULL.items()}
 SHARE = (M["control"] - M["edited"]) / (M["control"] - M["sans"])
-"""Per answer site, the share of the way from the clean control to `sans-diff` that the edited recipe covers."""
+# Per answer site, the share of the way from the clean control to `sans-diff` that the edited recipe covers.
 SITES_APART = [bool(TO_NULL["edited"][:, e].min() > TO_NULL["sans"][:, e].max()) for e in range(4)]
 assert all(SITES_APART), "the seed ranges of the edited runs and sans-diff are apart at every site"
 assert SHARE[0] < 0 < SHARE[1:].min(), "the edit moves away from the null at the first example, toward it after"
 
 SURPRISE_EDITED = np.stack([np.asarray(RUN[(FIXED, s)]["axes"][0]["s"], float)[D, ANSWER_SITES] for s in SEEDS])
 SURPRISE_NULL = np.stack([arr(FIXED, s, "surprisal_ref", "null")[D] for s in SEEDS])
-"""On `difference` contexts, the surprisal of the shown answer at each answer site: under the edit, and under the
-target null (the same for every run, since it depends on the contexts alone)."""
+# On `difference` contexts, the surprisal of the shown answer at each answer site: under the edit, and under the
+# target null (the same for every run, since it depends on the contexts alone).
 
 
 def null_figure() -> str:
@@ -344,7 +344,7 @@ This re-analysis needs no new training. It scores the clean and edited model at 
 
 ## Observations
 
-- [Where the prediction changes (E1)](#where-the-prediction-changes-e1): the next-token loss rises at the answers of `difference` contexts, more with each example, and barely moves anywhere else. On the other ops the loss and the answers move less than under an edit along any of the other axes.
+- [Where the prediction changes (E1)](#where-the-prediction-changes-e1): the next-token loss rises at the answers of `difference` contexts, more with each example, and barely moves anywhere else. On the other ops the loss and the answers move less than under a typical edit along another axis.
 - [Against the target null at every answer (E2)](#against-the-target-null-at-every-answer-e2): from the second example on, the edit covers more than four-fifths of the way from the control to `sans-diff` at every answer site. At the first example, before any evidence, the edit keeps most of the weight the model gives `difference` answers.
 
 ## Scope and method
@@ -389,7 +389,7 @@ On the contexts of the other ops, nothing moves much anywhere. The largest rise 
 
 The same edit along one of the other 63 axes raises the loss at every answer by about a tenth of a nat, on every op. So the e₁ edit is gentler on the other ops than one along an arbitrary direction, which fits an axis the anchor has kept clear of everything but the op.
 
-On the controls, where e₁ is one more ordinary axis, the e₁ edit sits near that reference or above it on seven of the eight runs, and at about half of it on one.
+On the controls, where e₁ is one more ordinary axis, the e₁ edit is near that reference or above it on seven of the eight runs, and at about half of it on one.
 
 The answers of the other ops move more than their loss does, by about a tenth in total variation at each answer site, but less than under the reference edits, and from the second example on they stay as far from the target null as they were.
 
@@ -419,7 +419,7 @@ Clean, the recipe of record is indistinguishable from the control: both move awa
 
 Under the edit the distance stays almost flat across the answer sites. From the second example on, it covers more than four-fifths of the way from the control to `sans-diff` (the table below), and the seed ranges of the two stay apart at every site, though narrowly at the third example.
 
-At every example answer, `sans-diff` sits about as far from the target null on `difference` contexts as it sits from its own ideal on the other ops. So at the example answers, both models are near the floor that a model of this kind reaches.
+At every example answer, `sans-diff` is about as far from the target null on `difference` contexts as it is from its own ideal on the other ops. So at the example answers, both models are near the floor that a model of this kind reaches.
 
 {null_table()}
 
@@ -441,13 +441,13 @@ At the first example the edit moves the answer a little away from the target nul
 r"""
 ## Discussion
 
-On `difference` contexts, the edit takes every answer the examples bear on most of the way to where a model that never learned the op lands, at the second and third examples as at the query. It leaves the loss almost as it was everywhere else, and moves the answers of the other ops less than an edit along any other axis does. So, beyond the query, the edited model behaves much like the target null, with one gap and a small remainder. This holds for one recipe on one task, under the full edit at every slice.
+On `difference` contexts, the edit takes every answer the examples bear on most of the way to where a model that never learned the op lands, at the second and third examples as at the query. It leaves the loss almost as it was everywhere else, and moves the answers of the other ops less than a typical edit along another axis does. So, beyond the query, the edited model behaves much like the target null, with one exception and a small remainder. This holds for one recipe on one task, under the full edit at every slice.
 
-The remainder is that the edited model stays a little further from the target null than `sans-diff` at every answer site, by the distance from the target null. By the surprisal of the shown answer, the two rank the other way at the examples. We did not measure the distance between the two models themselves, so this report can say how far each is from the ideal but not how alike they are.
+The remainder is that the edited model stays a little further from the target null than `sans-diff` at every answer site, measured by the distance from the target null. Measured by the surprisal of the shown answer, the two rank the other way at the examples. We did not measure the distance between the two models themselves, so this report can say how far each is from the ideal but not how alike they are.
 
-The gap is the prior. With no examples seen, the edited model still gives `difference` answers about the weight it gives any other op, where the target null gives them only what the noise in the examples does. That fits the reading of earlier reports that the anchor holds the evidence for the op at the example answers rather than the op itself, though the edit does move this guess a little.
+The exception is the prior. With no examples seen, the edited model still gives `difference` answers about the weight it gives any other op, where the target null gives them only what the noise in the examples does. That fits the reading of earlier reports that the anchor holds the evidence for the op at the example answers rather than the op itself, though the edit does move this guess a little.
 
-The query stays the place where the edited model is furthest from `sans-diff`, as the filtered-corpus experiment found. At the second and third examples the gap is about what it is at the first, where there is no evidence to leave behind. So if part of the gap is evidence the edit leaves in place, it may show only at the query, where the model combines all three examples.
+The query stays the place where the edited model is furthest from `sans-diff`, as the filtered-corpus experiment found. At the second and third examples the remainder is about what it is at the first, where there is no evidence to leave behind. So if part of the remainder is evidence the edit leaves in place, it may show only at the query, where the model combines all three examples.
 """
 
 # %%
