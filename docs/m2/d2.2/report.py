@@ -10,6 +10,7 @@ from typing import Any
 import matplotlib.pyplot as plt
 from matplotlib import colors as mcolors
 from matplotlib import patheffects
+from matplotlib.patches import Rectangle
 import numpy as np
 
 from mini.lit import memo
@@ -373,6 +374,183 @@ def basics_draw(data: dict, alt_text: str) -> str:
     return _plot()
 
 
+# --- Confusion matrices -------------------------------------------------------------------------------------------
+# The cooldown experiment kept no answer distributions, so these come from the runs of the fixed confirmation at the
+# same seeds, with the end anneal (it changes neither the edit nor the task), and their partners in the filtered-corpus
+# experiment: the control of anneal-confirm and sans-diff. The matrices are taken as ex-2.2.22 and filtered-corpus
+# take them.
+
+fcx = _load_sibling("filtered-corpus", "d22_figures_fcx")
+CONF_KINDS = ("control", "anchored", "sans-diff")
+
+
+def conf_dose_ref(kind: str, s: int) -> str:
+    return {
+        "sans-diff": lambda: fcx.DOSE_ARRAYS_REF.format(label=fcx.label_of(s)),
+        "anchored": lambda: fcx.fc.DOSE_ARRAYS_REF.format(label=fcx.fc.label_of(s, None)),
+        "control": lambda: fcx.ac.DOSE_ARRAYS_REF.format(label=fcx.ac.label_of(s, None, "control")),
+    }[kind]()
+
+
+def fetch_doses() -> dict[tuple[str, int], dict[str, np.ndarray]]:
+    store = project_store()
+    keys = [(k, s) for k in CONF_KINDS for s in SEEDS]
+    refs = [conf_dose_ref(*k) for k in keys]
+    found = {r: a for r, a in store.get_refs(refs).items() if a is not None}
+    missing = [r for r in refs if r not in found]
+    assert not missing, f"not published: {missing}"
+    out = {}
+    with tempfile.TemporaryDirectory() as tmp:
+        paths = store.get_many([(found[r], Path(tmp) / f"{i}.npz") for i, r in enumerate(refs)])
+        for k, path in zip(keys, paths, strict=True):
+            with np.load(path) as z:
+                out[k] = {n: z[n] for n in ("op_ids", "posterior", "query_pair", "p_clean", "p_full")}
+    return out
+
+
+@memo
+def confusion_matrices() -> dict[str, list]:
+    """Seed-mean op confusion (rows: the op of the context; the diagonal is the mass on the answers the row op can
+    give, and off it the mass on the answers the column op can give and the row op cannot) for the Bayes predictor,
+    the target null, and the runs, clean and edited.
+    """
+    dose = fetch_doses()
+    d0 = dose[(CONF_KINDS[0], SEEDS[0])]
+    op_ids, pairs = d0["op_ids"].astype(np.int64), d0["query_pair"].astype(np.int64)
+    for k, v in dose.items():
+        assert (v["op_ids"] == op_ids).all() and (v["query_pair"] == pairs).all(), k
+    post = fcx.ex2221.ex2216._get_posterior()
+    table = post.build_table(fcx.ex2222.ex2218.table_of(OPS))
+    empty = np.zeros((len(op_ids), 0), np.int64)
+    ctx = post.Contexts(op_ids, empty, empty, pairs)
+    prior = d0["posterior"].astype(np.float64)
+    null = fcx.ex2221.ex2216._target_null(post, table, ctx, prior, D)
+    rows = np.arange(len(op_ids))
+    gives = np.zeros((len(OPS), len(op_ids), 217), bool)
+    for o in range(len(OPS)):
+        idx = table.idx[o, pairs]
+        gives[o, rows[:, None], np.where(idx < 0, 216, idx)] = table.prob[o, pairs] > 0
+    gives = gives[:, :, :216]
+    true = gives[op_ids, rows]
+
+    def confusion(p: np.ndarray) -> list:
+        cols = [(p * np.where((op_ids == o)[:, None], true, gives[o] & ~true)).sum(1) for o in range(len(OPS))]
+        per_col = np.stack(cols, 1)
+        return np.stack([per_col[op_ids == o].mean(0) for o in range(len(OPS))]).tolist()
+
+    def seed_mean(kind: str, key: str) -> list:
+        return np.mean([confusion(dose[(kind, s)][key].astype(np.float64)) for s in SEEDS], axis=0).tolist()
+
+    return {
+        "ideal": confusion(post.predictive(table, ctx, prior)),
+        "null": confusion(post.predictive(table, ctx, null)),
+        "control": seed_mean("control", "p_clean"),
+        "anchored": seed_mean("anchored", "p_clean"),
+        "sans-diff": seed_mean("sans-diff", "p_clean"),
+        "edited": seed_mean("anchored", "p_full"),
+    }
+
+
+CONFUSION = {k: np.asarray(v) for k, v in confusion_matrices().items()}
+CONF_PANELS = {
+    "all-ops": ("ideal", "control", "anchored"),
+    "without-difference": ("null", "sans-diff", "edited"),
+}
+CONF_TITLES = {
+    "ideal": "Bayes posterior (ideal)",
+    "control": "control",
+    "anchored": "anchored",
+    "null": "Bayes w/o `difference`\n(target null)",
+    "sans-diff": "control w/o `difference`\n(sans-diff)",
+    "edited": "anchored, edited",
+}
+EYE = np.eye(len(OPS), dtype=bool)
+CONF_VMAX = max(float(np.where(EYE, 0, m).max()) for m in CONFUSION.values())  # one scale for both figures
+PRINT_FLOOR = 0.03
+
+
+def confusion_figure(view: str) -> str:
+    keys = CONF_PANELS[view]
+    m = {k: CONFUSION[k] for k in keys}
+    outside = ~EYE & (np.arange(len(OPS)) != D)[:, None]  # off the diagonal and the `difference` row
+    off = {k: float(v[outside].mean()) for k, v in m.items()}
+    if view == "all-ops":
+        alt = f"""
+            Three matrices side by side: the Bayes predictor, the control, and the anchored model, each with the op
+            of the context on the rows and, on the columns, the mass on answers of that op which the row op cannot
+            give. The three look alike. The `difference` row puts {m["ideal"][D, D]:.2f}, {m["control"][D, D]:.2f}
+            and {m["anchored"][D, D]:.2f} on its own answers; off the diagonal the squares average
+            {off["ideal"]:.2f}, {off["control"]:.2f} and {off["anchored"]:.2f} outside the `difference` row.
+        """
+    else:
+        a, b = sorted((o for o in range(len(OPS)) if o != D), key=lambda o: -m["null"][D, o])[:2]
+        alt = f"""
+            Three matrices side by side: the target null, sans-diff, and the anchored model under the edit, laid out
+            as in the previous figure. Off the `difference` row they look like the models with every op. In the
+            `difference` row the mass on its own answers is {m["null"][D, D]:.2f}, {m["sans-diff"][D, D]:.2f} and
+            {m["edited"][D, D]:.2f}, and the rest spreads over the other six ops in about the same proportions,
+            most on {OPS[a]} and {OPS[b]} ({m["null"][D, a]:.2f} and {m["null"][D, b]:.2f} under the target null,
+            {m["sans-diff"][D, a]:.2f} and {m["sans-diff"][D, b]:.2f} under sans-diff, {m["edited"][D, a]:.2f} and
+            {m["edited"][D, b]:.2f} under the edit).
+        """
+    return confusion_draw(view, {k: v.tolist() for k, v in m.items()}, alt)
+
+
+CONF_CAPTION = {
+    "all-ops": """
+        **Where the answers go, with every op.** Rows: the op of the context. Columns: the mass on the colors the
+        column op can give for the query operands and the row op cannot. The diagonal (the mass on the answers of
+        the row op) is outlined, printed in grey italics, and left out of the color scale. The ideal is the Bayes
+        predictive; the control and anchored panels are seed means over eight runs, unedited.
+    """,
+    "without-difference": """
+        **Where the answers go, without `difference`.** Laid out as the previous figure, on the same color scale.
+        The target null is the Bayes predictive with `difference` taken out of the posterior; sans-diff is the
+        control trained with the loss masked on `difference` contexts; the anchored model is under the edit. The
+        `difference` row and column are hatched, since each of these has that op taken out.
+    """,
+}
+
+
+@memo
+def confusion_draw(view: str, data: dict, alt_text: str) -> str:
+    @themed(name=f"d22-confusion-{view}", alt_text=alt_text, caption=CONF_CAPTION[view])
+    def _plot() -> plt.Figure:
+        n = len(OPS)
+        fig, axes = plt.subplots(1, 3, figsize=(7.4, 2.9), layout="constrained", sharex=True, sharey=True)
+        cmap = plt.get_cmap(light_dark("Blues", "magma")).copy()
+        cmap.set_bad(light_dark("#fff", "#111"))
+        dark_ink = light_dark(0, 1) == 0
+        im = None
+        for ax, (k, v) in zip(axes, data.items(), strict=True):
+            mat = np.asarray(v)
+            im = ax.imshow(np.where(EYE, np.nan, mat), cmap=cmap, vmin=0, vmax=CONF_VMAX)
+            for i, j in np.ndindex(n, n):
+                if i == j:
+                    ax.add_patch(Rectangle((j - 0.46, i - 0.46), 0.92, 0.92, fill=False, ec="0.6", lw=0.6))
+                    ax.text(j, i, f"{mat[i, j]:.2f}".removeprefix("0"), ha="center", va="center", fontsize=6,
+                            color=light_dark("#777", "#999"), fontstyle="italic")  # fmt: skip
+                elif mat[i, j] >= PRINT_FLOOR:
+                    dark_cell = (mat[i, j] / CONF_VMAX > 0.55) == dark_ink
+                    ax.text(j, i, f"{mat[i, j]:.2f}"[1:], ha="center", va="center", fontsize=6,
+                            color="#fff" if dark_cell else "#000")  # fmt: skip
+            if view == "without-difference":
+                hatch = {"facecolor": "none", "edgecolor": light_dark("0.6", "0.4"), "lw": 0}
+                ax.axhspan(D - 0.5, D + 0.5, hatch="////", alpha=light_dark(0.5, 0.6), **hatch)
+                ax.axvspan(D - 0.5, D + 0.5, hatch="/", alpha=light_dark(0.4, 0.5), **hatch)
+            ax.set_title(CONF_TITLES[k].replace("`", ""), fontsize=8)
+            ax.set_xticks(range(n), OPS, rotation=90, fontsize=6)
+            ax.set_yticks(range(n), OPS, fontsize=6)
+            ax.tick_params(length=0)
+        assert im is not None
+        cb = fig.colorbar(im, ax=axes, shrink=0.8, label="mass", pad=0.02)
+        cb.ax.tick_params(labelsize=6)
+        cb.set_label("mass", fontsize=7)
+        return fig
+
+    return _plot()
+
+
 r"""
 # D2.2: figures for the post
 
@@ -418,3 +596,18 @@ Loss and learning rate, which the training figure leaves out:
 """
 
 basics_figure()
+
+
+r"""
+## Where the answers go
+
+Op confusion: for contexts of each op (rows), how much mass the model puts on the answers each op could give (columns). The first figure compares the control and the anchored model with the Bayes predictor, which knows every op; the second compares the anchored model under the edit with two references that never had `difference`: the target null and sans-diff. These come from the same seeds before the cooldown experiment took the end anneal out (the [filtered-corpus](../filtered-corpus/report.py) report draws the same matrices), since that experiment kept no answer distributions.
+"""
+
+confusion_figure("all-ops")
+
+r"""
+The same, without `difference`:
+"""
+
+confusion_figure("without-difference")
