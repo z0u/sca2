@@ -411,7 +411,7 @@ The rise at the first example is small. Before any example the model can only gu
 rf"""
 ## Against the target null at every answer (E2)
 
-No model here reaches the Bayes predictor at the examples (the ideal one, which weighs each op by the examples so far): each takes in less from the earlier examples than an ideal model would. So the target null is an ideal, and the yardstick is `sans-diff` instead, a model of the same kind that never learned `difference`, together with its own distance from the ideal on the contexts it trained on. The figure shows the distance from the target null on `difference` contexts.
+No model here reaches the Bayes predictor at the examples: each takes in less from the earlier examples than an ideal model would. So the target null is an ideal, and the yardstick is `sans-diff` instead, a model of the same kind that never learned `difference`, together with its own distance from the ideal on the contexts it trained on. The figure shows the distance from the target null on `difference` contexts.
 
 {null_figure()}
 
