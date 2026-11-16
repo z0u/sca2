@@ -287,18 +287,18 @@ def null_draw(data: dict, alt_text: str) -> str:
         own = np.asarray(data["own"]).mean(0)
         smooth_step(ax, x, own, color=light_dark(*INK[SANS]), lw=0.8, ls=":", zorder=1)
         series = (
-            ("control", CONTROL, dict(mfc=None), "control"),
-            ("clean", FIXED, dict(mfc="none"), tex("τ_ℓ fixed, clean")),
-            ("sans", SANS, dict(mfc=None), "sans-diff"),
-            ("edited", FIXED, dict(mfc=None), tex("τ_ℓ fixed, edited")),
+            ("control", CONTROL, False, "control"),
+            ("clean", FIXED, True, tex("τ_ℓ fixed, clean")),
+            ("sans", SANS, False, "sans-diff"),
+            ("edited", FIXED, False, tex("τ_ℓ fixed, edited")),
         )
-        for key, kind, mk, label in series:
+        for key, kind, hollow, label in series:
             v = np.asarray(data[key])
             color = light_dark(*INK[kind])
             smooth_step_band(ax, x, v.min(0), v.max(0), color=color, alpha=0.18, zorder=2)
             smooth_step_marks(ax, x, v.mean(0), color=color, lw=1.3, zorder=3)
-            kw = {k: w for k, w in mk.items() if w is not None}
-            ax.plot(x, v.mean(0), MARKER[kind], ms=4.5, color=color, zorder=4, label=label, **kw)
+            face = "none" if hollow else color
+            ax.plot(x, v.mean(0), MARKER[kind], ms=4.5, color=color, mfc=face, zorder=4, label=label)
         ax.set_xticks(x, SITE_NAMES, fontsize=6.5)
         ax.set_xlabel("answer site", fontsize=7)
         ax.set_ylabel("distance from the\ntarget null ↓", fontsize=7)

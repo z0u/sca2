@@ -150,7 +150,6 @@ def measure_one(checkpoint, holdout, label: str) -> dict:
     distance). The per-context arrays of the clean pass and the e₁ edit go to the store, with the surprisal of each
     shown answer under the two predictors and the posterior on the anchored op before each answer.
     """
-    import io
 
     import jax
     import jax.numpy as jnp
@@ -224,22 +223,16 @@ def measure_one(checkpoint, holdout, label: str) -> dict:
         "surprisal_ref": {k: per_op(v) for k, v in s_ref.items()},
         "n_per_op": [int((ho.op_ids == o).sum()) for o in range(len(OP_NAMES))],
     }
-    buf = io.BytesIO()
-    np.savez_compressed(
-        buf,
-        op_ids=ho.op_ids.astype(np.int8),
-        s_clean=clean["s"].astype(np.float16),
-        s_edited=edited["s"].astype(np.float16),
-        tv_edit=edited["tv"].astype(np.float16),
-        **{
-            f"{k}_{p}": arr[k].astype(np.float16)
-            for p, arr in (("clean", clean), ("edited", edited))
-            for k in ("tv_bayes", "tv_null")
-        },  # fmt: skip
-        **{f"s_{k}": v.astype(np.float16) for k, v in s_ref.items()},
-        posterior_before=ref["before"][:, :, a_id].astype(np.float32),
-    )
-    return {"label": label, "summary": summary, "arrays": put(buf.getvalue(), name=f"edit-by-role-{label}.npz")}
+    arrays = {
+        "op_ids": ho.op_ids.astype(np.int8),
+        "s_clean": clean["s"].astype(np.float16),
+        "s_edited": edited["s"].astype(np.float16),
+        "tv_edit": edited["tv"].astype(np.float16),
+        "posterior_before": ref["before"][:, :, a_id].astype(np.float32),
+    }
+    arrays |= {f"{k}_{p}": run[k].astype(np.float16) for p, run in (("clean", clean), ("edited", edited)) for k in ("tv_bayes", "tv_null")}  # fmt: skip
+    arrays |= {f"s_{k}": v.astype(np.float16) for k, v in s_ref.items()}
+    return {"label": label, "summary": summary, "arrays": put(ex2216._npz(**arrays), name=f"edit-by-role-{label}.npz")}
 
 
 def design() -> dict[str, Any]:
