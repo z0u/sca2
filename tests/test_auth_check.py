@@ -109,18 +109,75 @@ def test_missing_binary_reports_not_installed(monkeypatch):
     assert not status.ok and status.detail == "not installed"
 
 
+# -- the push-notification channel -------------------------------------------
+
+
+@pytest.fixture
+def pushover_env(monkeypatch):
+    for name, value in {"PUSHOVER_TOKEN": "a-token", "PUSHOVER_USER": "u-key", "PUSHOVER_GROUP": "g-key"}.items():
+        monkeypatch.setenv(name, value)
+
+
+def fake_validate(verdicts: dict[str, dict]):
+    """A stand-in for `_pushover_validate` that answers per key, and the list of what it was asked."""
+    asked: list[tuple[str, str]] = []
+
+    async def _pushover_validate(token: str, key: str):
+        asked.append((token, key))
+        return verdicts[key]
+
+    return _pushover_validate, asked
+
+
+def test_pushover_names_the_missing_secrets(monkeypatch, pushover_env):
+    monkeypatch.delenv("PUSHOVER_USER")
+    monkeypatch.delenv("PUSHOVER_GROUP")
+    status = asyncio.run(auth_check.check_pushover())
+    assert status == auth_check.Status(
+        "Pushover", False, "PUSHOVER_USER and PUSHOVER_GROUP not set", notes=[auth_check._PUSHOVER_ADVICE]
+    )
+
+
+def test_pushover_validates_both_keys(monkeypatch, pushover_env):
+    validate, asked = fake_validate({"u-key": {"status": 1}, "g-key": {"status": 1, "group": 1}})
+    monkeypatch.setattr(auth_check, "_pushover_validate", validate)
+    assert asyncio.run(auth_check.check_pushover()) == auth_check.Status("Pushover", True, "user and group keys valid")
+    assert sorted(asked) == [("a-token", "g-key"), ("a-token", "u-key")]
+
+
+def test_pushover_quotes_the_refusal_and_not_the_key(monkeypatch, pushover_env):
+    verdicts = {"u-key": {"status": 1}, "g-key": {"status": 0, "errors": ["user key is invalid"]}}
+    monkeypatch.setattr(auth_check, "_pushover_validate", fake_validate(verdicts)[0])
+    status = asyncio.run(auth_check.check_pushover())
+    assert status == auth_check.Status(
+        "Pushover", False, "group: user key is invalid", notes=[auth_check._PUSHOVER_ADVICE]
+    )
+    assert "g-key" not in status.line()
+
+
+def test_pushover_unreachable_names_only_the_error_type(monkeypatch, pushover_env):
+    async def _pushover_validate(token: str, key: str):
+        raise ConnectionError(f"refused while sending token={token}")
+
+    monkeypatch.setattr(auth_check, "_pushover_validate", _pushover_validate)
+    status = asyncio.run(auth_check.check_pushover())
+    assert status == auth_check.Status(
+        "Pushover", False, "api.pushover.net unreachable (ConnectionError)", notes=[auth_check._PUSHOVER_ADVICE]
+    )
+
+
 # -- environment-aware selection ---------------------------------------------
 
 
 @pytest.mark.parametrize(
     ("env", "expected"),
     [
-        ({}, ["check_modal", "check_hf", "check_github", "check_claude"]),
+        ({}, ["check_modal", "check_hf", "check_pushover", "check_github", "check_claude"]),
         # On Claude Code for the web GitHub goes through MCP tools, not `gh`.
-        ({"CLAUDE_CODE_REMOTE": "true"}, ["check_modal", "check_hf", "check_claude"]),
+        ({"CLAUDE_CODE_REMOTE": "true"}, ["check_modal", "check_hf", "check_pushover", "check_claude"]),
         # Claude's own auth is irrelevant when Claude is the caller.
-        ({"CLAUDECODE": "1"}, ["check_modal", "check_hf", "check_github"]),
-        ({"CLAUDE_CODE_REMOTE": "true", "CLAUDECODE": "1"}, ["check_modal", "check_hf"]),
+        ({"CLAUDECODE": "1"}, ["check_modal", "check_hf", "check_pushover", "check_github"]),
+        ({"CLAUDE_CODE_REMOTE": "true", "CLAUDECODE": "1"}, ["check_modal", "check_hf", "check_pushover"]),
     ],
     ids=["a-local-shell", "the-web", "claude-is-the-caller", "a-web-agent"],
 )

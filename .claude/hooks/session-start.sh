@@ -72,7 +72,9 @@ fi
     # this just says what's plausibly wired up.
     on() { [[ -n "${!1:-}" ]] && printf on || printf OFF; }
     echo "Resources (env presence; ./go auth --check for live status):" \
-         "Modal $(on MODAL_TOKEN_ID) · HF $(on HF_TOKEN)"
+         "Modal $(on MODAL_TOKEN_ID) · HF $(on HF_TOKEN) · Pushover $(on PUSHOVER_TOKEN)"
+    [[ -n "${PUSHOVER_TOKEN:-}" ]] \
+        || echo "bin/notify won't work without Pushover configured. Tell the human."
     # Which storage pair this environment writes to. A web environment has no
     # mini.local.toml, so it names the pair by variable rather than by profile
     # (mi-ni skill, storage reference); the names aren't secret, so print them.

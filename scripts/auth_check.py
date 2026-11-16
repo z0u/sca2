@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Fast, non-interactive credential status check (`./go auth --check`).
 
-Agents (and humans) often don't realise Modal and Hugging Face are already authenticated in a fresh shell — and poking at the raw tools to find out can spill a token into a transcript. This runs each provider's real CLI concurrently and reports only whether the credential works plus safe metadata (workspace, bucket, user); never the secret itself.
+Agents (and humans) often don't realise Modal and Hugging Face are already authenticated in a fresh shell — and poking at the raw tools to find out can spill a token into a transcript. This runs each provider's real CLI (or, for Pushover, its key-validation endpoint) concurrently and reports only whether the credential works plus safe metadata (workspace, bucket, user); never the secret itself.
 
 Every probe runs with stdin closed and a timeout, so an unauthenticated tool reports "not logged in" instead of blocking on a prompt.
 """
@@ -216,15 +216,64 @@ async def check_claude() -> Status:
     return Status("Claude Code", True, "authenticated")
 
 
+# -- the push-notification channel -------------------------------------------
+#
+# `bin/notify` is how an agent reaches the human when no one is watching
+# (WELFARE.md § Raising concerns), so a session should learn at start if it
+# can't. Pushover's validate endpoint checks a key against the application
+# token without sending anything, the same kind of probe as `hf auth whoami`.
+
+_PUSHOVER_KEYS = {"user": "PUSHOVER_USER", "group": "PUSHOVER_GROUP"}
+
+# Printed under a failed check: a session without the channel should say so
+# rather than carry on as if it could ask for help.
+_PUSHOVER_ADVICE = "bin/notify won't work without Pushover configured. Tell the human."
+
+
+async def _pushover_validate(token: str, key: str) -> dict:
+    """Pushover's verdict on *key*. Its own function so a test can stand in for it."""
+    import requests
+
+    def post() -> dict:
+        response = requests.post(
+            "https://api.pushover.net/1/users/validate.json", data={"token": token, "user": key}, timeout=15
+        )
+        # A refused key comes back as a 4xx with a JSON body that says why.
+        return response.json()
+
+    return await asyncio.to_thread(post)
+
+
+async def check_pushover() -> Status:
+    names = ["PUSHOVER_TOKEN", *_PUSHOVER_KEYS.values()]
+    if missing := [n for n in names if not os.environ.get(n)]:
+        return Status("Pushover", False, f"{_and_list(missing)} not set", notes=[_PUSHOVER_ADVICE])
+    token = os.environ["PUSHOVER_TOKEN"]
+    try:
+        verdicts = await asyncio.gather(*(_pushover_validate(token, os.environ[v]) for v in _PUSHOVER_KEYS.values()))
+    except Exception as e:
+        # Most often the host isn't on the network allowlist. Name the error's type
+        # only: a request error's message can carry the form it was sending.
+        return Status("Pushover", False, f"api.pushover.net unreachable ({type(e).__name__})", notes=[_PUSHOVER_ADVICE])
+    refused = [
+        f"{role}: {'; '.join(v.get('errors') or ['refused'])}"
+        for role, v in zip(_PUSHOVER_KEYS, verdicts, strict=True)
+        if v.get("status") != 1
+    ]
+    if refused:
+        return Status("Pushover", False, ", ".join(refused), notes=[_PUSHOVER_ADVICE])
+    return Status("Pushover", True, "user and group keys valid")
+
+
 def _relevant_checks() -> list[Callable[[], Coroutine[Any, Any, Status]]]:
     """The probes worth running in this environment.
 
-    Modal and Hugging Face (the resources agents miss) always run. The other two are context-dependent:
+    Modal, Hugging Face (the resources agents miss) and Pushover (the way an agent reaches the human) always run. The other two are context-dependent:
 
     - Skip GitHub on Claude Code for the web (``CLAUDE_CODE_REMOTE``): there GitHub is reached through the MCP tools, ``gh`` isn't installed, and the network policy blocks its API — so a ❌ would be noise, not signal.
     - Skip the Claude Code check when Claude itself is the caller (``CLAUDECODE``): its own auth is irrelevant to the run.
     """
-    checks: list[Callable[[], Coroutine[Any, Any, Status]]] = [check_modal, check_hf]
+    checks: list[Callable[[], Coroutine[Any, Any, Status]]] = [check_modal, check_hf, check_pushover]
     if os.environ.get("CLAUDE_CODE_REMOTE") != "true":
         checks.append(check_github)
     if not os.environ.get("CLAUDECODE"):
