@@ -317,14 +317,14 @@ def null_table() -> str:
         ["`τ_ℓ fixed`, edited", *[span(TO_NULL["edited"][:, e]) for e in range(4)]],
         ["`sans-diff`, clean", *[span(TO_NULL["sans"][:, e]) for e in range(4)]],
         ["`sans-diff` on the other ops", *[span(OWN_GAP[:, e]) for e in range(4)]],
-        ["share of the way, edited", *[num(float(SHARE[e])) for e in range(4)]],
+        ["share of the way, edited", "–", *[num(float(SHARE[e])) for e in range(1, 4)]],
     ]
     return table_html(
         ["distance from the target null ↓", *SITE_NAMES],
         rows,
         f"""**Distance from the target null at each answer site**, on `difference` contexts unless named. Seed mean and
         range over {len(SEEDS)} runs. The share of the way is how far the edit moves the recipe of record from the
-        control toward `sans-diff`, on the seed means: 0 at the control, 1 at `sans-diff`.""",
+        control toward `sans-diff`, on the seed means: 0 at the control, 1 at `sans-diff`. At the first example the control and `sans-diff` are too close for a share to mean much.""",
     )
 
 
@@ -335,19 +335,19 @@ r"""
 
 /// tip |
 <!-- lede -->
-Beyond the query, the edit changes the prediction only where the model predicts the answer of a `difference` context. From the second example on, it brings those answers about as close to the target null as a model trained without `difference`. At every other position, and on the contexts of the other ops, the prediction stays as it was.
+Beyond the query, the edit changes the next-token loss almost only at the answers of `difference` contexts. From the second example on, it takes those answers most of the way to where a model trained without `difference` lands. Before any example, it leaves the guess the model makes about `difference` mostly in place.
 ///
 
 Every score of the edit so far reads one prediction, the answer at the query `=`. There the edited model answers `difference` contexts about as the target null says it should, in aggregate ([fixed-effects](/docs/m2/fixed-effects/report.py)). But the model predicts a token at every position of a context, and the edit acts at all of them. This re-analysis, with no new training, scores the clean and edited model at every position of the held-out contexts, on the recipe of record at its eight fresh seeds, beside the controls and the `sans-diff` runs (a model trained without `difference`) at the same seeds.
 
 ## Observations
 
-- [Where the prediction changes (E1)](#where-the-prediction-changes-e1): the next-token loss rises at the answers of `difference` contexts, more with each example, and barely moves anywhere else. On the other ops it moves less than an edit along a direction the anchor did not choose.
-- [Against the target null at every answer (E2)](#against-the-target-null-at-every-answer-e2): from the second example on, the edited model lands nearly as close to the target null as `sans-diff`, at every answer site. At the first example, before any evidence, the edit leaves the prediction as it was.
+- [Where the prediction changes (E1)](#where-the-prediction-changes-e1): the next-token loss rises at the answers of `difference` contexts, more with each example, and barely moves anywhere else. On the other ops the loss and the answers move less than under an edit along any of the other axes.
+- [Against the target null at every answer (E2)](#against-the-target-null-at-every-answer-e2): from the second example on, the edit covers more than four-fifths of the way from the control to `sans-diff` at every answer site. At the first example, before any evidence, the edit keeps most of the weight the model gives `difference` answers.
 
 ## Scope and method
 
-This is an exploratory re-analysis, with no preregistration and no gate. It covers three kinds of run at seeds 712 to 719: `τ_ℓ fixed` from the fixed-confirm experiment (the recipe of record), the controls of the anneal-confirm experiment, and the `sans-diff` runs of the filtered-corpus experiment. Each is scored at its final checkpoint on the 14,000 held-out contexts of ex-2.2.21, 2,000 per op, on the clean pass and under the full edit along e₁ at every slice and position. As the D2.2 design asks, the same edit along each of the other 63 coordinate axes of the run gives a reference: what an edit of the same size along a direction the anchor did not choose does to the same model.
+This is an exploratory re-analysis, with no preregistration and no gate. It covers three kinds of run at seeds 712 to 719: `τ_ℓ fixed` from the fixed-confirm experiment (the recipe of record), the controls of the anneal-confirm experiment, and the `sans-diff` runs of the filtered-corpus experiment. Each is scored at its final checkpoint on the 14,000 held-out contexts of ex-2.2.21, 2,000 per op, on the clean pass and under the full edit along e₁ at every slice and position. As the D2.2 design asks, the same edit along each of the other 63 coordinate axes of the run gives a reference: what the same edit along a direction the anchor did not choose does to the same model.
 
 A context is three examples and a query, each an equation of six tokens: *a* `?` *b* `=` *y* and a separator. The operands are drawn at random, so no model can predict them, and the symbols are fixed, so every model predicts them at once. Only the answers depend on the op, and the model infers the op from the examples before each one.
 
@@ -360,6 +360,13 @@ Distance from the target null
 
 # %%
 
+# REVIEW: three corrections of fact in E1, checked against the stored summary. (1) "within two hundredths" at the
+# operands and symbols holds per position except at the separator after the query answer (seed mean 0.04, runs 713
+# and 716 at 0.07 and 0.21), so that position is now named. (2) "an edit of the same size" became "the same edit":
+# every axis gets the same full projection, and how much it removes depends on what the state has on that axis.
+# (3) The control e₁ edit is at half the reference on run 712 (0.05 against 0.10, pooled over the other ops), so
+# "near or above" is now seven of eight. Verify: `by_position(FIXED, "e1", [D])` and `by_position(CONTROL, "e1", OTHER)`.
+
 rf"""
 ## Where the prediction changes (E1)
 
@@ -367,16 +374,26 @@ Does the edit change what the model predicts anywhere other than the answer? The
 
 {where_figure()}
 
-On `difference` contexts, the loss rises only at the answers. The rise grows with each example the model has seen: barely anything at the first, about two-thirds of a nat at the second, nearly a nat at the third, and four nats at the query, where the clean model was most sure of a `difference` answer (the table below). At the operands and the symbols the loss stays within two hundredths of a nat of where it was, and on most runs within a few thousandths.
+On `difference` contexts, the loss rises only at the answers. The rise grows with each example the model has seen: barely anything at the first, about two-thirds of a nat at the second, nearly a nat at the third, and four nats at the query, where the clean model was most sure of a `difference` answer (the table below). At the operands and the symbols the loss stays within two hundredths of a nat of where it was, and on most runs within a few thousandths. The one exception is the separator after the query answer, where it rises by a few hundredths on the seed mean and by a fifth of a nat on one run.
 
-On the contexts of the other ops, nothing moves much anywhere. The largest rise on any one op, at any answer site, is a few hundredths of a nat on most runs, and an eighth of a nat on the query of one. An edit of the same size along one of the other 63 axes raises the loss at every answer by about a tenth of a nat, on every op. So the e₁ edit is gentler on the other ops than an edit along an arbitrary direction, which fits an axis the anchor has kept clear of everything but the op. The e₁ edit on the controls, where e₁ is one more ordinary axis, sits near that reference or above it.
+On the contexts of the other ops, nothing moves much anywhere. The largest rise on any one op, at any answer site, is a few hundredths of a nat on most runs, and an eighth of a nat on the query of one. At the query answer the loss falls a little on most of these ops, which is the way the target null points: with `difference` gone, the other ops take its share. The same edit along one of the other 63 axes raises the loss at every answer by about a tenth of a nat, on every op. So the e₁ edit is gentler on the other ops than an edit along an arbitrary direction, which fits an axis the anchor has kept clear of everything but the op. The e₁ edit on the controls, where e₁ is one more ordinary axis, sits near that reference or above it on seven of the eight runs, and at about half of it on one.
+
+The answers of the other ops move more than their loss does, by about a tenth in total variation at each answer site, but less than under the reference edits, and from the second example on they stay as far from the target null as they were.
 
 {where_table()}
 
-The rise at the first example is small because there is nothing there to remove. Before any example, the model can only guess among all seven ops, and the edit leaves that guess alone (E2).
+The rise at the first example is small. Before any example the model can only guess among all seven ops, and the edit keeps most of the weight that guess gives `difference` answers (E2).
 """
 
 # %%
+
+# REVIEW: three corrections of fact in E2 and the discussion. (1) The seed ranges of the edited runs and `sans-diff`
+# are apart by 0.02, 0.01, 0.006, and 0.03 across the sites, so "by a few hundredths" became "narrowly at the third
+# example". (2) The target null does give `difference` answers weight at an example: `predictives` keeps the anchored
+# op among the replacement ops, so the median null surprisal of a shown `difference` answer is -log(ρ/6) ≈ 3.0 at
+# every example. "No weight" and "expects none" were reworded. (3) "Close to it at the later ones" holds at the
+# second and third examples only: at the query the null gives 91% of the shown answers zero probability, so its mean
+# surprisal (629, from the 1e-300 clamp) is no yardstick. Verify: SURPRISE_EDITED and SURPRISE_NULL above.
 
 rf"""
 ## Against the target null at every answer (E2)
@@ -385,23 +402,33 @@ How close do the edited answers come to the target null, at each answer and not 
 
 {null_figure()}
 
-Clean, the recipe of record is indistinguishable from the control: both move away from the target null with each example, as they grow surer of `difference`. Under the edit the distance stays almost flat across the answer sites. From the second example on, it covers more than four-fifths of the way from the control to `sans-diff` (the table below), and the seed ranges of the two stay apart by a few hundredths. `sans-diff` itself sits about as far from the target null on `difference` contexts as it sits from its own ideal on the other ops, at every example answer, so at the example answers both are near the floor that a model of this kind reaches.
+Clean, the recipe of record is indistinguishable from the control: both move away from the target null with each example, as they grow surer of `difference`. Under the edit the distance stays almost flat across the answer sites. From the second example on, it covers more than four-fifths of the way from the control to `sans-diff` (the table below), and the seed ranges of the two stay apart at every site, though narrowly at the third example. `sans-diff` itself sits about as far from the target null on `difference` contexts as it sits from its own ideal on the other ops, at every example answer, so at the example answers both are near the floor that a model of this kind reaches.
 
 {null_table()}
 
-At the first example the edit moves the answer a little away from the target null, where `sans-diff` is slightly closer than the control. Before any example, the target null is an even guess among the six other ops, so it gives `difference` answers no weight, and `sans-diff` has learned to give them little. The clean recipe gives them as much weight as the answers of any other op, and the edit leaves that weight in place: the surprisal of the shown answer under the edit is below the target null at the first example and close to it at the later ones. So the edit takes out the evidence for `difference` as it arrives, and leaves alone the guess the model makes before seeing any.
+At the first example the edit moves the answer a little away from the target null, where `sans-diff` is slightly closer than the control. Before any example, the target null is an even guess among the six other ops, so it expects a `difference` answer only where another op gives the same color or the noise in the examples shows one, and `sans-diff` has learned to give them little. The clean recipe gives them as much weight as the answers of any other op, and the edit leaves that weight in place: the surprisal of the shown answer under the edit is below the target null at the first example and close to it at the second and third. So the edit takes out the evidence for `difference` as it arrives, and keeps most of the guess the model makes before seeing any.
 """
 
 # %%
 
+# REVIEW: narrowed after the claims review. "The prediction stays as it was" became a claim about the loss, since
+# the answers of the other ops move by about a tenth in total variation (less than the reference edits). "About as
+# close as sans-diff" became "most of the way", since the seed ranges are apart at every site and the surprisal of the
+# shown answer ranks the two the other way. The first example now says the edit keeps most of the weight on
+# `difference` answers rather than leaving the guess alone (it moves it 0.10 in total variation). "Builds up where
+# the model combines the evidence" became "may show only at the query", since the gap at examples 2 and 3 equals the
+# gap at example 1. Verify: MOVED, TO_NULL, SURPRISE_EDITED.
+
 r"""
 ## Discussion
 
-The edited model behaves like the target null at every position, to about the degree a trained model can, with one gap. Where a `difference` context gives evidence for its op, the edit removes it, and the answers that follow land about as near the target null as the answers of a model that never learned the op. Where there is no answer to predict, or the op is another one, the prediction stays as it was, closer than an edit along any other axis leaves it.
+On `difference` contexts, the edit takes every answer the examples bear on most of the way to where a model that never learned the op lands, at the second and third examples as at the query. It leaves the loss almost as it was everywhere else, and moves the answers of the other ops less than an edit along any other axis does. So, beyond the query, the edited model behaves much like the target null, with one gap and a small remainder. This holds for one recipe on one task, under the full edit at every slice.
 
-The gap is the prior. With no examples seen, the edited model still expects a `difference` answer as often as any other, where the target null expects none. That fits the reading of earlier reports that the anchor holds the evidence for the op, at the example answers, rather than the op itself: an expectation formed before any evidence has nothing on e₁ to take away.
+The remainder is that the edited model stays a little further from the target null than `sans-diff` at every answer site. That is by the distance from the target null; by the surprisal of the shown answer the two rank the other way at the examples, and the distance between the two models themselves was not measured, so this report can say how far each is from the ideal but not how alike they are.
 
-The query stays the place where the edited model is furthest from `sans-diff`, as the filtered-corpus experiment found. At the example answers the two are much closer, so whatever the edit leaves behind builds up where the model combines the evidence of all three examples.
+The gap is the prior. With no examples seen, the edited model still gives `difference` answers about the weight it gives any other op, where the target null gives them only what the noise in the examples does. That fits the reading of earlier reports that the anchor holds the evidence for the op at the example answers rather than the op itself, though the edit does move this guess a little.
+
+The query stays the place where the edited model is furthest from `sans-diff`, as the filtered-corpus experiment found. At the second and third examples the gap is about what it is at the first, where there is no evidence to leave behind. So if part of the gap is evidence the edit leaves in place, it may show only at the query, where the model combines all three examples.
 """
 
 # %%
