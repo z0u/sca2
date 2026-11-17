@@ -14,6 +14,8 @@ each run (a control of the anneal confirmation, or an anchored run of the fixed 
 6. `finish_one` scores what the hypotheses and the E sections need at the selected configurations: the permuted
    fits, the median along the other 63 axes, the label ladder, the per-context arrays for grading and landing, the
    write and its bound, a fresh probe, and the cosine with e₁.
+7. `confusion_one` (a later step, for the op confusion of the D2.2 post) keeps the answer distribution of every
+   test context at the main configuration of each method, on the controls, from fits made again as above.
 
 `smoke` runs every stage on two stored runs outside the comparison (ex-2.2.23's control and split-anti-seeds'
 `falloff` run at seed 704), with a thinned grid, and records the time of each kind of pass, which gives the cost
@@ -21,6 +23,8 @@ of the full run.
 
     bin/mini run docs/m2/post-hoc-compare/experiment.py --app modal --max-containers 12 --budget 1h
     bin/mini status post-hoc-compare
+
+`STAGE` picks the entry point: `smoke`, `main` (the published run), and later `confusion-smoke` and `confusion`.
 """
 
 from __future__ import annotations
@@ -1347,8 +1351,181 @@ def smoke(ctx: Ctx) -> dict:
     return run(ctx, smoke=True)
 
 
-STAGE = "main"
-"""Which entry point `experiment` runs: the smoke test until its cost is approved, then the full run."""
+# =============================================================================================
+# The confusion step: every op's answer distributions at the main configurations (added for the D2.2 post)
+# =============================================================================================
+#
+# `finish_one` kept answer distributions for `difference` contexts only (`{method}/p_difference`), so the op
+# confusion could not show the fitted edits. This step measures them on every test context, for the controls, with
+# no new tuning or selection: it remakes the fit set (`prepare_sets`) and every closed-form fit (`fit_one`) as the
+# main run made them (the memo records of that run are gone), rebuilds the edit of the configuration each method's E
+# sections read (`main_config`, from the published results and from the pooled selections of "Without role labels"),
+# and runs one forward pass. The optimized direction takes its unit vectors from the published search rows. Each edit
+# is checked against what the main run published: the expected exact match of every context, and the answer
+# distribution of every `difference` context.
+
+CONFUSION_SETS = ("role-keyed", "pooled")
+"""The two sets of selections: the main one (fits keyed to the example answers allowed) and the selections over the
+pooled fits alone."""
+CONFUSION_REF = PREFIX + "/confusion"
+CONFUSION_ARRAYS_REF = PREFIX + "/confusion-arrays/{label}"
+"""Per control: `op_ids`, `query_pair`, `posterior`, `clean/p_full`, and `{set}/{method}/p_full`, the answer
+distribution over the palette of every test context (float16)."""
+
+
+def confusion_resolve() -> dict:
+    """For the confusion step: the held-out set, each control's checkpoint, and this experiment's published
+    results and arrays.
+    """
+    import json
+
+    from mini.store import get, get_ref
+
+    controls = [r for r in runs() if r["kind"] == "control"]
+    refs = {
+        "results": RESULTS_REF,
+        "pooled": POOLED_REF,
+        **{f"ckpt/{r['label']}": r["ref"] for r in controls},
+        **{f"role-keyed/{r['label']}": ARRAYS_REF.format(label=r["label"]) for r in controls},
+        **{f"pooled/{r['label']}": POOLED_ARRAYS_REF.format(label=r["label"]) for r in controls},
+    }
+    maybe = {k: get_ref(v) for k, v in refs.items()}
+    missing = [refs[k] for k, a in maybe.items() if a is None]
+    found = {k: a for k, a in maybe.items() if a is not None}
+    holdout = get_ref(ex2221.HOLDOUT_REF.format(key=ex2222.MAIN_KEY))
+    assert holdout is not None and not missing, f"not published: {missing}"
+    workdir = get_data_dir() / NAME / "confusion-resolve"
+    results = json.loads(get(found["results"], workdir / "results.json").read_text())
+    pooled = json.loads(get(found["pooled"], workdir / "pooled.json").read_text())
+    by_label = {r["label"]: r for r in results["runs"]}
+    pooled_by_label = {r["label"]: r for r in pooled["runs"]}
+    out = []
+    for r in controls:
+        lab = r["label"]
+        main = {m: v["main_config"] for m, v in by_label[lab]["finish"]["methods"].items()}
+        opt = config_of(main["optimized"])
+        searched = [s for s in by_label[lab]["search"]
+                    if s["perm"] is None and s["target"] == opt.target and tuple(s["slices"]) == opt.slices
+                    and s["weight"] == opt.weight]  # fmt: skip
+        assert len(searched) == 1, (lab, len(searched))
+        out.append({
+            "label": lab,
+            "seed": r["seed"],
+            "checkpoint": found[f"ckpt/{lab}"],
+            "configs": {"role-keyed": main,
+                        "pooled": {m: v["main_config"] for m, v in pooled_by_label[lab]["methods"].items()}},
+            "searched": searched,
+            "stored": {s: found[f"{s}/{lab}"] for s in CONFUSION_SETS},
+        })  # fmt: skip
+    return {"holdout": holdout, "runs": out}
+
+
+def confusion_one(checkpoint, holdout, fits, searched: list[dict], configs: dict, stored: dict, label: str) -> dict:
+    """The answer distribution over the palette of every test context, clean and under the main edit of each
+    method in both sets, and how far each edit is from what the comparison published.
+    """
+    import pickle
+
+    from mini.store import get, put
+    from sca.posthoc import SliceEdit
+
+    model, s, workdir = _load_common(checkpoint, lambda w: get(holdout, w / "test.npz"), label, "confusion", True)
+    width = model.transformer.wte.shape[1]
+    with open(get(fits, workdir / "fits.pkl"), "rb") as f:
+        body = pickle.load(f)
+    f_ = _Fits(body, searched, width)
+    is_d = s.op_ids == D
+
+    arrays: dict[str, np.ndarray] = {
+        "op_ids": s.op_ids.astype(np.int8),
+        "query_pair": s.ctx.query_pair.astype(np.int32),
+        "posterior": s.posterior.astype(np.float32),
+    }
+    checks: dict[str, Any] = {}
+
+    def measure(edit, stored_z, key: str, out_key: str) -> dict:
+        lg = _logits(model, s, edit)
+        p = ex2216._color_probs(lg, s.color_ids)
+        eem = s.match(lg)
+        arrays[out_key] = p.astype(np.float16)
+        ref_eem = stored_z[f"{key}/eem"].astype(np.float64)
+        ref_p = stored_z[f"{key}/p_difference"].astype(np.float64)
+        return {
+            "eem_max_abs": float(np.abs(eem - ref_eem).max()),
+            "eem_mean_diff": float((eem - ref_eem).mean()),
+            "p_difference_max_abs": float(np.abs(p[is_d].astype(np.float16).astype(np.float64) - ref_p).max()),
+            "eem_difference": float(eem[is_d].mean()),
+            "eem_difference_published": float(ref_eem[is_d].mean()),
+        }
+
+    for name in CONFUSION_SETS:
+        with np.load(get(stored[name], workdir / f"stored-{name}.npz")) as z:
+            zs = {k: z[k] for k in z.files}
+        if name == CONFUSION_SETS[0]:
+            identity = SliceEdit.identity(N_SLICES, width, CONTEXT_LEN)
+            checks["clean"] = measure(identity, zs, "clean", "clean/p_full")
+        for method, cfg in configs[name].items():
+            checks[f"{name}/{method}"] = measure(f_.edit(config_of(cfg)), zs, method, f"{name}/{method}/p_full")
+    return {
+        "label": label,
+        "checks": checks,
+        "configs": configs,
+        "arrays": put(ex2216._npz(**arrays), name=f"{NAME}-confusion-{label}.npz"),
+    }
+
+
+def publish_confusion(measured: list[dict]) -> dict:
+    import json
+
+    from mini.store import put, set_ref
+
+    body = {"sets": list(CONFUSION_SETS), "runs": [{k: v for k, v in m.items() if k != "arrays"} for m in measured]}
+    set_ref(CONFUSION_REF, put(json.dumps(body).encode(), name=f"{NAME}-confusion.json"))
+    for m in measured:
+        set_ref(CONFUSION_ARRAYS_REF.format(label=m["label"]), m["arrays"])
+    return {"runs": len(measured), "ref": CONFUSION_REF, "arrays": CONFUSION_ARRAYS_REF}
+
+
+def run_confusion(ctx: Ctx, seeds: tuple[int, ...] = SEEDS, publishes: bool = True) -> dict:
+    resolved = ctx.run(confusion_resolve, role="prep")
+    todo = [r for r in resolved["runs"] if r["seed"] in seeds]
+    holdout = resolved["holdout"]
+    sets = ctx.run(prepare_sets, holdout, role="sets")
+    ckpt = [r["checkpoint"] for r in todo]
+    labels = [r["label"] for r in todo]
+    n = len(todo)
+    fitted = ctx.map(fit_one, ckpt, [sets["fit"]] * n, labels, [False] * n, role="fit")
+    measured = ctx.map(
+        confusion_one,
+        ckpt,
+        [holdout] * n,
+        [f["fits"] for f in fitted],
+        [r["searched"] for r in todo],
+        [r["configs"] for r in todo],
+        [r["stored"] for r in todo],
+        labels,
+        role="score",
+    )
+    summary = {m["label"]: m["checks"] for m in measured} | {
+        "fit_seconds": {f["label"]: f["seconds_total"] for f in fitted}
+    }
+    if not publishes:
+        return summary
+    return summary | {"published": ctx.run(publish_confusion, measured, role="prep")}
+
+
+def confusion(ctx: Ctx) -> dict:
+    return run_confusion(ctx)
+
+
+def confusion_smoke(ctx: Ctx) -> dict:
+    """The confusion step on the first seed only, with no refs; its tasks are the full step's, so that reuses them."""
+    return run_confusion(ctx, seeds=SEEDS[:1], publishes=False)
+
+
+STAGE = "confusion"
+"""Which entry point `experiment` runs: `smoke` until its cost was approved, then `main` (the published run), and
+later the confusion step (`confusion-smoke`, then `confusion`)."""
 
 COMPUTE = {
     "prep": dict(cpu=2, timeout=1800),
@@ -1362,4 +1539,5 @@ COMPUTE = {
     "score": dict(gpu="L40S", cpu=2, memory=16_384, timeout=7200, scaledown_window=2),
 }
 
-experiment = Experiment(name=NAME, main=smoke if STAGE == "smoke" else main, roles=COMPUTE)
+ENTRIES = {"smoke": smoke, "main": main, "confusion-smoke": confusion_smoke, "confusion": confusion}
+experiment = Experiment(name=NAME, main=ENTRIES[STAGE], roles=COMPUTE)
