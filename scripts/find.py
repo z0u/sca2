@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Ranked keyword search over what the project has written down: report prose, design docs, the backlogs, the decision register, and the index entries.
+"""Ranked keyword search over what the project has written down: report prose, the notes of probes that have no report, design docs, the backlogs, the decision register, and the index entries.
 
 The question this answers is "where did we find out X?", which `rg` answers poorly in two ways. It searches a report's `.py` source, where the prose sits among loaders and figure code, so a hit names a file and leaves the reading to you. And it does not rank, so a common word comes back as fifty files in path order. Here every document is cut into passages at its headings (a report's prose is pulled out of the source statically, with `{…}` fields left as written, so nothing runs), and the passages are ranked by BM25: each query word adds to a passage's score in proportion to how rare the word is across the corpus, with diminishing returns for repeats and a correction for passage length.
 
@@ -31,7 +31,7 @@ from itertools import pairwise
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent.resolve()
-KINDS = ("report", "doc", "todo", "eng", "index")
+KINDS = ("report", "probe", "doc", "todo", "eng", "index")
 K1, B = 1.2, 0.75  # the usual BM25 constants: term-frequency saturation, length normalization
 ALIAS_WEIGHT = 0.5  # how much a glossary alias counts against a word the query used
 SNIPPET = 320  # characters of excerpt per hit
@@ -154,6 +154,27 @@ def report_passages(path: Path, rel: str) -> Iterator[Passage]:
         yield Passage(rel, line_of(offset), "report", title, heading, body)
 
 
+def probe_passages(path: Path, rel: str) -> Iterator[Passage]:
+    """A probe's notes: the module docstring of an `experiment.py` with no report beside it, one paragraph a passage.
+
+    A probe (a timing or check with no report) records its setup and results in that docstring, so without this its
+    findings could only be found through whatever quotes them. Indented lines are commands and are left out.
+    """
+    if (path.parent / "report.py").exists():
+        return
+    try:
+        module = ast.parse(path.read_text())
+    except SyntaxError:
+        return
+    if not (doc := ast.get_docstring(module, clean=False)) or not module.body:
+        return
+    title = doc.strip().split("\n", 1)[0].split(":", 1)[0].strip()
+    first = module.body[0].lineno
+    for m in re.finditer(r"(?:^(?! {4}).+\n?)+", doc, re.MULTILINE):
+        if body := m.group().strip():
+            yield Passage(rel, first + doc.count("\n", 0, m.start()), "probe", title, "", body)
+
+
 def front_matter(text: str) -> tuple[dict[str, str], str, int]:
     """A backlog item's header as raw strings, the text after it, and the line the text starts on."""
     if not text.startswith("---\n") or (end := text.find("\n---\n", 4)) < 0:
@@ -187,6 +208,8 @@ def corpus(root: Path) -> Iterator[Passage]:
 
     for path in files("docs", "*.py"):
         yield from report_passages(path, path.relative_to(root).as_posix())
+    for path in files("docs", "experiment.py"):
+        yield from probe_passages(path, path.relative_to(root).as_posix())
     for path in files("docs", "*.md"):
         rel = path.relative_to(root).as_posix()
         if rel == "docs/index.md":

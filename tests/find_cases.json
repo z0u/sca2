@@ -8,6 +8,8 @@
     {"query": "residual stream geometry RSA", "path": "docs/m2/geometry-rsa/report.py"},
     {"query": "step time anchored versus control overhead regularizer ms per step", "path": "docs/m2/d2.2/post-outline.md"},
     {"query": "anchor overhead compute cost step time", "path": "docs/m2/d2.2/post-outline.md"},
-    {"query": "write bound tolerance 1.25", "path": "docs/m2/write-floor/report.py"}
+    {"query": "write bound tolerance 1.25", "path": "docs/m2/write-floor/report.py"},
+    {"query": "how much do the anchor and anti terms add to step time", "path": "docs/m2/term-cost/experiment.py"},
+    {"query": "is the arc there in controls trained without the anchor", "path": "docs/m2/arc-in-controls/experiment.py"}
   ]
 }
