@@ -468,13 +468,7 @@ CONF_STYLE = {
     "edited": ("anchored, edited", "orange"),
 }
 EYE = np.eye(len(OPS), dtype=bool)
-CONF_SCALE = "log"  # bar height: "log" from LOG_FLOOR to 1, or "linear" from 0 to 1
-LOG_FLOOR = 0.01
-
-
-def bar_height(v: float, scale: str) -> float:
-    """The share of a cell a bar of mass *v* fills."""
-    return float(np.log10(max(v, LOG_FLOOR) / LOG_FLOOR) / -np.log10(LOG_FLOOR)) if scale == "log" else v
+OP_SHORT = {"difference": "diff", "hue-hsv": "hue", "sat-hsv": "sat", "value-hsv": "value"}
 
 
 def confusion_figure(view: str) -> str:
@@ -504,18 +498,14 @@ def confusion_figure(view: str) -> str:
             the mass goes to the other six ops instead, most to {OPS[a]} and {OPS[b]}: {row}. The edited control
             keeps `difference`, with {m["control-edited"][D, D]:.2f} on the diagonal.
         """
-    return confusion_draw(view, CONF_SCALE, {k: v.tolist() for k, v in m.items()}, head + tail)
+    return confusion_draw(view, {k: v.tolist() for k, v in m.items()}, head + tail)
 
 
-SCALE_NOTE = {
-    "log": f"Bar heights are on a log scale from {LOG_FLOOR:g} to 1, with a faint line at 0.1.",
-    "linear": "Bar heights run from 0 to 1, with a faint line at 0.5.",
-}
 CONF_CAPTION = {
-    "clean": f"""
+    "clean": """
         **Where the answers go.** Rows: the op of the context. Columns: the mass on the colors the column op can give
         for the query operands and the row op cannot, so a color several ops can give counts in each of their
-        columns. On the diagonal (outlined), the mass on the answers of the row op. {SCALE_NOTE[CONF_SCALE]} The ideal is the Bayes predictive; the models are seed means over eight runs.
+        columns. On the diagonal (outlined), the mass on the answers of the row op. A full cell is a mass of 1. The ideal is the Bayes predictive; the models are seed means over eight runs.
     """,
     "edited": """
         **Where the answers go, with `difference` taken out.** Laid out as the earlier figure. The target null is
@@ -526,11 +516,25 @@ CONF_CAPTION = {
 }
 
 
+# The bar grids are laid out in whole pixels of the saved PNG, so cell and bar edges land on pixel edges and stay
+# crisp; only the tops of the bars fall between pixels. The pixels assume the save settings of `themed`: 192 dpi, a
+# tight crop, and a pad that is itself a whole number of pixels (set below), around a figure the crop keeps whole.
+DPI = 192
+plt.rcParams["savefig.pad_inches"] = 24 / DPI
+
+
 @memo
-def confusion_draw(view: str, scale: str, data: dict, alt_text: str) -> str:
+def confusion_draw(view: str, data: dict, alt_text: str) -> str:
     @themed(name=f"d22-confusion-{view}", alt_text=alt_text, caption=CONF_CAPTION[view])
     def _plot() -> plt.Figure:
         n, k_n = len(OPS), len(data)
+        pitch, gap, frame = 116, 8, 2  # cell pitch, gap between cells, diagonal frame (pixels)
+        bar_gap, side = 2, 6  # between bars, and from the cell edge to the outer bars
+        left, top, bottom, right = 84, 88, 44, 4
+        w, h = left + n * pitch + right, top + n * pitch + bottom
+        cell = pitch - gap
+        bar_w = (cell - 2 * side - (k_n - 1) * bar_gap) // k_n
+        x_pad = (cell - k_n * bar_w - (k_n - 1) * bar_gap) // 2
         inks = {
             "grey": light_dark("#555", "#aaa"),
             "blue": light_dark("#2a6fbb", "#6aa6e8"),
@@ -539,34 +543,47 @@ def confusion_draw(view: str, scale: str, data: dict, alt_text: str) -> str:
         }
         paper = light_dark("#fff", "#111")
         well = light_dark("#f3f3f3", "#1e1e1e")
-        fig, ax = plt.subplots(figsize=(4.8, 5.0), layout="constrained")
-        bw = 0.85 / k_n
-        handles = []
-        for c, (k, v) in enumerate(data.items()):
-            label, color = CONF_STYLE[k]
-            mat = np.asarray(v)
-            for i, j in np.ndindex(n, n):
-                h = 0.9 * bar_height(mat[i, j], scale)
-                bar = ax.bar(j - 0.425 + (c + 0.5) * bw, h, bw * 0.88, bottom=-i - 0.45, lw=0, color=inks[color])
-            handles.append((bar, label))
-        guide = 0.1 if scale == "log" else 0.5  # a faint line across every cell at this mass
+        edge = light_dark("#999", "#666")
+        fig = plt.figure(figsize=(w / DPI, h / DPI), dpi=DPI)
+        ax = fig.add_axes((0, 0, 1, 1))
+        ax.set_xlim(0, w)
+        ax.set_ylim(h, 0)  # y in pixels from the top
+        ax.set_axis_off()
+        # A clear patch over the whole figure, so the tight crop keeps the figure whole and the pixels stay put.
+        fig.add_artist(Rectangle((0, 0), 1, 1, transform=fig.transFigure, fc="none", ec="none", lw=0))
+
+        def box(x: float, y: float, bw: float, bh: float, fc: Any) -> Rectangle:
+            patch = Rectangle((x, y), bw, bh, fc=fc, lw=0, snap=False)
+            ax.add_patch(patch)
+            return patch
+
+        handles = {}
         for i, j in np.ndindex(n, n):
-            y = -i - 0.45 + 0.9 * bar_height(guide, scale)
-            ax.plot([j - 0.45, j + 0.45], [y, y], color=light_dark("#ccc", "#444"), lw=0.5, zorder=0.5)
+            x0, y0 = left + j * pitch + gap // 2, top + i * pitch + gap // 2
             if i == j:
-                ax.add_patch(
-                    Rectangle((j - 0.47, -i - 0.47), 0.94, 0.94, fill=False, ec=light_dark("0.6", "0.45"), lw=0.6)
-                )
-            else:
-                ax.add_patch(Rectangle((j - 0.5, -i - 0.5), 1, 1, fc=well, ec=paper, lw=1.5, zorder=0))
-        ax.set_xticks(range(n), OPS, rotation=90, fontsize=7)
-        ax.set_yticks([-i for i in range(n)], OPS, fontsize=7)
-        ax.set_xlim(-0.5, n - 0.5)
-        ax.set_ylim(-n + 0.5, 0.5)
-        ax.set_aspect("equal")
-        ax.spines[:].set_visible(False)
-        ax.tick_params(length=0)
-        fig.legend(*zip(*handles, strict=True), ncols=2, frameon=False, fontsize=7, loc="outside upper center")
+                box(x0 - frame, y0 - frame, cell + 2 * frame, cell + 2 * frame, fc=edge)
+            box(x0, y0, cell, cell, fc=paper if i == j else well)
+            for c, (k, v) in enumerate(data.items()):
+                bar_h = cell * float(v[i][j])
+                bx = x0 + x_pad + c * (bar_w + bar_gap)
+                handles[k] = box(bx, y0 + cell - bar_h, bar_w, bar_h, fc=inks[CONF_STYLE[k][1]])
+        ink = light_dark("#222", "#ddd")
+        for i, op in enumerate(OPS):
+            mid = top + i * pitch + pitch / 2
+            ax.text(left - 10, mid, OP_SHORT.get(op, op), ha="right", va="center", fontsize=7, color=ink)
+            ax.text(
+                left + i * pitch + pitch / 2,
+                top + n * pitch + 6,
+                OP_SHORT.get(op, op),
+                ha="center",
+                va="top",
+                fontsize=7,
+                color=ink,
+            )
+        fig.legend(
+            list(handles.values()), [CONF_STYLE[k][0] for k in handles], ncols=2, frameon=False, fontsize=7,
+            loc="upper center", bbox_to_anchor=(0.5, 1.0), borderaxespad=0.2, handlelength=1.4,
+        )  # fmt: skip
         return fig
 
     return _plot()
