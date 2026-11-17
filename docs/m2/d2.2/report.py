@@ -455,21 +455,26 @@ def confusion_matrices() -> dict[str, list]:
 CONFUSION = {k: np.asarray(v) for k, v in confusion_matrices().items()}
 CONF_PANELS = {
     "clean": ("ideal", "control", "anchored"),
-    "edited": ("null", "control-edited", "sans-diff", "edited"),
+    "edited": ("null", "control-edited", "edited", "sans-diff"),
 }
-# Bayes grey, control blue, anchored orange; hatched for the references built without `difference`.
+# Bayes grey, control blue, anchored orange, sans-diff purple.
 CONF_STYLE = {
-    "ideal": ("Bayes posterior (ideal)", "grey", False),
-    "control": ("control", "blue", False),
-    "anchored": ("anchored", "orange", False),
-    "null": ("Bayes w/o difference (target null)", "grey", True),
-    "control-edited": ("control, edited", "blue", False),
-    "sans-diff": ("control w/o difference (sans-diff)", "blue", True),
-    "edited": ("anchored, edited", "orange", False),
+    "ideal": ("Bayes posterior (ideal)", "grey"),
+    "control": ("control", "blue"),
+    "anchored": ("anchored", "orange"),
+    "null": ("Bayes w/o difference (target null)", "grey"),
+    "control-edited": ("control, edited", "blue"),
+    "sans-diff": ("control w/o difference (sans-diff)", "purple"),
+    "edited": ("anchored, edited", "orange"),
 }
 EYE = np.eye(len(OPS), dtype=bool)
-CELL_OFF, CELL_DIAG = 0.3, 1.0  # the mass that fills a cell, off the diagonal and on it
-assert all(float(np.where(EYE, 0, m).max()) <= CELL_OFF for m in CONFUSION.values()), "an off-diagonal bar would clip"
+CONF_SCALE = "log"  # bar height: "log" from LOG_FLOOR to 1, or "linear" from 0 to 1
+LOG_FLOOR = 0.01
+
+
+def bar_height(v: float, scale: str) -> float:
+    """The share of a cell a bar of mass *v* fills."""
+    return float(np.log10(max(v, LOG_FLOOR) / LOG_FLOOR) / -np.log10(LOG_FLOOR)) if scale == "log" else v
 
 
 def confusion_figure(view: str) -> str:
@@ -499,15 +504,18 @@ def confusion_figure(view: str) -> str:
             the mass goes to the other six ops instead, most to {OPS[a]} and {OPS[b]}: {row}. The edited control
             keeps `difference`, with {m["control-edited"][D, D]:.2f} on the diagonal.
         """
-    return confusion_draw(view, {k: v.tolist() for k, v in m.items()}, head + tail)
+    return confusion_draw(view, CONF_SCALE, {k: v.tolist() for k, v in m.items()}, head + tail)
 
 
+SCALE_NOTE = {
+    "log": f"Bar heights are on a log scale from {LOG_FLOOR:g} to 1, with a faint line at 0.1.",
+    "linear": "Bar heights run from 0 to 1, with a faint line at 0.5.",
+}
 CONF_CAPTION = {
     "clean": f"""
         **Where the answers go.** Rows: the op of the context. Columns: the mass on the colors the column op can give
         for the query operands and the row op cannot, so a color several ops can give counts in each of their
-        columns. On the diagonal (outlined), the mass on the answers of the row op. A full cell is {CELL_OFF:g} off the
-        diagonal and {CELL_DIAG:g} on it. The ideal is the Bayes predictive; the models are seed means over eight runs.
+        columns. On the diagonal (outlined), the mass on the answers of the row op. {SCALE_NOTE[CONF_SCALE]} The ideal is the Bayes predictive; the models are seed means over eight runs.
     """,
     "edited": """
         **Where the answers go, with `difference` taken out.** Laid out as the earlier figure. The target null is
@@ -519,7 +527,7 @@ CONF_CAPTION = {
 
 
 @memo
-def confusion_draw(view: str, data: dict, alt_text: str) -> str:
+def confusion_draw(view: str, scale: str, data: dict, alt_text: str) -> str:
     @themed(name=f"d22-confusion-{view}", alt_text=alt_text, caption=CONF_CAPTION[view])
     def _plot() -> plt.Figure:
         n, k_n = len(OPS), len(data)
@@ -527,6 +535,7 @@ def confusion_draw(view: str, data: dict, alt_text: str) -> str:
             "grey": light_dark("#555", "#aaa"),
             "blue": light_dark("#2a6fbb", "#6aa6e8"),
             "orange": light_dark("#d9731a", "#f0a05a"),
+            "purple": light_dark("#7b4fb0", "#b493e0"),
         }
         paper = light_dark("#fff", "#111")
         well = light_dark("#f3f3f3", "#1e1e1e")
@@ -534,16 +543,16 @@ def confusion_draw(view: str, data: dict, alt_text: str) -> str:
         bw = 0.85 / k_n
         handles = []
         for c, (k, v) in enumerate(data.items()):
-            label, color, hatched = CONF_STYLE[k]
+            label, color = CONF_STYLE[k]
             mat = np.asarray(v)
             for i, j in np.ndindex(n, n):
-                h = 0.9 * mat[i, j] / (CELL_DIAG if i == j else CELL_OFF)
-                bar = ax.bar(
-                    j - 0.425 + (c + 0.5) * bw, h, bw * 0.88, bottom=-i - 0.45, lw=0.6,
-                    color=paper if hatched else inks[color], edgecolor=inks[color], hatch="//////" if hatched else None,
-                )  # fmt: skip
+                h = 0.9 * bar_height(mat[i, j], scale)
+                bar = ax.bar(j - 0.425 + (c + 0.5) * bw, h, bw * 0.88, bottom=-i - 0.45, lw=0, color=inks[color])
             handles.append((bar, label))
+        guide = 0.1 if scale == "log" else 0.5  # a faint line across every cell at this mass
         for i, j in np.ndindex(n, n):
+            y = -i - 0.45 + 0.9 * bar_height(guide, scale)
+            ax.plot([j - 0.45, j + 0.45], [y, y], color=light_dark("#ccc", "#444"), lw=0.5, zorder=0.5)
             if i == j:
                 ax.add_patch(
                     Rectangle((j - 0.47, -i - 0.47), 0.94, 0.94, fill=False, ec=light_dark("0.6", "0.45"), lw=0.6)
