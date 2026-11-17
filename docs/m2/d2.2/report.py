@@ -381,6 +381,27 @@ def basics_draw(data: dict, alt_text: str) -> str:
 # take them.
 
 fcx = _load_sibling("filtered-corpus", "d22_figures_fcx")
+# The post-hoc edits re-scored on every held-out context: the configurations the post-hoc comparison chose, fitted
+# on the controls without role labels ("pooled"), with nothing tuned again.
+phc = _load_sibling("post-hoc-compare", "d22_figures_phc")
+POSTHOC = ("leace", "inlp")
+
+
+def fetch_posthoc() -> dict[int, dict[str, np.ndarray]]:
+    store = project_store()
+    refs = {s: phc.CONFUSION_ARRAYS_REF.format(label=f"control-s{s}") for s in SEEDS}
+    found = {r: a for r, a in store.get_refs(list(refs.values())).items() if a is not None}
+    missing = [r for r in refs.values() if r not in found]
+    assert not missing, f"not published: {missing}"
+    out = {}
+    with tempfile.TemporaryDirectory() as tmp:
+        paths = store.get_many([(found[r], Path(tmp) / f"{s}.npz") for s, r in refs.items()])
+        for s, path in zip(refs, paths, strict=True):
+            with np.load(path) as z:
+                out[s] = {k: z[k] for k in ("op_ids", "query_pair", *(f"pooled/{m}/p_full" for m in POSTHOC))}
+    return out
+
+
 CONF_KINDS = ("control", "anchored", "sans-diff")
 
 
@@ -441,7 +462,17 @@ def confusion_matrices() -> dict[str, list]:
     def seed_mean(kind: str, key: str) -> list:
         return np.mean([confusion(dose[(kind, s)][key].astype(np.float64)) for s in SEEDS], axis=0).tolist()
 
+    posthoc = fetch_posthoc()
+    for s, v in posthoc.items():
+        assert (v["op_ids"] == op_ids).all() and (v["query_pair"] == pairs).all(), s
+
+    def posthoc_mean(method: str) -> list:
+        return np.mean(
+            [confusion(posthoc[s][f"pooled/{method}/p_full"].astype(np.float64)) for s in SEEDS], axis=0
+        ).tolist()
+
     return {
+        **{m: posthoc_mean(m) for m in POSTHOC},
         "ideal": confusion(post.predictive(table, ctx, prior)),
         "null": confusion(post.predictive(table, ctx, null)),
         "control": seed_mean("control", "p_clean"),
@@ -456,10 +487,11 @@ CONFUSION = {k: np.asarray(v) for k, v in confusion_matrices().items()}
 CONF_PANELS = {
     "clean": ("ideal", "control", "anchored"),
     "edited": ("null", "control-edited", "edited", "sans-diff"),
+    "post-hoc": ("null", "edited", "leace", "inlp"),
 }
 CONF_WIDEST = max(len(v) for v in CONF_PANELS.values())  # every figure sizes its bars for the widest panel
 # What each model was before `difference` was taken out, drawn faintly behind its bar.
-CONF_BEFORE = {"null": "ideal", "control-edited": "control", "edited": "anchored", "sans-diff": "control"}
+CONF_BEFORE = {"null": "ideal", "control-edited": "control", "edited": "anchored", "sans-diff": "control", "leace": "control", "inlp": "control"}  # fmt: skip
 # Bayes grey, control blue, anchored orange, sans-diff purple.
 CONF_STYLE = {
     "ideal": ("Bayes posterior (ideal)", "grey"),
@@ -469,6 +501,8 @@ CONF_STYLE = {
     "control-edited": ("control, edited", "blue"),
     "sans-diff": ("control w/o difference (sans-diff)", "purple"),
     "edited": ("anchored, edited", "orange"),
+    "leace": ("control, LEACE edit", "green"),
+    "inlp": ("control, INLP edit", "red"),
 }
 EYE = np.eye(len(OPS), dtype=bool)
 OP_SHORT = {"difference": "diff", "hue-hsv": "hue", "sat-hsv": "sat", "value-hsv": "value"}
@@ -480,14 +514,23 @@ def confusion_figure(view: str) -> str:
     outside = ~EYE & (np.arange(len(OPS)) != D)[:, None]  # off the diagonal and the `difference` row
     off = {k: float(v[outside].mean()) for k, v in m.items()}
     names = "; ".join(CONF_STYLE[k][0] for k in keys)
+    lo, hi = f"{min(off.values()):.2f}", f"{max(off.values()):.2f}"
+    spread = f"about {lo}" if lo == hi else f"{lo} to {hi}"
     head = f"""
         A grid with the op of the context on the rows and the op of the answer on the columns; each cell holds one
-        bar per model ({names}). Off the diagonal, the bars are short and about even ({min(off.values()):.2f} to {max(off.values()):.2f} on average outside the `difference` row).
+        bar per model ({names}). Off the diagonal, the bars are short and about even ({spread} on average outside the `difference` row).
     """
     if view == "clean":
         tail = f"""
             The models look alike everywhere. On the diagonal, the Bayes ideal puts about {np.diag(m["ideal"]).mean():.2f}
             on the answers of the row op, and the two models about {np.diag(m["control"]).mean():.2f}.
+        """
+    elif view == "post-hoc":
+        a = max((o for o in range(len(OPS)) if o != D), key=lambda o: m["null"][D, o])
+        row = "; ".join(f"{CONF_STYLE[k][0]} {m[k][D, D]:.2f}, with {m[k][D, a]:.2f} on {OPS[a]}" for k in keys)
+        tail = f"""
+            In the `difference` row, all four put little on `difference` answers and spread the rest over the other
+            ops in about the same proportions: {row}.
         """
     else:
         a, b = sorted((o for o in range(len(OPS)) if o != D), key=lambda o: -m["null"][D, o])[:2]
@@ -519,6 +562,12 @@ CONF_CAPTION = {
         `difference` was taken out: the ideal for the target null, the control for sans-diff, and the unedited
         model for the edited ones.
     """,
+    "post-hoc": """
+        **Where the answers go, with `difference` taken out after training.** Laid out as the earlier figures. LEACE
+        and INLP are post-hoc erasers fitted to the control without role labels, at the settings the post-hoc
+        comparison chose; beside them, the anchored model under its edit and the target null. Faint bars behind show
+        each one before the edit (for the target null, the ideal). Seed means over eight runs.
+    """,
 }
 
 
@@ -546,6 +595,8 @@ def confusion_draw(view: str, data: dict, before: dict, alt_text: str) -> str:
             "blue": light_dark("#2a6fbb", "#6aa6e8"),
             "orange": light_dark("#d9731a", "#f0a05a"),
             "purple": light_dark("#7b4fb0", "#b493e0"),
+            "green": light_dark("#3a8f4f", "#6cc184"),
+            "red": light_dark("#b8435a", "#e57a8e"),
         }
         paper = light_dark("#fff", "#111")
         well = light_dark("#f3f3f3", "#1e1e1e")
@@ -658,3 +709,9 @@ With `difference` taken out:
 """
 
 confusion_figure("edited")
+
+r"""
+The same with the two post-hoc erasers that removed the op best without role labels in the [post-hoc comparison](../post-hoc-compare/report.py):
+"""
+
+confusion_figure("post-hoc")
