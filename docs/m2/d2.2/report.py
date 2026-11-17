@@ -448,25 +448,28 @@ def confusion_matrices() -> dict[str, list]:
         "anchored": seed_mean("anchored", "p_clean"),
         "sans-diff": seed_mean("sans-diff", "p_clean"),
         "edited": seed_mean("anchored", "p_full"),
+        "control-edited": seed_mean("control", "p_full"),
     }
 
 
 CONFUSION = {k: np.asarray(v) for k, v in confusion_matrices().items()}
 CONF_PANELS = {
-    "all-ops": ("ideal", "control", "anchored"),
-    "without-difference": ("null", "sans-diff", "edited"),
+    "clean": ("ideal", "control", "anchored"),
+    "edited": ("null", "control-edited", "sans-diff", "edited"),
 }
-CONF_TITLES = {
-    "ideal": "Bayes posterior (ideal)",
-    "control": "control",
-    "anchored": "anchored",
-    "null": "Bayes w/o `difference`\n(target null)",
-    "sans-diff": "control w/o `difference`\n(sans-diff)",
-    "edited": "anchored, edited",
+# Bayes grey, control blue, anchored orange; hatched for the references built without `difference`.
+CONF_STYLE = {
+    "ideal": ("Bayes posterior (ideal)", "grey", False),
+    "control": ("control", "blue", False),
+    "anchored": ("anchored", "orange", False),
+    "null": ("Bayes w/o difference (target null)", "grey", True),
+    "control-edited": ("control, edited", "blue", False),
+    "sans-diff": ("control w/o difference (sans-diff)", "blue", True),
+    "edited": ("anchored, edited", "orange", False),
 }
 EYE = np.eye(len(OPS), dtype=bool)
-CONF_VMAX = max(float(np.where(EYE, 0, m).max()) for m in CONFUSION.values())  # one scale for both figures
-PRINT_FLOOR = 0.03
+CELL_OFF, CELL_DIAG = 0.3, 1.0  # the mass that fills a cell, off the diagonal and on it
+assert all(float(np.where(EYE, 0, m).max()) <= CELL_OFF for m in CONFUSION.values()), "an off-diagonal bar would clip"
 
 
 def confusion_figure(view: str) -> str:
@@ -474,40 +477,43 @@ def confusion_figure(view: str) -> str:
     m = {k: CONFUSION[k] for k in keys}
     outside = ~EYE & (np.arange(len(OPS)) != D)[:, None]  # off the diagonal and the `difference` row
     off = {k: float(v[outside].mean()) for k, v in m.items()}
-    if view == "all-ops":
-        alt = f"""
-            Three matrices side by side: the Bayes predictor, the control, and the anchored model, each with the op
-            of the context on the rows and, on the columns, the mass on answers of that op which the row op cannot
-            give. The three look alike. The `difference` row puts {m["ideal"][D, D]:.2f}, {m["control"][D, D]:.2f}
-            and {m["anchored"][D, D]:.2f} on its own answers; off the diagonal the squares average
-            {off["ideal"]:.2f}, {off["control"]:.2f} and {off["anchored"]:.2f} outside the `difference` row.
+    names = "; ".join(CONF_STYLE[k][0] for k in keys)
+    head = f"""
+        A grid with the op of the context on the rows and the op of the answer on the columns; each cell holds one
+        bar per model ({names}). Off the diagonal, the bars are short and about even ({min(off.values()):.2f} to {max(off.values()):.2f} on average outside the `difference` row).
+    """
+    if view == "clean":
+        tail = f"""
+            The models look alike everywhere. On the diagonal, the Bayes ideal puts about {np.diag(m["ideal"]).mean():.2f}
+            on the answers of the row op, and the two models about {np.diag(m["control"]).mean():.2f}.
         """
     else:
         a, b = sorted((o for o in range(len(OPS)) if o != D), key=lambda o: -m["null"][D, o])[:2]
-        alt = f"""
-            Three matrices side by side: the target null, sans-diff, and the anchored model under the edit, laid out
-            as in the previous figure. Off the `difference` row they look like the models with every op. In the
-            `difference` row the mass on its own answers is {m["null"][D, D]:.2f}, {m["sans-diff"][D, D]:.2f} and
-            {m["edited"][D, D]:.2f}, and the rest spreads over the other six ops in about the same proportions,
-            most on {OPS[a]} and {OPS[b]} ({m["null"][D, a]:.2f} and {m["null"][D, b]:.2f} under the target null,
-            {m["sans-diff"][D, a]:.2f} and {m["sans-diff"][D, b]:.2f} under sans-diff, {m["edited"][D, a]:.2f} and
-            {m["edited"][D, b]:.2f} under the edit).
+        row = "; ".join(
+            f"{CONF_STYLE[k][0]} {m[k][D, D]:.2f}, with {m[k][D, a]:.2f} on {OPS[a]}"
+            for k in keys
+            if k != "control-edited"
+        )
+        tail = f"""
+            In the `difference` row, the diagonal bars are near zero for the three models without `difference`, and
+            the mass goes to the other six ops instead, most to {OPS[a]} and {OPS[b]}: {row}. The edited control
+            keeps `difference`, with {m["control-edited"][D, D]:.2f} on the diagonal.
         """
-    return confusion_draw(view, {k: v.tolist() for k, v in m.items()}, alt)
+    return confusion_draw(view, {k: v.tolist() for k, v in m.items()}, head + tail)
 
 
 CONF_CAPTION = {
-    "all-ops": """
-        **Where the answers go, with every op.** Rows: the op of the context. Columns: the mass on the colors the
-        column op can give for the query operands and the row op cannot. The diagonal (the mass on the answers of
-        the row op) is outlined, printed in grey italics, and left out of the color scale. The ideal is the Bayes
-        predictive; the control and anchored panels are seed means over eight runs, unedited.
+    "clean": f"""
+        **Where the answers go.** Rows: the op of the context. Columns: the mass on the colors the column op can give
+        for the query operands and the row op cannot, so a color several ops can give counts in each of their
+        columns. On the diagonal (outlined), the mass on the answers of the row op. A full cell is {CELL_OFF:g} off the
+        diagonal and {CELL_DIAG:g} on it. The ideal is the Bayes predictive; the models are seed means over eight runs.
     """,
-    "without-difference": """
-        **Where the answers go, without `difference`.** Laid out as the previous figure, on the same color scale.
-        The target null is the Bayes predictive with `difference` taken out of the posterior; sans-diff is the
-        control trained with the loss masked on `difference` contexts; the anchored model is under the edit. The
-        `difference` row and column are hatched, since each of these has that op taken out.
+    "edited": """
+        **Where the answers go, with `difference` taken out.** Laid out as the earlier figure. The target null is
+        the Bayes predictive with `difference` taken out of the posterior; sans-diff is the control trained with
+        the loss masked on `difference` contexts. Both edited models are under the same edit of the anchored axis;
+        the control holds nothing there, so its edit leaves the op in place.
     """,
 }
 
@@ -516,36 +522,42 @@ CONF_CAPTION = {
 def confusion_draw(view: str, data: dict, alt_text: str) -> str:
     @themed(name=f"d22-confusion-{view}", alt_text=alt_text, caption=CONF_CAPTION[view])
     def _plot() -> plt.Figure:
-        n = len(OPS)
-        fig, axes = plt.subplots(1, 3, figsize=(7.4, 2.9), layout="constrained", sharex=True, sharey=True)
-        cmap = plt.get_cmap(light_dark("Blues", "magma")).copy()
-        cmap.set_bad(light_dark("#fff", "#111"))
-        dark_ink = light_dark(0, 1) == 0
-        im = None
-        for ax, (k, v) in zip(axes, data.items(), strict=True):
+        n, k_n = len(OPS), len(data)
+        inks = {
+            "grey": light_dark("#555", "#aaa"),
+            "blue": light_dark("#2a6fbb", "#6aa6e8"),
+            "orange": light_dark("#d9731a", "#f0a05a"),
+        }
+        paper = light_dark("#fff", "#111")
+        well = light_dark("#f3f3f3", "#1e1e1e")
+        fig, ax = plt.subplots(figsize=(4.8, 5.0), layout="constrained")
+        bw = 0.85 / k_n
+        handles = []
+        for c, (k, v) in enumerate(data.items()):
+            label, color, hatched = CONF_STYLE[k]
             mat = np.asarray(v)
-            im = ax.imshow(np.where(EYE, np.nan, mat), cmap=cmap, vmin=0, vmax=CONF_VMAX)
             for i, j in np.ndindex(n, n):
-                if i == j:
-                    ax.add_patch(Rectangle((j - 0.46, i - 0.46), 0.92, 0.92, fill=False, ec="0.6", lw=0.6))
-                    ax.text(j, i, f"{mat[i, j]:.2f}".removeprefix("0"), ha="center", va="center", fontsize=6,
-                            color=light_dark("#777", "#999"), fontstyle="italic")  # fmt: skip
-                elif mat[i, j] >= PRINT_FLOOR:
-                    dark_cell = (mat[i, j] / CONF_VMAX > 0.55) == dark_ink
-                    ax.text(j, i, f"{mat[i, j]:.2f}"[1:], ha="center", va="center", fontsize=6,
-                            color="#fff" if dark_cell else "#000")  # fmt: skip
-            if view == "without-difference":
-                hatch = {"facecolor": "none", "edgecolor": light_dark("0.6", "0.4"), "lw": 0}
-                ax.axhspan(D - 0.5, D + 0.5, hatch="////", alpha=light_dark(0.5, 0.6), **hatch)
-                ax.axvspan(D - 0.5, D + 0.5, hatch="/", alpha=light_dark(0.4, 0.5), **hatch)
-            ax.set_title(CONF_TITLES[k].replace("`", ""), fontsize=8)
-            ax.set_xticks(range(n), OPS, rotation=90, fontsize=6)
-            ax.set_yticks(range(n), OPS, fontsize=6)
-            ax.tick_params(length=0)
-        assert im is not None
-        cb = fig.colorbar(im, ax=axes, shrink=0.8, label="mass", pad=0.02)
-        cb.ax.tick_params(labelsize=6)
-        cb.set_label("mass", fontsize=7)
+                h = 0.9 * mat[i, j] / (CELL_DIAG if i == j else CELL_OFF)
+                bar = ax.bar(
+                    j - 0.425 + (c + 0.5) * bw, h, bw * 0.88, bottom=-i - 0.45, lw=0.6,
+                    color=paper if hatched else inks[color], edgecolor=inks[color], hatch="//////" if hatched else None,
+                )  # fmt: skip
+            handles.append((bar, label))
+        for i, j in np.ndindex(n, n):
+            if i == j:
+                ax.add_patch(
+                    Rectangle((j - 0.47, -i - 0.47), 0.94, 0.94, fill=False, ec=light_dark("0.6", "0.45"), lw=0.6)
+                )
+            else:
+                ax.add_patch(Rectangle((j - 0.5, -i - 0.5), 1, 1, fc=well, ec=paper, lw=1.5, zorder=0))
+        ax.set_xticks(range(n), OPS, rotation=90, fontsize=7)
+        ax.set_yticks([-i for i in range(n)], OPS, fontsize=7)
+        ax.set_xlim(-0.5, n - 0.5)
+        ax.set_ylim(-n + 0.5, 0.5)
+        ax.set_aspect("equal")
+        ax.spines[:].set_visible(False)
+        ax.tick_params(length=0)
+        fig.legend(*zip(*handles, strict=True), ncols=2, frameon=False, fontsize=7, loc="outside upper center")
         return fig
 
     return _plot()
@@ -601,13 +613,13 @@ basics_figure()
 r"""
 ## Where the answers go
 
-Op confusion: for contexts of each op (rows), how much mass the model puts on the answers each op could give (columns). The first figure compares the control and the anchored model with the Bayes predictor, which knows every op; the second compares the anchored model under the edit with two references that never had `difference`: the target null and sans-diff. These come from the same seeds before the cooldown experiment took the end anneal out (the [filtered-corpus](../filtered-corpus/report.py) report draws the same matrices), since that experiment kept no answer distributions.
+Op confusion: for the contexts of each op (rows), how much mass a model puts on the answers each op could give (columns), with one bar per model in each cell. The first figure has the models with every op, beside the Bayes predictor; the second has the models with `difference` taken out, by the edit or in training, beside the target null. These come from the same seeds before the cooldown experiment took the end anneal out (the [filtered-corpus](../filtered-corpus/report.py) report draws the same matrices as heatmaps), since that experiment kept no answer distributions.
 """
 
-confusion_figure("all-ops")
+confusion_figure("clean")
 
 r"""
-The same, without `difference`:
+With `difference` taken out:
 """
 
-confusion_figure("without-difference")
+confusion_figure("edited")
