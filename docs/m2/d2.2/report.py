@@ -457,6 +457,9 @@ CONF_PANELS = {
     "clean": ("ideal", "control", "anchored"),
     "edited": ("null", "control-edited", "edited", "sans-diff"),
 }
+CONF_WIDEST = max(len(v) for v in CONF_PANELS.values())  # every figure sizes its bars for the widest panel
+# What each model was before `difference` was taken out, drawn faintly behind its bar.
+CONF_BEFORE = {"null": "ideal", "control-edited": "control", "edited": "anchored", "sans-diff": "control"}
 # Bayes grey, control blue, anchored orange, sans-diff purple.
 CONF_STYLE = {
     "ideal": ("Bayes posterior (ideal)", "grey"),
@@ -498,7 +501,8 @@ def confusion_figure(view: str) -> str:
             the mass goes to the other six ops instead, most to {OPS[a]} and {OPS[b]}: {row}. The edited control
             keeps `difference`, with {m["control-edited"][D, D]:.2f} on the diagonal.
         """
-    return confusion_draw(view, {k: v.tolist() for k, v in m.items()}, head + tail)
+    before = {k: CONFUSION[CONF_BEFORE[k]].tolist() for k in keys if k in CONF_BEFORE}
+    return confusion_draw(view, {k: v.tolist() for k, v in m.items()}, before, head + tail)
 
 
 CONF_CAPTION = {
@@ -511,7 +515,9 @@ CONF_CAPTION = {
         **Where the answers go, with `difference` taken out.** Laid out as the earlier figure. The target null is
         the Bayes predictive with `difference` taken out of the posterior; sans-diff is the control trained with
         the loss masked on `difference` contexts. Both edited models are under the same edit of the anchored axis;
-        the control holds nothing there, so its edit leaves the op in place.
+        the control holds nothing there, so its edit leaves the op in place. Faint bars behind show each one before
+        `difference` was taken out: the ideal for the target null, the control for sans-diff, and the unedited
+        model for the edited ones.
     """,
 }
 
@@ -524,16 +530,16 @@ plt.rcParams["savefig.pad_inches"] = 24 / DPI
 
 
 @memo
-def confusion_draw(view: str, data: dict, alt_text: str) -> str:
+def confusion_draw(view: str, data: dict, before: dict, alt_text: str) -> str:
     @themed(name=f"d22-confusion-{view}", alt_text=alt_text, caption=CONF_CAPTION[view])
     def _plot() -> plt.Figure:
         n, k_n = len(OPS), len(data)
-        pitch, gap, frame = 116, 8, 2  # cell pitch, gap between cells, diagonal frame (pixels)
+        pitch, gap, frame = 116, 8, 1  # cell pitch, gap between cells, diagonal frame (pixels)
         bar_gap, side = 2, 6  # between bars, and from the cell edge to the outer bars
         left, top, bottom, right = 84, 88, 44, 4
         w, h = left + n * pitch + right, top + n * pitch + bottom
         cell = pitch - gap
-        bar_w = (cell - 2 * side - (k_n - 1) * bar_gap) // k_n
+        bar_w = (cell - 2 * side - (CONF_WIDEST - 1) * bar_gap) // CONF_WIDEST
         x_pad = (cell - k_n * bar_w - (k_n - 1) * bar_gap) // 2
         inks = {
             "grey": light_dark("#555", "#aaa"),
@@ -552,8 +558,8 @@ def confusion_draw(view: str, data: dict, alt_text: str) -> str:
         # A clear patch over the whole figure, so the tight crop keeps the figure whole and the pixels stay put.
         fig.add_artist(Rectangle((0, 0), 1, 1, transform=fig.transFigure, fc="none", ec="none", lw=0))
 
-        def box(x: float, y: float, bw: float, bh: float, fc: Any) -> Rectangle:
-            patch = Rectangle((x, y), bw, bh, fc=fc, lw=0, snap=False)
+        def box(x: float, y: float, bw: float, bh: float, fc: Any, alpha: float = 1.0) -> Rectangle:
+            patch = Rectangle((x, y), bw, bh, fc=fc, alpha=alpha, lw=0, snap=False)
             ax.add_patch(patch)
             return patch
 
@@ -566,6 +572,9 @@ def confusion_draw(view: str, data: dict, alt_text: str) -> str:
             for c, (k, v) in enumerate(data.items()):
                 bar_h = cell * float(v[i][j])
                 bx = x0 + x_pad + c * (bar_w + bar_gap)
+                if k in before:
+                    was = cell * float(before[k][i][j])
+                    box(bx, y0 + cell - was, bar_w, was, fc=inks[CONF_STYLE[k][1]], alpha=light_dark(0.15, 0.25))
                 handles[k] = box(bx, y0 + cell - bar_h, bar_w, bar_h, fc=inks[CONF_STYLE[k][1]])
         ink = light_dark("#222", "#ddd")
         for i, op in enumerate(OPS):
