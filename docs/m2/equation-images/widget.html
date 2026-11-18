@@ -208,7 +208,7 @@ function render() {
   const who = {
     clean: "the unedited model",
     edited: "the model with the op's axis edited out",
-    retrained: "a model trained the same way but never shown <code>difference</code>",
+    retrained: "a model trained the same way but never taught <code>difference</code> (its loss was masked on <code>difference</code> contexts)",
     ideal: "the ideal predictor without <code>difference</code>, which weighs the other ops by how well they fit the examples",
   }[s.model];
   const answer = s.model === "truth"
