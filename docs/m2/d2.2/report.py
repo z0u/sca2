@@ -494,17 +494,17 @@ CONF_PANELS = {
 CONF_WIDEST = max(len(v) for v in CONF_PANELS.values())  # every figure sizes its bars for the widest panel
 # What each model was before `difference` was taken out, drawn faintly behind its bar.
 CONF_BEFORE = {"null": "ideal", "control-edited": "control", "edited": "anchored", "sans-diff": "control", "leace": "control", "inlp": "control"}  # fmt: skip
-# Bayes grey, control blue, anchored orange, sans-diff purple.
+# Bayes grey, control blue, anchored orange, retrained (sans-diff) purple.
 CONF_STYLE = {
     "ideal": ("ideal₇", "grey"),
     "control": ("control", "blue"),
     "anchored": ("anchored", "orange"),
     "null": ("ideal₆", "grey"),
     "control-edited": ("control, edited", "blue"),
-    "sans-diff": ("control w/o difference (sans-diff)", "purple"),
+    "sans-diff": ("retrained", "purple"),
     "edited": ("anchored, edited", "orange"),
-    "leace": ("control, LEACE edit", "green"),
-    "inlp": ("control, INLP edit", "red"),
+    "leace": ("control, LEACE", "green"),
+    "inlp": ("control, INLP", "red"),
 }
 EYE = np.eye(len(OPS), dtype=bool)
 OP_SHORT = {"difference": "diff", "hue-hsv": "hue", "sat-hsv": "sat", "value-hsv": "value"}
@@ -558,10 +558,10 @@ CONF_CAPTION = {
     """,
     "edited": """
         **Where the answers go, with `difference` taken out.** Laid out as the earlier figure. ideal₆ is the
-        Bayes-optimal predictor with `difference` taken out (the target null); sans-diff is the control trained with
-        the loss masked on `difference` contexts. Both edited models are under the same edit of the anchored axis;
+        Bayes-optimal predictor with `difference` taken out (the target null); retrained is the control trained from scratch with
+        the loss masked on `difference` contexts (sans-diff in the earlier reports). Both edited models are under the same edit of the anchored axis;
         the control holds nothing there, so its edit leaves the op in place. Faint bars behind show each one before
-        `difference` was taken out: ideal₇ for ideal₆, the control for sans-diff, and the unedited
+        `difference` was taken out: ideal₇ for ideal₆, the control for retrained, and the unedited
         model for the edited ones.
     """,
     "post-hoc": """
@@ -587,7 +587,7 @@ def confusion_draw(view: str, data: dict, before: dict, alt_text: str) -> str:
         n, k_n = len(OPS), len(data)
         pitch, gap, frame = 116, 8, 1  # cell pitch, gap between cells, diagonal frame (pixels)
         bar_gap, side = 2, 6  # between bars, and from the cell edge to the outer bars
-        left, top, bottom, right = 84, 88, 44, 4
+        left, top, bottom, right = 84, 56, 44, 4
         w, h = left + n * pitch + right, top + n * pitch + bottom
         cell = pitch - gap
         bar_w = (cell - 2 * side - (CONF_WIDEST - 1) * bar_gap) // CONF_WIDEST
@@ -643,7 +643,7 @@ def confusion_draw(view: str, data: dict, before: dict, alt_text: str) -> str:
                 color=ink,
             )
         fig.legend(
-            list(handles.values()), [CONF_STYLE[k][0] for k in handles], ncols=2, frameon=False, fontsize=7,
+            list(handles.values()), [CONF_STYLE[k][0] for k in handles], ncols=len(handles), frameon=False, fontsize=7,
             loc="upper center", bbox_to_anchor=(0.5, 1.0), borderaxespad=0.2, handlelength=1.4,
         )  # fmt: skip
         return fig
