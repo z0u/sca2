@@ -109,10 +109,10 @@ const CHOICES = {
     ["sample", "T = 1", "Temperature 1: one color drawn from the model's answer at each pixel"]]],
   full: ["Answer, with every op", [
     ["truth", "true", "The true answer under the op"],
-    ["bayes", "ideal₇", "Ideal₇: answer of the ideal predictor, which knows all seven ops"],
+    ["bayes", "ideal\u2087", "Ideal\u2087: answer of the ideal predictor, which knows all seven ops"],
     ["clean", "clean", "Answer from the unedited model"]], "all ops"],
   nodiff: ["Answer, without difference", [
-    ["ideal", "ideal₆", "Ideal₆: answer of the ideal predictor without difference, which knows the other six ops"],
+    ["ideal", "ideal\u2086", "Ideal\u2086: answer of the ideal predictor without difference, which knows the other six ops"],
     ["retrained", "retrained", "Answer from a model trained without difference"],
     ["edited", "edited", "Answer from the model with the op's axis edited out"]], "w/o diff."],
 };
@@ -178,7 +178,7 @@ for (const [a, b] of EXAMPLES) {
 box.append(controls(QUERY), controls(ANSWERS));
 const qa = panel("query", "a"), qb = panel("query", "b"), qy = panel("query", "y");
 box.append(el("div", "side", "query"), qa[0], el("span", "sym", "&"), qb[0], el("span", "sym", "="), qy[0]);
-const NAMES = { truth: "true", bayes: "ideal₇", clean: "clean", ideal: "ideal₆", retrained: "retrained", edited: "edited" };
+const NAMES = { truth: "true", bayes: "ideal\u2087", clean: "clean", ideal: "ideal\u2086", retrained: "retrained", edited: "edited" };
 function answerName(s) {
   if (s.model === "truth") return `truth-${s.render}-${s.b}-${s.op}`;
   return `answer-${WALK}-${s.render}-${s.b}-${s.op}-${s.model}-${s.pick}`;
@@ -222,11 +222,11 @@ function render() {
 
   const op = `<code>${s.op}</code>`;
   const who = {
-    bayes: "ideal₇, the ideal predictor, which weighs all seven ops by how well they fit the examples",
+    bayes: "ideal\u2087, the ideal predictor, which weighs all seven ops by how well they fit the examples",
     clean: "the unedited model",
     edited: "the model with the op's axis edited out",
     retrained: "a model trained the same way but never taught <code>difference</code> (its loss was masked on <code>difference</code> contexts)",
-    ideal: "ideal₆, the ideal predictor without <code>difference</code>, which weighs the other six ops by how well they fit the examples",
+    ideal: "ideal\u2086, the ideal predictor without <code>difference</code>, which weighs the other six ops by how well they fit the examples",
   }[s.model];
   const answer = s.model === "truth"
     ? `Here y is the true answer under ${op}.`
