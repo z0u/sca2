@@ -477,7 +477,7 @@ The table gives the share of pixels where two of these pictures name the same co
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 {_agree_lines}
 
-On `difference`, the edited model names the same color as the ideal without `difference` on {AGREE[_ramp, A, "full edit/argmax"][0]:.0%} of the ramp pixels and the retrained model on {AGREE[_ramp, A, "retrained/argmax"][0]:.0%}; on the hue and lightness query, {AGREE[_hue, A, "full edit/argmax"][0]:.0%} and {AGREE[_hue, A, "retrained/argmax"][0]:.0%}.
+On `difference`, the edited model names the same color as the ideal without `difference` on {AGREE[_ramp, A, "full edit/argmax"][0]:.0%} of the ramp pixels and the retrained model on {AGREE[_ramp, A, "retrained/argmax"][0]:.0%}; on the hue and lightness query, {AGREE[_hue, A, "full edit/argmax"][0]:.0%} and {AGREE[_hue, A, "retrained/argmax"][0]:.0%}. These shares are low for every model because the ideal without `difference` is often close to a tie: once `difference` is out, several ops explain a pixel's examples about equally, and a small shift in probability moves the most likely color from one op's answer to another's. The retrained model, which never knew `difference`, sets the level a model can reach here, and the edited model comes within a few hundredths of it. In the pictures, all three paint the same kind of patchwork of the other ops.
 """
 
 # %%
@@ -495,9 +495,9 @@ def png(idx: np.ndarray) -> bytes:
     return buf.getvalue()
 
 
+# The reference pictures as panels. The ideal without `difference` takes the name `ideal`, the comparison the
+# widget offers beside the edited and retrained models; the full-task ideal is `bayes`.
 REFERENCE_PANELS = (("retrained", "retrained"), ("null", "ideal"), ("bayes", "bayes"))
-"""The reference pictures as panels. The ideal without `difference` takes the name `ideal`, the comparison the
-widget offers beside the edited and retrained models; the full-task ideal is `bayes`."""
 
 
 def query_panels(seed: int, render: str, query: tuple[str, str], op: str) -> list[tuple[str, np.ndarray]]:
