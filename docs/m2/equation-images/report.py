@@ -387,11 +387,11 @@ With random examples the edit takes the `difference` picture from {_diff[RANDOM,
 
 REFERENCE_COLUMNS = (
     ("truth", "true answer"),
-    ("bayes/argmax", "ideal"),
+    ("bayes/argmax", "ideal₇"),
     ("clean/argmax", "unedited"),
-    ("null/argmax", "ideal w/o diff."),
-    ("full edit/argmax", "edited"),
+    ("null/argmax", "ideal₆"),
     ("retrained/argmax", "retrained"),
+    ("full edit/argmax", "edited"),
 )
 
 
@@ -423,8 +423,8 @@ def draw_references(seed: int, render: str, op: str) -> plt.Figure:
 def references_figure(seed: int, render: str, op: str) -> str:
     alt = (
         f"Two rows of pictures, one per query: the operands a and b, then the {op} of them six ways, each at the most "
-        "likely color: the true answer, the ideal predictor and the unedited model; then the ideal predictor without "
-        "difference, the edited model and the model retrained without difference."
+        "likely color: the true answer, ideal₇ (the ideal predictor) and the unedited model; then ideal₆ (the ideal predictor without "
+        "difference), the model retrained without difference and the edited model."
     )
     return themed(draw_references, name=f"references-{render}-{op}", alt_text=alt)(seed, render, op)
 
@@ -459,8 +459,8 @@ r"""
 
 How close do the edited pictures come to what a model that never knew `difference` should paint? Two references answer the same contexts, with the examples in step.
 
-Ideal predictor
-:   The Bayes predictive: the posterior over ops given a pixel's three examples, under the corpus noise model, weighting each op's answer distribution on the query pair. The ideal without `difference` takes `difference` out of the posterior and renormalizes the rest (the target null), which is what an edited model should aim at.
+Ideal predictors
+:   Ideal₇ is the Bayes predictive over all seven ops: the posterior over ops given a pixel's three examples, under the corpus noise model, weighting each op's answer distribution on the query pair. Ideal₆ takes `difference` out of the posterior and renormalizes the other six (the target null), which is what an edited model should aim at.
 
 Retrained model
 :   The model trained without `difference` in the filtered-corpus experiment: the same recipe with its loss masked on `difference` contexts, at the same seed.
@@ -473,11 +473,11 @@ references_figure(SEED, "posterized", A)
 rf"""
 The table gives the share of pixels where two of these pictures name the same color, as the mean over the eight seeds with the seed range in parentheses, posterized, for the ramp query and then the hue and lightness query.
 
-| op | unedited ~ ideal | edited ~ ideal w/o diff. | retrained ~ ideal w/o diff. | unedited ~ ideal | edited ~ ideal w/o diff. | retrained ~ ideal w/o diff. |
+| op | unedited ~ ideal₇ | edited ~ ideal₆ | retrained ~ ideal₆ | unedited ~ ideal₇ | edited ~ ideal₆ | retrained ~ ideal₆ |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 {_agree_lines}
 
-On `difference`, the edited model names the same color as the ideal without `difference` on {AGREE[_ramp, A, "full edit/argmax"][0]:.0%} of the ramp pixels and the retrained model on {AGREE[_ramp, A, "retrained/argmax"][0]:.0%}; on the hue and lightness query, {AGREE[_hue, A, "full edit/argmax"][0]:.0%} and {AGREE[_hue, A, "retrained/argmax"][0]:.0%}. These shares are low for every model because the ideal without `difference` is often close to a tie: once `difference` is out, several ops explain a pixel's examples about equally, and a small shift in probability moves the most likely color from one op's answer to another's. The retrained model, which never knew `difference`, sets the level a model can reach here, and the edited model sits about five hundredths below it on both queries. In the pictures, all three paint the same kind of patchwork of the other ops.
+On `difference`, the edited model names the same color as ideal₆ on {AGREE[_ramp, A, "full edit/argmax"][0]:.0%} of the ramp pixels and the retrained model on {AGREE[_ramp, A, "retrained/argmax"][0]:.0%}; on the hue and lightness query, {AGREE[_hue, A, "full edit/argmax"][0]:.0%} and {AGREE[_hue, A, "retrained/argmax"][0]:.0%}. These shares are low for every model because ideal₆ is often close to a tie: once `difference` is out, several ops explain a pixel's examples about equally, and a small shift in probability moves the most likely color from one op's answer to another's. The retrained model, which never knew `difference`, sets the level a model can reach here, and the edited model sits about five hundredths below it on both queries. In the pictures, all three paint the same kind of patchwork of the other ops.
 """
 
 # %%
@@ -495,7 +495,7 @@ def png(idx: np.ndarray) -> bytes:
     return buf.getvalue()
 
 
-# The reference pictures as panels. The ideal without `difference` takes the name `ideal`, the comparison the
+# The reference pictures as panels. Ideal₆ (without `difference`) takes the name `ideal`, the comparison the
 # widget offers beside the edited and retrained models; the full-task ideal is `bayes`.
 REFERENCE_PANELS = (("retrained", "retrained"), ("null", "ideal"), ("bayes", "bayes"))
 
@@ -552,7 +552,7 @@ WIDGET = write_panels(SEED)
 rf"""
 ## The panels as files
 
-Every panel of seed {SEED} is also a PNG at its native size ({W} × {H}, one pixel per grid color), named in [panels.json]({MANIFEST.get("manifest", "_assets/panels.json")}). A [small page]({WIDGET or "_assets/widget.html"}) shows them as one context at a time, with the examples walked in step, and a choice of op, colors, second image, temperature and answer (the unedited, edited and retrained models, the ideal predictor without `difference`, and the true answer), for embedding in a post.
+Every panel of seed {SEED} is also a PNG at its native size ({W} × {H}, one pixel per grid color), named in [panels.json]({MANIFEST.get("manifest", "_assets/panels.json")}). A [small page]({WIDGET or "_assets/widget.html"}) shows them as one context at a time, with the examples walked in step, and a choice of op, colors, second image, temperature and answer (the unedited, edited and retrained models, the ideal predictors ideal₇ and ideal₆, and the true answer), for embedding in a post.
 
 ## References
 
