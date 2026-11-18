@@ -105,6 +105,8 @@ const CHOICES = {
   model: ["Answer", [
     ["clean", "clean", "Answer from the unedited model"],
     ["edited", "edited", "Answer from the model with the op's axis edited out"],
+    ["retrained", "retrained", "Answer from a model trained without difference"],
+    ["ideal", "ideal", "Answer of the ideal predictor without difference"],
     ["truth", "true", "The true answer under the op"]]],
 };
 const TOP = ["render", "op"], QUERY = ["b", "pick", "model"];
@@ -160,7 +162,7 @@ for (const [a, b] of EXAMPLES) {
 box.append(controls(QUERY));
 const qa = panel("query", "a"), qb = panel("query", "b"), qy = panel("query", "y");
 box.append(el("div", "side", "query"), qa[0], el("span", "sym", "&"), qb[0], el("span", "sym", "="), qy[0]);
-const NAMES = { clean: "clean", edited: "edited", truth: "true" };
+const NAMES = { clean: "clean", edited: "edited", retrained: "retrained", ideal: "ideal", truth: "true" };
 function answerName(s) {
   if (s.model === "truth") return `truth-${s.render}-${s.b}-${s.op}`;
   return `answer-${WALK}-${s.render}-${s.b}-${s.op}-${s.model}-${s.pick}`;
@@ -203,9 +205,15 @@ function render() {
   });
 
   const op = `<code>${s.op}</code>`;
+  const who = {
+    clean: "the unedited model",
+    edited: "the model with the op's axis edited out",
+    retrained: "a model trained the same way but never shown <code>difference</code>",
+    ideal: "the ideal predictor without <code>difference</code>, which weighs the other ops by how well they fit the examples",
+  }[s.model];
   const answer = s.model === "truth"
     ? `Here y is the true answer under ${op}.`
-    : `Here y is the answer of the ${s.model === "clean" ? "unedited model" : "model with the op's axis edited out"}, ` +
+    : `Here y is the answer of ${who}, ` +
       (s.pick === "sample" ? "with one color drawn from its answer at each pixel (T = 1)." : "with its most likely color at each pixel (T = 0).") +
       " Each pixel of y is its own context: the three example pixels at the same position, then the query pair.";
   document.getElementById("caption").innerHTML =
