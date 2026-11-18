@@ -39,6 +39,18 @@ Nothing about that word here.
 """
 '''
 
+PROBE = '''"""Step timing: how long a training step takes.
+
+Setup, about the batches.
+
+Results (a date): the step took 2 ms.
+
+    bin/mini run docs/m2/timing/experiment.py
+"""
+
+import numpy as np
+'''
+
 GLOSSARY = """# Glossary
 
 <!-- a comment -->
@@ -64,6 +76,9 @@ def tree(tmp_path: Path) -> Path:
     (tmp_path / "todo" / "science" / "latch.md").write_text(
         "---\nstatus: done\ntags: [spill]\n---\n# Why the separator latches\n\nThe body names α once.\n"
     )
+    (tmp_path / "docs" / "m2" / "timing").mkdir(parents=True)
+    (tmp_path / "docs" / "m2" / "timing" / "experiment.py").write_text(PROBE)
+    (tmp_path / "docs" / "m2" / "scout" / "experiment.py").write_text(PROBE)
     return tmp_path
 
 
@@ -86,6 +101,14 @@ def test_report_lines_point_at_the_source(tree: Path):
     for p in find.corpus(tree):
         if p.kind == "report" and p.heading:
             assert p.heading.split(" › ")[-1] in source[p.line - 1]
+
+
+def test_probe_notes_are_passages_unless_a_report_covers_them(tree: Path):
+    probe = [p for p in find.corpus(tree) if p.kind == "probe"]
+    assert {p.path for p in probe} == {"docs/m2/timing/experiment.py"}
+    assert [p.title for p in probe] == ["Step timing"] * 3
+    results = next(p for p in probe if p.text.startswith("Results"))
+    assert results.line == 5 and "bin/mini" not in results.text
 
 
 def test_index_entries_point_at_their_report(tree: Path):
