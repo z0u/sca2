@@ -218,10 +218,12 @@ def training_figure(view: str) -> str:
 TASK_CAPTION = {
     "per-op": """the task score (expected exact match) of each op on held-out contexts, as the mean over the eight
         runs, with each run behind it as a hairline in the same color. The ticks past the end of
-        training mark the Bayes ceiling of each op, the score of an ideal predictor on the same contexts.""",
+        training mark the score ideal₇ would give for each op on the same contexts, where ideal₇ is the
+        Bayes-optimal predictor over all seven ops.""",
     "mean": """the task score (expected exact match) on held-out contexts: the mean over ops and runs, with a band
         spanning the runs, and each op of each run behind it as a hairline. The tick past the end of training marks
-        the Bayes ceiling, the score of an ideal predictor on the same contexts.""",
+        the score ideal₇ would give on the same contexts, where ideal₇ is the Bayes-optimal predictor over all seven
+        ops.""",
 }
 
 
@@ -494,10 +496,10 @@ CONF_WIDEST = max(len(v) for v in CONF_PANELS.values())  # every figure sizes it
 CONF_BEFORE = {"null": "ideal", "control-edited": "control", "edited": "anchored", "sans-diff": "control", "leace": "control", "inlp": "control"}  # fmt: skip
 # Bayes grey, control blue, anchored orange, sans-diff purple.
 CONF_STYLE = {
-    "ideal": ("Bayes posterior (ideal)", "grey"),
+    "ideal": ("ideal₇", "grey"),
     "control": ("control", "blue"),
     "anchored": ("anchored", "orange"),
-    "null": ("Bayes w/o difference (target null)", "grey"),
+    "null": ("ideal₆", "grey"),
     "control-edited": ("control, edited", "blue"),
     "sans-diff": ("control w/o difference (sans-diff)", "purple"),
     "edited": ("anchored, edited", "orange"),
@@ -522,7 +524,7 @@ def confusion_figure(view: str) -> str:
     """
     if view == "clean":
         tail = f"""
-            The models look alike everywhere. On the diagonal, the Bayes ideal puts about {np.diag(m["ideal"]).mean():.2f}
+            The models look alike everywhere. On the diagonal, ideal₇ puts about {np.diag(m["ideal"]).mean():.2f}
             on the answers of the row op, and the two models about {np.diag(m["control"]).mean():.2f}.
         """
     elif view == "post-hoc":
@@ -552,21 +554,21 @@ CONF_CAPTION = {
     "clean": """
         **Where the answers go.** Rows: the op of the context. Columns: the mass on the colors the column op can give
         for the query operands and the row op cannot, so a color several ops can give counts in each of their
-        columns. On the diagonal (outlined), the mass on the answers of the row op. A full cell is a mass of 1. The ideal is the Bayes predictive; the models are seed means over eight runs.
+        columns. On the diagonal (outlined), the mass on the answers of the row op. A full cell is a mass of 1. ideal₇ is the Bayes-optimal predictor over all seven ops; the models are seed means over eight runs.
     """,
     "edited": """
-        **Where the answers go, with `difference` taken out.** Laid out as the earlier figure. The target null is
-        the Bayes predictive with `difference` taken out of the posterior; sans-diff is the control trained with
+        **Where the answers go, with `difference` taken out.** Laid out as the earlier figure. ideal₆ is the
+        Bayes-optimal predictor with `difference` taken out (the target null); sans-diff is the control trained with
         the loss masked on `difference` contexts. Both edited models are under the same edit of the anchored axis;
         the control holds nothing there, so its edit leaves the op in place. Faint bars behind show each one before
-        `difference` was taken out: the ideal for the target null, the control for sans-diff, and the unedited
+        `difference` was taken out: ideal₇ for ideal₆, the control for sans-diff, and the unedited
         model for the edited ones.
     """,
     "post-hoc": """
         **Where the answers go, with `difference` taken out after training.** Laid out as the earlier figures. LEACE
         and INLP are post-hoc erasers fitted to the control without role labels, at the settings the post-hoc
-        comparison chose; beside them, the anchored model under its edit and the target null. Faint bars behind show
-        each one before the edit (for the target null, the ideal). Seed means over eight runs.
+        comparison chose; beside them, the anchored model under its edit and ideal₆. Faint bars behind show
+        each one before the edit (for ideal₆, ideal₇). Seed means over eight runs.
     """,
 }
 
@@ -699,7 +701,7 @@ basics_figure()
 r"""
 ## Where the answers go
 
-Op confusion: for the contexts of each op (rows), how much mass a model puts on the answers each op could give (columns), with one bar per model in each cell. The first figure has the models with every op, beside the Bayes predictor; the second has the models with `difference` taken out, by the edit or in training, beside the target null. These come from the same seeds before the cooldown experiment took the end anneal out (the [filtered-corpus](../filtered-corpus/report.py) report draws the same matrices as heatmaps), since that experiment kept no answer distributions.
+Op confusion: for the contexts of each op (rows), how much mass a model puts on the answers each op could give (columns), with one bar per model in each cell. The first figure has the models with every op, beside ideal₇, the Bayes-optimal predictor over all seven ops; the second has the models with `difference` taken out, by the edit or in training, beside ideal₆, the same predictor with `difference` taken out (the target null). These come from the same seeds before the cooldown experiment took the end anneal out (the [filtered-corpus](../filtered-corpus/report.py) report draws the same matrices as heatmaps), since that experiment kept no answer distributions.
 """
 
 confusion_figure("clean")
