@@ -818,7 +818,7 @@ r"""
 The states at the example answers, in the plane of the two class means:
 """
 # The arc: the states at the example answers in the plane of the two class means (arc-in-controls probe, its
-# full-disc pass: every slice, with the anchored runs from the cooldown experiment's `no-cooldown` arm).
+# pass over every slice, with the anchored runs from the cooldown experiment's `no-cooldown` arm).
 aic = _load_sibling("arc-in-controls", "d22_figures_aic")
 ARC_SEED = 715  # the run drawn; the angles between the means are given for all eight seeds
 ARC_SPAN = (-25.0, 100.0)  # the part of the disc the cropped figure shows, in degrees from the non-fitting mean
@@ -841,14 +841,14 @@ def arc_data() -> dict:
 ARC = arc_data()
 
 
-def arc_panel(ax: plt.Axes, m: dict, anchored: bool, full: bool) -> None:
-    """One geometry panel (style-fig): the unit disc, or the part of it the states lie in with no radial edges,
+def arc_panel(ax: plt.Axes, m: dict, anchored: bool) -> None:
+    """One geometry panel (style-fig): the part of the unit disc the states lie in, with no drawn radial edges,
     the states on it, a tick on the rim at each class mean, and the angle between them. In an anchored run the
     vertical axis is e₁, marked with the solid triangle of the anchor.
     """
     from matplotlib.patches import Arc, Wedge
 
-    t0, t1 = (0.0, 360.0) if full else ARC_SPAN
+    t0, t1 = ARC_SPAN
     fill = light_dark("#eee", "#1d1d1d")
     rim = light_dark("#0006", "#fff6")
     red = light_dark("#c2185b", "#f06292")
@@ -864,17 +864,13 @@ def arc_panel(ax: plt.Axes, m: dict, anchored: bool, full: bool) -> None:
     mid = th / 2
     ax.text(1.2 * np.cos(mid), 1.2 * np.sin(mid), f"{m['angle']:.0f}°", ha="left", va="bottom" if mid > 0.2 else "center", fontsize=6.5)  # fmt: skip
     if anchored:
-        ax.plot([0], [1.3], marker="v", ms=5, color=light_dark("#222", "#ddd"), clip_on=False, zorder=11)
+        ax.plot([0], [1.07], marker="v", ms=5, color=light_dark("#222", "#ddd"), clip_on=False, zorder=11)
     nf, ff = np.asarray(m["not"]), np.asarray(m["fits"])
     ax.scatter(nf[:, 0], nf[:, 1], s=2.5, color=grey, alpha=0.6, lw=0, zorder=2)
     ax.scatter(ff[:, 0], ff[:, 1], s=2.5, color=red, alpha=0.6, lw=0, zorder=3)
     ax.set_aspect("equal")
-    if full:
-        ax.set_xlim(-1.4, 1.4)
-        ax.set_ylim(-1.4, 1.4)
-    else:
-        ax.set_xlim(np.cos(np.radians(t1)) - 0.05, 1.45)
-        ax.set_ylim(np.sin(np.radians(t0)) - 0.05, 1.4)
+    ax.set_xlim(np.cos(np.radians(t1)) - 0.05, 1.45)
+    ax.set_ylim(np.sin(np.radians(t0)) - 0.05, 1.22)
     ax.set_axis_off()
 
 
@@ -896,38 +892,32 @@ ARC_CAPTION = """
     the part of the fitting mean at right angles to it, which in an anchored run is e₁ (▼). 300 fitting examples (red;
     answers `difference` could give) and 300 non-fitting ones (grey) per panel, from one run of each kind at seed
     {seed}; the ticks on the rim mark the class means and the arc the angle between them. **Columns:** control,
-    anchored.
+    anchored. **Rows:** slices 3 and 2.
 """
 
 
 def arcs_figure() -> str:
     data = {"panels": {k: {s: ARC["panels"][k][s] for s in ("3", "2")} for k in ARC["panels"]}, "seed": ARC_SEED}
-    return arcs_draw(data, arcs_alt(["2", "3"]), full=False)
-
-
-def arcs_full_figure() -> str:
-    data = {"panels": {k: {s: ARC["panels"][k][s] for s in ("4", "3", "2", "1")} for k in ARC["panels"]}, "seed": ARC_SEED}  # fmt: skip
-    return arcs_draw(data, arcs_alt(["1", "2", "3", "4"]), full=True)
+    return arcs_draw(data, arcs_alt(["2", "3"]))
 
 
 @memo
-def arcs_draw(data: dict, alt_text: str, full: bool) -> str:
+def arcs_draw(data: dict, alt_text: str) -> str:
     rows = list(data["panels"]["control"])
 
     @themed(
-        name="d22-arcs-full" if full else "d22-arcs",
+        name="d22-arcs",
         alt_text=alt_text,
-        caption=ARC_CAPTION.format(seed=data["seed"]) + ("Rows: slices 4 to 1." if full else "Rows: slices 3 and 2."),
+        caption=ARC_CAPTION.format(seed=data["seed"]),
     )
     def _plot() -> plt.Figure:
-        size = (3.6, 7.2) if full else (5.0, 4.6)
-        fig, axs = plt.subplots(len(rows), 2, figsize=size, layout="constrained", squeeze=False)
+        fig, axs = plt.subplots(len(rows), 2, figsize=(5.0, 4.4), layout="constrained", squeeze=False)
         for i, s in enumerate(rows):
             for j, kind in enumerate(("control", "anchored")):
                 ax = axs[i, j]
-                arc_panel(ax, data["panels"][kind][s], anchored=kind == "anchored", full=full)
-                if i == 0:
-                    ax.set_title(kind, fontsize=8)
+                arc_panel(ax, data["panels"][kind][s], anchored=kind == "anchored")
+                if i == len(rows) - 1:
+                    ax.text(0.5, -0.02, kind, transform=ax.transAxes, ha="center", va="top", fontsize=8)
                 if j == 0:
                     ax.text(-0.02, 0.5, f"slice {s}", transform=ax.transAxes, rotation=90, ha="right", va="center", fontsize=8)  # fmt: skip
         handles = [plt.Line2D([], [], color=light_dark("#c2185b", "#f06292"), label="fitting", marker="o", ls="", ms=3.5),
@@ -939,12 +929,6 @@ def arcs_draw(data: dict, alt_text: str, full: bool) -> str:
 
 
 arcs_figure()
-
-r"""
-The same, uncropped, at every slice:
-"""
-
-arcs_full_figure()
 
 r"""
 ## Training
