@@ -176,7 +176,8 @@ def measure(checkpoint, holdout, label: str, kind: str) -> dict:
 
 def measure_disc(checkpoint, holdout, label: str, kind: str) -> dict:
     """The class-means plane at every slice from the embedding (0) to block 4, for the full-disc figures of the D2.2
-    post; the same reading as `measure` gives under `means`, here at each slice.
+    post; the same reading as `measure` gives under `means`, here at each slice, and the one-example posterior on the
+    anchored op at each example drawn (`alone`, in the order of the points).
     """
     from mini import get_data_dir
     from mini.store import get
@@ -190,9 +191,18 @@ def measure_disc(checkpoint, holdout, label: str, kind: str) -> dict:
     y = tok2color[ho.tokens[:, list(lr.ANSWERS)]]
     a = tok2color[ho.tokens[:, [lr.UNIT * i for i in range(lr.K)]]]
     b = tok2color[ho.tokens[:, [lr.UNIT * i + 2 for i in range(lr.K)]]]
-    fits = (scorer.table.lookup(a * n_colors + b, y)[a_id] > 0).ravel()
+    p = scorer.table.lookup(a * n_colors + b, y).reshape(len(lr.OP_NAMES), -1)  # (ops, examples)
+    fits = p[a_id] > 0
+    # The one-example posterior on the anchored op (the example-evidence report): that example alone, under the
+    # noise model of the corpus, from a uniform prior over the ops.
+    rho, cube = lr.ex2221.CENTRE[1], lr.ex2221.CUBE_RATE
+    like = (1 - rho - cube) * p + rho * (p.sum(0) - p) / (len(p) - 1) + cube / n_colors
+    alone = like[a_id] / like.sum(0)
+    # The examples `_means` draws, in the same order.
+    rng = np.random.default_rng(0)
+    pick = {k: rng.choice(np.flatnonzero(mk), size=min(SAMPLE, int(mk.sum())), replace=False) for k, mk in (("fits", fits), ("not", ~fits))}  # fmt: skip
     st = lr._states(model, ho.tokens)
-    out: dict[str, Any] = {"label": label, "kind": kind, "slices": {}}
+    out: dict[str, Any] = {"label": label, "kind": kind, "slices": {}, "alone": {k: alone[i].round(4).tolist() for k, i in pick.items()}}  # fmt: skip
     for s in range(st.shape[0]):
         x = st[s][:, list(lr.ANSWERS)].reshape(-1, st.shape[-1]).astype(np.float64)
         d = x[fits].mean(0) - x[~fits].mean(0)
