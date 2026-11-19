@@ -896,7 +896,7 @@ def arc_panel(ax: plt.Axes, m: dict, anchored: bool) -> None:
     t = np.clip((fit - FIT_RANGE[0]) / np.subtract(*FIT_RANGE[::-1]), 0, 1).round(2)
     for v in np.unique(t):
         k = t == v
-        ax.scatter(pts[k, 0], pts[k, 1], s=10, marker=(2, 0, -90 * (1 - v)), color=fit_ink(v), alpha=0.12, lw=0.5, zorder=2 + v)  # fmt: skip
+        ax.scatter(pts[k, 0], pts[k, 1], s=22, marker=(2, 0, -90 * (1 - v)), color=fit_ink(v), alpha=0.2, lw=0.6, zorder=2 + v)  # fmt: skip
     ax.set_aspect("equal")
     ax.set_xlim(np.cos(np.radians(t1)) - 0.05, 1.45)
     ax.set_ylim(np.sin(np.radians(t0)) - 0.05, 1.22)
@@ -953,7 +953,7 @@ def arcs_draw(data: dict, alt_text: str) -> str:
         caption=ARC_CAPTION.format(seed=data["seed"], n=len(data["panels"]["control"][rows[0]]["alone"])),
     )
     def _plot() -> plt.Figure:
-        fig, axs = plt.subplots(len(rows), 2, figsize=(5.0, 4.4), layout="constrained", squeeze=False)
+        fig, axs = plt.subplots(len(rows), 2, figsize=(6.4, 5.6), layout="constrained", squeeze=False)
         for i, s in enumerate(rows):
             for j, kind in enumerate(("control", "anchored")):
                 ax = axs[i, j]
