@@ -703,7 +703,7 @@ def positions_draw(data: dict, alt_text: str) -> str:
         alt_text=alt_text,
         caption="""
             **Where the anchored axis is used.** The cosine between the state and e₁ at each position of a held-out
-            context, one row per slice, the embedding at the bottom. Blue: `difference` contexts, the mean over the
+            context, one row per slice, the embedding at the bottom. Red: `difference` contexts, the mean over the
             eight runs, with each run behind it as a hairline; grey: the other ops. Shaded columns are the `=` positions,
             where each answer is predicted. The bars sit on the positions,
             and the thin lines between them only join them up.
@@ -714,7 +714,7 @@ def positions_draw(data: dict, alt_text: str) -> str:
         n_slices, n_pos = dif.shape
         x = np.arange(n_pos)
         ramp = 0.35  # the share of each gap the riser takes
-        main = light_dark("#2a6fbb", "#6aa6e8")
+        main = light_dark("#c2185b", "#f06292")  # the anchored op, as in the α-by-slice figure
         other = light_dark("#777", "#999")
         fig, ax = plt.subplots(figsize=(6.4, 3.6), layout="constrained")
         for p in [i for i, t in enumerate(POSITION_LABELS) if t == "="]:  # where each answer is predicted
