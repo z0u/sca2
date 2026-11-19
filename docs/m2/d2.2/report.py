@@ -18,7 +18,7 @@ from mini.lit import memo
 from mini.reports import current_publisher
 from mini.store import project_store
 from mini.vis import figure_html, light_dark, themed
-from mini.vis.plt import smooth_step_area, smooth_step_marks
+from mini.vis.plt import smooth_step_marks
 
 
 def _load_sibling(name: str, alias: str):
@@ -659,9 +659,9 @@ def confusion_draw(view: str, data: dict, before: dict, alt_text: str) -> str:
 
 lr = _load_sibling("low-runs", "d22_figures_lr")
 POSITION_LABELS = [
-    *(t for i in "₁₂₃" for t in (f"a{i}", "?", f"b{i}", "=", f"y{i}", ",")),
+    *(t for i in "₁₂₃" for t in (f"a{i}", "&", f"b{i}", "=", f"y{i}", ",")),
     "a",
-    "?",
+    "&",
     "b",
     "=",
     "y",
@@ -703,8 +703,9 @@ def positions_draw(data: dict, alt_text: str) -> str:
         alt_text=alt_text,
         caption="""
             **Where the anchored axis is used.** The cosine between the state and e₁ at each position of a held-out
-            context, one row per slice, the embedding at the bottom. Solid: `difference` contexts, the mean over the
-            eight runs, with each run behind it as a hairline; dashed: the other ops. The bars sit on the positions,
+            context, one row per slice, the embedding at the bottom. Blue: `difference` contexts, the mean over the
+            eight runs, with each run behind it as a hairline; grey: the other ops. Shaded columns are the `=` positions,
+            where each answer is predicted. The bars sit on the positions,
             and the thin lines between them only join them up.
         """,
     )
@@ -714,14 +715,13 @@ def positions_draw(data: dict, alt_text: str) -> str:
         x = np.arange(n_pos)
         ramp = 0.35  # the share of each gap the riser takes
         main = light_dark("#2a6fbb", "#6aa6e8")
-        other = light_dark("#444", "#bbb")
+        other = light_dark("#777", "#999")
         fig, ax = plt.subplots(figsize=(6.4, 3.6), layout="constrained")
+        for p in [i for i, t in enumerate(POSITION_LABELS) if t == "="]:  # where each answer is predicted
+            ax.axvspan(p - 0.5, p + 0.5, color=light_dark("#eee", "#1c1c1c"), lw=0, zorder=0)
         for si in range(n_slices):
             shift = Affine2D().translate(0, si) + ax.transData
             ax.axhline(si, color=light_dark("#bbb", "#444"), lw=0.5, zorder=0)
-            smooth_step_area(
-                ax, x, dif[si], ramp=ramp, fillet=2, color=light_dark("#eee", "#1c1c1c"), transform=shift, zorder=0.5
-            )
             for r in runs:
                 smooth_step_marks(
                     ax,
@@ -744,13 +744,23 @@ def positions_draw(data: dict, alt_text: str) -> str:
                 fillet=2,
                 color=other,
                 lw=0.9,
-                ls=(0, (3, 1.5)),
                 transform=shift,
                 clip_on=False,
                 zorder=2,
+                label="other ops" if si == 0 else None,
             )
             smooth_step_marks(
-                ax, x, dif[si], ramp=ramp, fillet=2, color=main, lw=1.5, transform=shift, clip_on=False, zorder=3
+                ax,
+                x,
+                dif[si],
+                ramp=ramp,
+                fillet=2,
+                color=main,
+                lw=1.5,
+                transform=shift,
+                clip_on=False,
+                zorder=3,
+                label="difference" if si == 0 else None,
             )
         ax.set_xlim(-0.5, n_pos - 0.5)
         ax.set_ylim(-0.05, n_slices)
@@ -758,7 +768,9 @@ def positions_draw(data: dict, alt_text: str) -> str:
         ax.set_yticks(np.arange(n_slices) + 0.5, SLICE_NAMES, fontsize=7)
         ax.tick_params(axis="x", bottom=False)
         ax.tick_params(axis="y", left=False)
-        ax.spines[:].set_visible(False)
+        ax.spines[:].set(color=light_dark("#ccc", "#444"), lw=0.6)
+        handles, labels = ax.get_legend_handles_labels()
+        fig.legend(handles[::-1], labels[::-1], ncols=2, frameon=False, fontsize=7, loc="outside upper center")
         sec = ax.secondary_yaxis("right")
         sec.set_yticks([0, 1], ["0", "1"])
         sec.tick_params(labelsize=6, direction="out")
