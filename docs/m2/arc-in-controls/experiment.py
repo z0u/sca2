@@ -52,9 +52,11 @@ def _load_sibling(name: str, alias: str):
 
 lr = _load_sibling("low-runs", "arc_in_controls_lr")
 fc, ac, ex2216 = lr.fc, lr.ac, lr.ex2216
+cd = _load_sibling("cooldown", "arc_in_controls_cd")
 NAME = "arc-in-controls"
 SEEDS = tuple(range(712, 720))
 SAMPLE = 300
+DISC_REF = f"reports/m2/{NAME}/disc"  # the class-means plane at every slice (`measure_disc`)
 
 
 def runs() -> list[dict[str, Any]]:
@@ -62,6 +64,16 @@ def runs() -> list[dict[str, Any]]:
             "checkpoint": ac.CHECKPOINT_REF.format(label=ac.label_of(s, None, "control"))} for s in SEEDS]  # fmt: skip
     out += [{"label": fc.label_of(s, None), "kind": "anchored", "seed": s,
              "checkpoint": fc.CHECKPOINT_REF.format(label=fc.label_of(s, None))} for s in SEEDS]  # fmt: skip
+    return out
+
+
+def disc_runs() -> list[dict[str, Any]]:
+    """The runs of the full-disc figures: the same controls, and the recipe of record as the D2.2 post draws it,
+    the `no-cooldown` arm of the cooldown experiment at the same seeds.
+    """
+    out = [r for r in runs() if r["kind"] == "control"]
+    out += [{"label": cd.label_of("no-cooldown", s), "kind": "anchored", "seed": s,
+             "checkpoint": cd.CHECKPOINT_REF.format(label=cd.label_of("no-cooldown", s))} for s in SEEDS]  # fmt: skip
     return out
 
 
@@ -162,6 +174,41 @@ def measure(checkpoint, holdout, label: str, kind: str) -> dict:
     return out
 
 
+def measure_disc(checkpoint, holdout, label: str, kind: str) -> dict:
+    """The class-means plane at every slice from the embedding (0) to block 4, for the full-disc figures of the D2.2
+    post; the same reading as `measure` gives under `means`, here at each slice.
+    """
+    from mini import get_data_dir
+    from mini.store import get
+
+    workdir = get_data_dir() / NAME / label
+    model, _, color_ids, tok2color = ex2216._load_run(checkpoint, workdir)
+    scorer = lr._Scorer(get(holdout, workdir / "holdout.npz"), tok2color, color_ids)
+    ho = scorer.ho
+    a_id = lr.OP_NAMES.index(lr.ANCHORED_OP)
+    n_colors = len(color_ids)
+    y = tok2color[ho.tokens[:, list(lr.ANSWERS)]]
+    a = tok2color[ho.tokens[:, [lr.UNIT * i for i in range(lr.K)]]]
+    b = tok2color[ho.tokens[:, [lr.UNIT * i + 2 for i in range(lr.K)]]]
+    fits = (scorer.table.lookup(a * n_colors + b, y)[a_id] > 0).ravel()
+    st = lr._states(model, ho.tokens)
+    out: dict[str, Any] = {"label": label, "kind": kind, "slices": {}}
+    for s in range(st.shape[0]):
+        x = st[s][:, list(lr.ANSWERS)].reshape(-1, st.shape[-1]).astype(np.float64)
+        d = x[fits].mean(0) - x[~fits].mean(0)
+        out["slices"][str(s)] = _means(x, fits, d / np.linalg.norm(d))
+    return out
+
+
+def publish_disc(got: list[dict]) -> dict:
+    import json
+
+    from mini.store import put, set_ref
+
+    set_ref(DISC_REF, put(json.dumps({"runs": got}).encode(), name=f"{NAME}-disc.json"))
+    return {"n": len(got)}
+
+
 def publish(got: list[dict]) -> dict:
     import json
 
@@ -182,7 +229,18 @@ def main(ctx: Ctx) -> dict:
         [r["kind"] for r in rows],
         role="measure",
     )
-    return ctx.run(publish, got, role="prep")
+    done = ctx.run(publish, got, role="prep")
+    rows = disc_runs()
+    res = ctx.run(resolve, rows, role="prep")
+    disc = ctx.map(
+        measure_disc,
+        [res["artifacts"][r["checkpoint"]] for r in rows],
+        [res["holdout"]] * len(rows),
+        [r["label"] for r in rows],
+        [r["kind"] for r in rows],
+        role="measure",
+    )
+    return {**done, "disc": ctx.run(publish_disc, disc, role="prep")}
 
 
 experiment = Experiment(
