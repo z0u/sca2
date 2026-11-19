@@ -832,18 +832,43 @@ def arc_data() -> dict:
     for kind in ("control", "anchored"):
         mine = [r for r in runs if r["kind"] == kind]
         (one,) = [r for r in mine if r["label"].endswith(f"s{ARC_SEED}")]
-        out["panels"][kind] = {s: {"fits": one["slices"][s]["points"]["fits"], "not": one["slices"][s]["points"]["not"],
-                                   "angle": one["slices"][s]["angle_between_means"]} for s in slices}  # fmt: skip
+        out["panels"][kind] = {s: {"angle": one["slices"][s]["angle_between_means"]} for s in slices}
         out["angles"][kind] = {s: [r["slices"][s]["angle_between_means"] for r in mine] for s in slices}
     return out
 
 
+def arc_every() -> dict:
+    """Every example answer of the two runs at `aic.EVERY_SEED`, by kind and slice: points and fit."""
+    store = project_store()
+    labels = {"control": aic.ac.label_of(aic.EVERY_SEED, None, "control"), "anchored": aic.cd.label_of("no-cooldown", aic.EVERY_SEED)}  # fmt: skip
+    refs = {k: aic.EVERY_REF.format(label=lab) for k, lab in labels.items()}
+    arts = store.get_refs(list(refs.values()))
+    out: dict[str, Any] = {}
+    with tempfile.TemporaryDirectory() as tmp:
+        for k, ref in refs.items():
+            art = arts.get(ref)
+            assert art is not None, f"not published: {ref}"
+            z = np.load(store.get(art, Path(tmp) / f"{k}.npz"))
+            out[k] = {"alone": z["alone"].round(3).tolist()} | {
+                s: z[f"points/{s}"].round(4).tolist() for s in ("2", "3")
+            }
+    return out
+
+
 ARC = arc_data()
+assert aic.EVERY_SEED == ARC_SEED
+ARC_EVERY = arc_every()
+
+
+FIT_RANGE = (
+    0.05,
+    0.69,
+)  # the one-example posterior of an example that fits no op but by noise, and of one only `difference` fits
 
 
 def arc_panel(ax: plt.Axes, m: dict, anchored: bool) -> None:
     """One geometry panel (style-fig): the part of the unit disc the states lie in, with no drawn radial edges,
-    the states on it, a tick on the rim at each class mean, and the angle between them. In an anchored run the
+    every example answer on it as a short tick, a tick on the rim at each class mean, and the angle between them. In an anchored run the
     vertical axis is e₁, marked with the solid triangle of the anchor.
     """
     from matplotlib.patches import Arc, Wedge
@@ -865,40 +890,57 @@ def arc_panel(ax: plt.Axes, m: dict, anchored: bool) -> None:
     ax.text(1.2 * np.cos(mid), 1.2 * np.sin(mid), f"{m['angle']:.0f}°", ha="left", va="bottom" if mid > 0.2 else "center", fontsize=6.5)  # fmt: skip
     if anchored:
         ax.plot([0], [1.07], marker="v", ms=5, color=light_dark("#222", "#ddd"), clip_on=False, zorder=11)
-    nf, ff = np.asarray(m["not"]), np.asarray(m["fits"])
-    ax.scatter(nf[:, 0], nf[:, 1], s=2.5, color=grey, alpha=0.6, lw=0, zorder=2)
-    ax.scatter(ff[:, 0], ff[:, 1], s=2.5, color=red, alpha=0.6, lw=0, zorder=3)
+    # Each example by how well it fits `difference` (its one-example posterior), from grey and flat to red and
+    # upright, so a tick points at 90° × fit from the horizontal; the best fits are drawn last.
+    pts, fit = np.asarray(m["points"]), np.asarray(m["alone"])
+    t = np.clip((fit - FIT_RANGE[0]) / np.subtract(*FIT_RANGE[::-1]), 0, 1).round(2)
+    for v in np.unique(t):
+        k = t == v
+        ax.scatter(pts[k, 0], pts[k, 1], s=10, marker=(2, 0, -90 * (1 - v)), color=fit_ink(v), alpha=0.12, lw=0.5, zorder=2 + v)  # fmt: skip
     ax.set_aspect("equal")
     ax.set_xlim(np.cos(np.radians(t1)) - 0.05, 1.45)
     ax.set_ylim(np.sin(np.radians(t0)) - 0.05, 1.22)
     ax.set_axis_off()
 
 
-def arcs_alt(slices: list[str]) -> str:
+def fit_ink(v: float) -> tuple[float, float, float]:
+    """Grey at no fit to the anchored red at a full fit."""
+    lo, hi = np.array(mcolors.to_rgb(light_dark(*GHOST))), np.array(mcolors.to_rgb(light_dark("#c2185b", "#f06292")))
+    return tuple(lo + v * (hi - lo))
+
+
+def arcs_alt() -> str:
     c, a = ARC["angles"]["control"], ARC["angles"]["anchored"]
-    seen = ", ".join(f"slice {s}: {np.median(c[s]):.0f}° and {np.median(a[s]):.0f}°" for s in slices)
+    seen = ", ".join(f"slice {s}: {np.median(c[s]):.0f}° and {np.median(a[s]):.0f}°" for s in ("3", "2"))
+    alone = np.asarray(ARC_EVERY["anchored"]["alone"])
     return f"""
-        The states at the example answers of one control and one anchored run at seed {ARC_SEED}, one row per
-        slice, drawn in the plane of the two class means: the non-fitting mean to the right and the part of the
-        fitting mean at right angles to it straight up, which in the anchored run is e₁. Both kinds of example lie
-        near the rim of the unit disc. In the control the fitting examples sit in a short group just above the
-        non-fitting ones; in the anchored run they spread along the rim up toward e₁. The median angle between the
+        Every example answer of one control and one anchored run at seed {ARC_SEED} ({len(alone):,} per panel),
+        as faint ticks, at slices 3 (top) and 2, in the plane of the two class means: the non-fitting mean to the
+        right and the part of the fitting mean at right angles to it straight up, which in the anchored run is e₁.
+        Each tick is colored and turned by how well its example fits `difference`: flat and grey for no fit,
+        upright and red for a full fit. In the control the red ticks sit in a short group just above the grey
+        ones. In the anchored run they form a band along the rim from the grey group up to e₁, pink and leaning in
+        the middle, where the partial fits lie, and red and upright near the top. The median angle between the
         means over eight seeds, control and anchored, is {seen}.
     """
 
 
 ARC_CAPTION = """
-    States at the example answers, in the plane of the two class means: the non-fitting mean points right, and up is
-    the part of the fitting mean at right angles to it, which in an anchored run is e₁ (▼). 300 fitting examples (red;
-    answers `difference` could give) and 300 non-fitting ones (grey) per panel, from one run of each kind at seed
-    {seed}; the ticks on the rim mark the class means and the arc the angle between them. **Columns:** control,
-    anchored. **Rows:** slices 3 and 2.
+    Every example answer ({n:,} per panel) of one run of each kind at seed {seed}, in the plane of the two class
+    means: the non-fitting mean points right, and up is the part of the fitting mean at right angles to it, which in
+    an anchored run is e₁ (▼). Each tick is turned and colored by how well its example fits `difference` (the
+    posterior on `difference` given that example alone), from flat and grey to upright and red. The ticks on the rim
+    mark the class means, and the arc the angle between them. **Columns:** control, anchored. **Rows:** slices 3 and
+    2.
 """
 
 
 def arcs_figure() -> str:
-    data = {"panels": {k: {s: ARC["panels"][k][s] for s in ("3", "2")} for k in ARC["panels"]}, "seed": ARC_SEED}
-    return arcs_draw(data, arcs_alt(["2", "3"]))
+    def panel(k: str, s: str) -> dict:
+        return ARC["panels"][k][s] | {"points": ARC_EVERY[k][s], "alone": ARC_EVERY[k]["alone"]}
+
+    data = {"panels": {k: {s: panel(k, s) for s in ("3", "2")} for k in ARC["panels"]}, "seed": ARC_SEED}
+    return arcs_draw(data, arcs_alt())
 
 
 @memo
@@ -908,7 +950,7 @@ def arcs_draw(data: dict, alt_text: str) -> str:
     @themed(
         name="d22-arcs",
         alt_text=alt_text,
-        caption=ARC_CAPTION.format(seed=data["seed"]),
+        caption=ARC_CAPTION.format(seed=data["seed"], n=len(data["panels"]["control"][rows[0]]["alone"])),
     )
     def _plot() -> plt.Figure:
         fig, axs = plt.subplots(len(rows), 2, figsize=(5.0, 4.4), layout="constrained", squeeze=False)
@@ -920,9 +962,9 @@ def arcs_draw(data: dict, alt_text: str) -> str:
                     ax.text(0.5, -0.02, kind, transform=ax.transAxes, ha="center", va="top", fontsize=8)
                 if j == 0:
                     ax.text(-0.02, 0.5, f"slice {s}", transform=ax.transAxes, rotation=90, ha="right", va="center", fontsize=8)  # fmt: skip
-        handles = [plt.Line2D([], [], color=light_dark("#c2185b", "#f06292"), label="fitting", marker="o", ls="", ms=3.5),
-                   plt.Line2D([], [], color=light_dark(*GHOST), label="non-fitting", marker="o", ls="", ms=3.5)]  # fmt: skip
-        fig.legend(handles=handles, ncols=2, frameon=False, fontsize=7, loc="outside upper center")
+        key = ((1.0, "fits only difference"), (0.5, "partial fit"), (0.0, "no fit"))
+        handles = [plt.Line2D([], [], color=fit_ink(v), marker=(2, 0, round(-90 * (1 - v))), ms=6, mew=1, ls="", label=lab) for v, lab in key]  # fmt: skip
+        fig.legend(handles=handles, ncols=3, frameon=False, fontsize=7, loc="outside upper center")
         return fig
 
     return _plot()
