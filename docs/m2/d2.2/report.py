@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -41,6 +42,19 @@ def fetch_json(ref: str) -> Any:
     assert art is not None, f"not published: {ref}"
     with tempfile.TemporaryDirectory() as tmp:
         return json.loads(Path(store.get(art, Path(tmp) / "body.json")).read_text())
+
+
+def table_html(head: list[str], rows: list[list[str]], caption: str) -> str:
+    def code(c: str) -> str:
+        return re.sub(r"`([^`]+)`", r"<code>\1</code>", c)
+
+    head, rows = [code(h) for h in head], [[code(c) for c in r] for r in rows]
+    ths = "".join(f"<th{' class=num' if i else ''}>{h}</th>" for i, h in enumerate(head))
+    body = "".join(
+        "<tr>" + "".join(f"<td{' class=num' if i else ''}>{c}</td>" for i, c in enumerate(r)) + "</tr>" for r in rows
+    )
+    table = f'<table class="report-table dense"><thead><tr>{ths}</tr></thead><tbody>{body}</tbody></table>'
+    return figure_html(table, caption=caption, class_="report-figure")
 
 
 # The recipe of record is `τ_ℓ fixed`, drawn without its end anneal (the cooldown): the `no-cooldown` arm of the
@@ -849,7 +863,7 @@ def arc_every() -> dict:
             art = arts.get(ref)
             assert art is not None, f"not published: {ref}"
             z = np.load(store.get(art, Path(tmp) / f"{k}.npz"))
-            out[k] = {"alone": z["alone"].round(3).tolist()} | {
+            out[k] = {"alone": z["alone"].round(3).tolist(), "dist": z["dist"].tolist()} | {
                 s: z[f"points/{s}"].round(4).tolist() for s in ("2", "3")
             }
     return out
@@ -860,13 +874,14 @@ assert aic.EVERY_SEED == ARC_SEED
 ARC_EVERY = arc_every()
 
 
+DIST_FLAT = 4  # grid steps from |a − b| at which a tick lies flat, in the variant turned by distance
 FIT_RANGE = (
     0.05,
     0.69,
 )  # the one-example posterior of an example that fits no op but by noise, and of one only `difference` fits
 
 
-def arc_panel(ax: plt.Axes, m: dict, anchored: bool) -> None:
+def arc_panel(ax: plt.Axes, m: dict, anchored: bool, angle_by: str) -> None:
     """One geometry panel (style-fig): the part of the unit disc the states lie in, with no drawn radial edges,
     every example answer on it as a short tick, a tick on the rim at each class mean, and the angle between them. In an anchored run the
     vertical axis is e₁, marked with the solid triangle of the anchor.
@@ -892,11 +907,14 @@ def arc_panel(ax: plt.Axes, m: dict, anchored: bool) -> None:
         ax.plot([0], [1.07], marker="v", ms=5, color=light_dark("#222", "#ddd"), clip_on=False, zorder=11)
     # Each example by how well it fits `difference` (its one-example posterior), from grey and flat to red and
     # upright, so a tick points at 90° × fit from the horizontal; the best fits are drawn last.
+    # With `angle_by="dist"` the tick turns instead by how far the answer is from |a − b|: upright on it, flat at
+    # DIST_FLAT grid steps or more.
     pts, fit = np.asarray(m["points"]), np.asarray(m["alone"])
     t = np.clip((fit - FIT_RANGE[0]) / np.subtract(*FIT_RANGE[::-1]), 0, 1).round(2)
-    for v in np.unique(t):
-        k = t == v
-        ax.scatter(pts[k, 0], pts[k, 1], s=22, marker=(2, 0, -90 * (1 - v)), color=fit_ink(v), alpha=0.2, lw=0.6, zorder=2 + v)  # fmt: skip
+    u = t if angle_by == "fit" else np.clip(1 - np.asarray(m["dist"]) / DIST_FLAT, 0, 1).round(2)
+    for v, w in sorted(set(zip(t.tolist(), u.tolist(), strict=True))):
+        k = (t == v) & (u == w)
+        ax.scatter(pts[k, 0], pts[k, 1], s=22, marker=(2, 0, round(-90 * (1 - w))), color=fit_ink(v), alpha=0.2, lw=0.6, zorder=2 + v + w / 10)  # fmt: skip
     ax.set_aspect("equal")
     ax.set_xlim(np.cos(np.radians(t1)) - 0.05, 1.45)
     ax.set_ylim(np.sin(np.radians(t0)) - 0.05, 1.22)
@@ -935,11 +953,15 @@ ARC_CAPTION = """
 """
 
 
-def arcs_figure() -> str:
+def arcs_figure(angle_by: str = "fit") -> str:
     def panel(k: str, s: str) -> dict:
-        return ARC["panels"][k][s] | {"points": ARC_EVERY[k][s], "alone": ARC_EVERY[k]["alone"]}
+        return ARC["panels"][k][s] | {
+            "points": ARC_EVERY[k][s],
+            "alone": ARC_EVERY[k]["alone"],
+            "dist": ARC_EVERY[k]["dist"],
+        }
 
-    data = {"panels": {k: {s: panel(k, s) for s in ("3", "2")} for k in ARC["panels"]}, "seed": ARC_SEED}
+    data = {"panels": {k: {s: panel(k, s) for s in ("3", "2")} for k in ARC["panels"]}, "seed": ARC_SEED, "angle_by": angle_by}  # fmt: skip
     return arcs_draw(data, arcs_alt())
 
 
@@ -948,7 +970,7 @@ def arcs_draw(data: dict, alt_text: str) -> str:
     rows = list(data["panels"]["control"])
 
     @themed(
-        name="d22-arcs",
+        name="d22-arcs" + ("" if data["angle_by"] == "fit" else "-by-distance"),
         alt_text=alt_text,
         caption=ARC_CAPTION.format(seed=data["seed"], n=len(data["panels"]["control"][rows[0]]["alone"])),
     )
@@ -957,20 +979,68 @@ def arcs_draw(data: dict, alt_text: str) -> str:
         for i, s in enumerate(rows):
             for j, kind in enumerate(("control", "anchored")):
                 ax = axs[i, j]
-                arc_panel(ax, data["panels"][kind][s], anchored=kind == "anchored")
+                arc_panel(ax, data["panels"][kind][s], anchored=kind == "anchored", angle_by=data["angle_by"])
                 if i == len(rows) - 1:
                     ax.text(0.5, -0.02, kind, transform=ax.transAxes, ha="center", va="top", fontsize=8)
                 if j == 0:
                     ax.text(-0.02, 0.5, f"slice {s}", transform=ax.transAxes, rotation=90, ha="right", va="center", fontsize=8)  # fmt: skip
-        key = ((1.0, "fits only difference"), (0.5, "partial fit"), (0.0, "no fit"))
-        handles = [plt.Line2D([], [], color=fit_ink(v), marker=(2, 0, round(-90 * (1 - v))), ms=6, mew=1, ls="", label=lab) for v, lab in key]  # fmt: skip
-        fig.legend(handles=handles, ncols=3, frameon=False, fontsize=7, loc="outside upper center")
+        if data["angle_by"] == "fit":
+            key = ((1.0, 1.0, "fits only difference"), (0.5, 0.5, "partial fit"), (0.0, 0.0, "no fit"))
+        else:
+            key = ((1.0, 1.0, "fits only difference"), (0.5, 1.0, "partial fit"), (0.0, 0.75, "no fit, 1 step off"), (0.0, 0.0, f"{DIST_FLAT}+ steps off"))  # fmt: skip
+        handles = [plt.Line2D([], [], color=fit_ink(v), marker=(2, 0, round(-90 * (1 - w))), ms=6, mew=1, ls="", label=lab) for v, w, lab in key]  # fmt: skip
+        fig.legend(handles=handles, ncols=len(key), frameon=False, fontsize=7, loc="outside upper center")
         return fig
 
     return _plot()
 
 
 arcs_figure()
+
+r"""
+The same, with each tick turned by how far its answer is from the one `difference` gives, |a − b|, in grid steps
+summed over the channels, and still colored by fit:
+"""
+
+arcs_figure("dist")
+
+r"""
+How far along the arc each kind of example sits, by its distance from |a − b|:
+"""
+
+
+def arc_distance_rows() -> list[list[str]]:
+    groups = [("fits only `difference`", lambda d, f: (d == 0) & (f > FIT_RANGE[1] - 0.04)),
+              ("partial fit", lambda d, f: (d == 0) & (f <= FIT_RANGE[1] - 0.04))]  # fmt: skip
+    groups += [(f"{n} step{'s' if n > 1 else ''} off", lambda d, f, n=n: d == n) for n in range(1, DIST_FLAT + 1)]
+    groups += [(f"{DIST_FLAT + 1}+ steps off", lambda d, f: d > DIST_FLAT)]
+    cols = [(k, s) for k in ("control", "anchored") for s in ("3", "2")]
+    dist, fit = {k: np.asarray(ARC_EVERY[k]["dist"]) for k in ARC_EVERY}, {k: np.asarray(ARC_EVERY[k]["alone"]) for k in ARC_EVERY}  # fmt: skip
+    rows = []
+    for name, pick in groups:
+        row = [name, f"{pick(dist['anchored'], fit['anchored']).sum():,}"]
+        for k, s in cols:
+            p = np.asarray(ARC_EVERY[k][s])
+            frac = np.degrees(np.arctan2(p[:, 1], p[:, 0])) / ARC["panels"][k][s]["angle"]
+            row.append(f"{np.median(frac[pick(dist[k], fit[k])]):.2f}")
+        rows.append(row)
+    return rows
+
+
+ARC_DIST_ROWS = arc_distance_rows()
+table_html(
+    ["example answers", "n", "control, slice 3", "control, slice 2", "anchored, slice 3", "anchored, slice 2"],
+    ARC_DIST_ROWS,
+    caption=f"""
+        **How far along the arc, by distance from `difference`'s answer.** Median position of the example answers
+        between the two class means (0 at the non-fitting mean, 1 at the fitting mean, so the angle from the
+        non-fitting mean over the angle between them), by how far each answer is from |a − b|, in grid steps summed
+        over the channels. Every example answer of one run of each kind at seed {ARC_SEED}; the same examples in
+        both runs. The means lie {ARC["panels"]["control"]["3"]["angle"]:.0f}° and {ARC["panels"]["control"]["2"]["angle"]:.0f}°
+        apart in the control (slices 3 and 2), {ARC["panels"]["anchored"]["3"]["angle"]:.0f}° and
+        {ARC["panels"]["anchored"]["2"]["angle"]:.0f}° in the anchored run.
+    """,
+)
 
 r"""
 ## Training

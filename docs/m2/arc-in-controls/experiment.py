@@ -214,7 +214,7 @@ def measure_disc(checkpoint, holdout, label: str, kind: str) -> dict:
 
 def measure_every(checkpoint, holdout, label: str, kind: str):
     """Every example answer of one run, in the class-means plane of each slice from 1 to 4 (the plane `_means`
-    draws), with its one-example posterior on the anchored op: an npz for the arc figure of the D2.2 post, which
+    draws), with its one-example posterior on the anchored op and its distance from the anchored op's answer: an npz for the arc figure of the D2.2 post, which
     draws them all.
     """
     from mini import get_data_dir
@@ -233,7 +233,15 @@ def measure_every(checkpoint, holdout, label: str, kind: str):
     fits = p[a_id] > 0
     rho, cube = lr.ex2221.CENTRE[1], lr.ex2221.CUBE_RATE
     like = (1 - rho - cube) * p + rho * (p.sum(0) - p) / (len(p) - 1) + cube / n_colors
-    out: dict[str, np.ndarray] = {"alone": (like[a_id] / like.sum(0)).astype(np.float32), "fits": fits}
+    # How far the shown answer is from the anchored op's answer |a − b|, in grid steps summed over channels.
+    assert lr.ANCHORED_OP == "difference", lr.ANCHORED_OP
+    from sca.data import ops as grammar
+
+    rgb = np.array(grammar.colors())
+    step = np.diff(np.unique(rgb))[0]
+    dist = (np.abs(rgb[y.ravel()] - np.abs(rgb[a.ravel()] - rgb[b.ravel()])) / step).sum(1).round().astype(np.int16)
+    assert ((dist == 0) == fits).all()
+    out: dict[str, np.ndarray] = {"alone": (like[a_id] / like.sum(0)).astype(np.float32), "fits": fits, "dist": dist}
     st = lr._states(model, ho.tokens)
     for s in range(1, st.shape[0]):
         x = st[s][:, list(lr.ANSWERS)].reshape(-1, st.shape[-1]).astype(np.float64)
