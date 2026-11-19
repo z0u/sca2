@@ -11,12 +11,14 @@ import matplotlib.pyplot as plt
 from matplotlib import colors as mcolors
 from matplotlib import patheffects
 from matplotlib.patches import Rectangle
+from matplotlib.transforms import Affine2D
 import numpy as np
 
 from mini.lit import memo
 from mini.reports import current_publisher
 from mini.store import project_store
 from mini.vis import figure_html, light_dark, themed
+from mini.vis.plt import smooth_step_area, smooth_step_marks
 
 
 def _load_sibling(name: str, alias: str):
@@ -651,6 +653,122 @@ def confusion_draw(view: str, data: dict, before: dict, alt_text: str) -> str:
     return _plot()
 
 
+# --- α by position ------------------------------------------------------------------------------------------------
+# The low-runs experiment scored α at every position of the held-out contexts for the per-visit runs of the fixed
+# confirmation: the recipe of record at seeds 712 to 719, with the end anneal (it changes neither the edit nor the task).
+
+lr = _load_sibling("low-runs", "d22_figures_lr")
+POSITION_LABELS = [
+    *(t for i in "₁₂₃" for t in (f"a{i}", "?", f"b{i}", "=", f"y{i}", ",")),
+    "a",
+    "?",
+    "b",
+    "=",
+    "y",
+    "⏎",
+]
+
+
+def alpha_by_position() -> dict[str, np.ndarray]:
+    """(runs, slices, positions) α on `difference` contexts and on the other ops, for the per-visit runs."""
+    ev = {r["label"]: r for r in fetch_json(lr.EVIDENCE_REF)["runs"]}
+    labels = [r["label"] for r in lr.runs() if r["kind"] == "per-visit"]
+    assert len(labels) == len(SEEDS), labels
+    return {k: np.array([ev[lab]["alpha_by_position"][k] for lab in labels]) for k in ("difference", "other")}
+
+
+ALPHA_POS = alpha_by_position()
+assert ALPHA_POS["difference"].shape[1:] == (len(SLICE_NAMES), len(POSITION_LABELS))
+
+
+def positions_figure() -> str:
+    dif, oth = ALPHA_POS["difference"].mean(0), ALPHA_POS["other"].mean(0)
+    ans = list(lr.ANSWERS)
+    alt = f"""
+        Five stacked step profiles, one per slice from the embedding at the bottom to slice 4 at the top, showing
+        the cosine with e₁ at each position of a context. On `difference` contexts it is near zero everywhere at
+        the embedding. From slice 1 on it rises at the three example answers ({dif[1, ans].mean():.2f} at slice 1,
+        {dif[3, ans].mean():.2f} at slice 3) and higher still at the query answer ({dif[1, QUERY_ANSWER]:.2f} at
+        slice 1, {dif[3, QUERY_ANSWER]:.2f} at slice 3), and stays near zero at every other position. On the other
+        ops it stays under {oth.max():.2f}.
+    """
+    data = {"difference": dif.tolist(), "other": oth.tolist(), "runs": ALPHA_POS["difference"].tolist()}
+    return positions_draw(data, alt)
+
+
+@memo
+def positions_draw(data: dict, alt_text: str) -> str:
+    @themed(
+        name="d22-alpha-by-position",
+        alt_text=alt_text,
+        caption="""
+            **Where the anchored axis is used.** The cosine between the state and e₁ at each position of a held-out
+            context, one row per slice, the embedding at the bottom. Solid: `difference` contexts, the mean over the
+            eight runs, with each run behind it as a hairline; dashed: the other ops. The bars sit on the positions,
+            and the thin lines between them only join them up.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        dif, oth, runs = (np.asarray(data[k]) for k in ("difference", "other", "runs"))
+        n_slices, n_pos = dif.shape
+        x = np.arange(n_pos)
+        ramp = 0.35  # the share of each gap the riser takes
+        main = light_dark("#2a6fbb", "#6aa6e8")
+        other = light_dark("#444", "#bbb")
+        fig, ax = plt.subplots(figsize=(6.4, 3.6), layout="constrained")
+        for si in range(n_slices):
+            shift = Affine2D().translate(0, si) + ax.transData
+            ax.axhline(si, color=light_dark("#bbb", "#444"), lw=0.5, zorder=0)
+            smooth_step_area(
+                ax, x, dif[si], ramp=ramp, fillet=2, color=light_dark("#eee", "#1c1c1c"), transform=shift, zorder=0.5
+            )
+            for r in runs:
+                smooth_step_marks(
+                    ax,
+                    x,
+                    r[si],
+                    ramp=ramp,
+                    fillet=2,
+                    color=main,
+                    lw=0.4,
+                    alpha=0.25,
+                    transform=shift,
+                    clip_on=False,
+                    zorder=1,
+                )
+            smooth_step_marks(
+                ax,
+                x,
+                oth[si],
+                ramp=ramp,
+                fillet=2,
+                color=other,
+                lw=0.9,
+                ls=(0, (3, 1.5)),
+                transform=shift,
+                clip_on=False,
+                zorder=2,
+            )
+            smooth_step_marks(
+                ax, x, dif[si], ramp=ramp, fillet=2, color=main, lw=1.5, transform=shift, clip_on=False, zorder=3
+            )
+        ax.set_xlim(-0.5, n_pos - 0.5)
+        ax.set_ylim(-0.05, n_slices)
+        ax.set_xticks(x, POSITION_LABELS, fontsize=6.5)
+        ax.set_yticks(np.arange(n_slices) + 0.5, SLICE_NAMES, fontsize=7)
+        ax.tick_params(axis="x", bottom=False)
+        ax.tick_params(axis="y", left=False)
+        ax.spines[:].set_visible(False)
+        sec = ax.secondary_yaxis("right")
+        sec.set_yticks([0, 1], ["0", "1"])
+        sec.tick_params(labelsize=6, direction="out")
+        sec.spines["right"].set_bounds(0, 1)
+        sec.set_ylabel("cosine with e₁", fontsize=7, y=0.1, va="top")
+        return fig
+
+    return _plot()  # fmt: skip
+
+
 r"""
 # D2.2: figures for the post
 
@@ -676,6 +794,12 @@ The figures from here on are drawn from eight runs of the recipe of record at se
 """
 
 alpha_slice_figure()
+
+r"""
+The same runs by position in a context, at every slice:
+"""
+
+positions_figure()
 
 r"""
 ## Training
