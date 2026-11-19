@@ -680,4 +680,12 @@ With `τ_ℓ fixed` adopted, we gave it the full set of measurements and a refer
 
     <!-- mini:figures ./m2/paired-runs/report.py -->
 
+- [D2.2 figures for the post](./m2/d2.2/report.py)
+
+    Figures for the post on D2.2, drawn from the reports above. It starts with the pooling diagram of ex-2.1.9, redrawn with the pool over slices added.
+
+    <span class="tags">`figures` `blog-post`</span>
+
+    <!-- mini:figures ./m2/d2.2/report.py -->
+
 </details>
