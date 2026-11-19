@@ -57,6 +57,8 @@ NAME = "arc-in-controls"
 SEEDS = tuple(range(712, 720))
 SAMPLE = 300
 DISC_REF = f"reports/m2/{NAME}/disc"  # the class-means plane at every slice (`measure_disc`)
+EVERY_SEED = 715  # the seed whose runs `measure_every` records in full, for the arc figure of the D2.2 post
+EVERY_REF = f"reports/m2/{NAME}/every/{{label}}"  # every example answer of one run (`measure_every`), an npz
 
 
 def runs() -> list[dict[str, Any]]:
@@ -210,6 +212,49 @@ def measure_disc(checkpoint, holdout, label: str, kind: str) -> dict:
     return out
 
 
+def measure_every(checkpoint, holdout, label: str, kind: str):
+    """Every example answer of one run, in the class-means plane of each slice from 1 to 4 (the plane `_means`
+    draws), with its one-example posterior on the anchored op: an npz for the arc figure of the D2.2 post, which
+    draws them all.
+    """
+    from mini import get_data_dir
+    from mini.store import get, put
+
+    workdir = get_data_dir() / NAME / label
+    model, _, color_ids, tok2color = ex2216._load_run(checkpoint, workdir)
+    scorer = lr._Scorer(get(holdout, workdir / "holdout.npz"), tok2color, color_ids)
+    ho = scorer.ho
+    a_id = lr.OP_NAMES.index(lr.ANCHORED_OP)
+    n_colors = len(color_ids)
+    y = tok2color[ho.tokens[:, list(lr.ANSWERS)]]
+    a = tok2color[ho.tokens[:, [lr.UNIT * i for i in range(lr.K)]]]
+    b = tok2color[ho.tokens[:, [lr.UNIT * i + 2 for i in range(lr.K)]]]
+    p = scorer.table.lookup(a * n_colors + b, y).reshape(len(lr.OP_NAMES), -1)  # (ops, examples)
+    fits = p[a_id] > 0
+    rho, cube = lr.ex2221.CENTRE[1], lr.ex2221.CUBE_RATE
+    like = (1 - rho - cube) * p + rho * (p.sum(0) - p) / (len(p) - 1) + cube / n_colors
+    out: dict[str, np.ndarray] = {"alone": (like[a_id] / like.sum(0)).astype(np.float32), "fits": fits}
+    st = lr._states(model, ho.tokens)
+    for s in range(1, st.shape[0]):
+        x = st[s][:, list(lr.ANSWERS)].reshape(-1, st.shape[-1]).astype(np.float64)
+        mf, mn = x[fits].mean(0), x[~fits].mean(0)
+        n = mn / np.linalg.norm(mn)
+        w = mf / np.linalg.norm(mf) - (mf @ n) / np.linalg.norm(mf) * n
+        w /= np.linalg.norm(w)
+        out[f"points/{s}"] = np.stack([x @ n, x @ w], axis=1).astype(np.float32)
+    path = workdir / "every.npz"
+    np.savez_compressed(path, allow_pickle=False, **out)
+    return put(path, name=f"{NAME}-every-{label}.npz")
+
+
+def publish_every(arts: list, labels: list[str]) -> dict:
+    from mini.store import set_ref
+
+    for art, label in zip(arts, labels, strict=True):
+        set_ref(EVERY_REF.format(label=label), art)
+    return {"every": labels}
+
+
 def publish_disc(got: list[dict]) -> dict:
     import json
 
@@ -250,7 +295,17 @@ def main(ctx: Ctx) -> dict:
         [r["kind"] for r in rows],
         role="measure",
     )
-    return {**done, "disc": ctx.run(publish_disc, disc, role="prep")}
+    disc_done = ctx.run(publish_disc, disc, role="prep")
+    pick = [r for r in rows if r["seed"] == EVERY_SEED]
+    every = ctx.map(
+        measure_every,
+        [res["artifacts"][r["checkpoint"]] for r in pick],
+        [res["holdout"]] * len(pick),
+        [r["label"] for r in pick],
+        [r["kind"] for r in pick],
+        role="measure",
+    )
+    return {**done, "disc": disc_done, **ctx.run(publish_every, every, [r["label"] for r in pick], role="prep")}
 
 
 experiment = Experiment(
