@@ -222,7 +222,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-We gave the post-hoc fitters the same shape of edit as the anchor: a pooled fit at every slice, with the configuration chosen on the other runs. In that shape no run can miss by editing the wrong slice, but three of the four fitters still remove only a small part of the op on nearly every run. Leaving out the embedding helps the probe, which then carries over on most runs, with less removal than the anchor.
+We gave the post-hoc fitters the same shape of edit as the anchor: a pooled fit at every slice, with the configuration chosen on the other runs. In that shape no run can miss by editing the wrong slice, but three of the four fitters still remove only a small part of the op on nearly every run. Leaving out the embedding helps the probe, which then carries over on all but one run, with less removal than the anchor.
 ///
 
 In the post-hoc-compare experiment, we chose a fitter configuration on seven runs and carried it to the eighth. It removed most of the op on seven runs. On seed 712 it missed for LEACE, INLP, and the probe: the choice made on the other runs edited one slice, and that run holds the op a slice earlier. The anchored edit acts at every slice, so it cannot miss in that way. Does a fitter given the same shape of edit carry over as well as the anchor does? This report answers from the scores that experiment stored, with no new runs and no new scoring.
@@ -233,7 +233,7 @@ In the post-hoc-compare experiment, we chose a fitter configuration on seven run
 rf"""
 ## Observations
 
-- [Carried to the run left out (E1)](#carried-to-the-run-left-out-e1): at every slice, with the choice made on the other runs, the standard fitters remove {num(min(EVERY[m]["removal"].mean() for m in FITTERS))} to {num(max(EVERY[m]["removal"].mean() for m in FITTERS))} of the op against {num(A_REMOVAL.mean())} for the anchor, and miss on most runs. The optimized direction (a ceiling, fitted against the scoring itself) comes close to the anchor.
+- [Carried to the run left out (E1)](#carried-to-the-run-left-out-e1): at every slice, with the choice made on the other runs, the standard fitters remove {num(min(EVERY[m]["removal"].mean() for m in FITTERS))} to {num(max(EVERY[m]["removal"].mean() for m in FITTERS))} of the op against {num(A_REMOVAL.mean())} for the anchor, and miss on most runs. Choosing on the run itself recovers part of the gap for the probe and INLP, so most of the shortfall is in the shape of the edit. The optimized direction (a ceiling, fitted against the scoring itself) comes close to the anchor.
 - [Where the spill comes from (E2)](#where-the-spill-comes-from-e2): the cost to the other ops comes from the edits at the embedding and at slice 1, which add little removal. Slice 2 alone, where the single-slice choices of post-hoc-compare edited, costs about nothing.
 - [Without the embedding (E3)](#without-the-embedding-e3): on slices 1 to 3, the probe carries over on all but one run, with less removal than the anchor and spill on two runs; the other three fitters still miss on most runs. This scope was added after the first results.
 
@@ -281,22 +281,11 @@ Does a pooled fit at every slice, with its configuration chosen on the other sev
 
 
 @memo
-def e1_draw(every: dict, pooled: dict, a_removal: np.ndarray) -> str:
-    @themed(
-        name="fitter-transfer-e1",
-        alt_text=(
-            "Removal per run for the anchor and five methods, each method with two columns. In the left column of "
-            "each fitter, any pooled fit, most runs sit near 0.8 to 0.95, with one run near 0.4 for the probe, LEACE, "
-            "and INLP. In the right column, "
-            "every slice, the four standard fitters sit between 0.1 and 0.4 with a few runs higher; the optimized "
-            "direction sits near 0.84 in both columns, and the anchor near 0.88."
-        ),
-        caption=f"""**Removal per run with the configuration chosen on the other seven runs**, on the test set of each
-        run, net. For each method the hollow column is the choice over every pooled fit (as in post-hoc-compare) and
-        the filled column the choice over the pooled fits that edit every slice. A small dot per run and the seed
-        mean as the marker; the anchor at full dose. The dashed line is a removal of {MISS}, under which a run
-        misses.""",
-    )
+def removal_draw(name: str, left: dict, right: dict, labels: tuple[str, str], a_removal: np.ndarray, caption: str,
+                 alt_text: str) -> str:  # fmt: skip
+    """Removal per run, two columns per method (hollow *left*, filled *right*), beside the anchor."""
+
+    @themed(name=name, alt_text=alt_text, caption=caption)
     def _plot() -> plt.Figure:
         fig, ax = plt.subplots(figsize=(6.0, 2.8), layout="constrained")
         rng = np.random.default_rng(0)
@@ -312,8 +301,8 @@ def e1_draw(every: dict, pooled: dict, a_removal: np.ndarray) -> str:
         column(0, a_removal, "anchor", True)
         ticks = [0.0]
         for k, m in enumerate(METHODS, start=1):
-            column(k - 0.17, pooled[m]["removal"], m, False)
-            column(k + 0.17, every[m]["removal"], m, True)
+            column(k - 0.17, left[m]["removal"], m, False)
+            column(k + 0.17, right[m]["removal"], m, True)
             ticks.append(k)
         ax.axhline(MISS, color=rule(), lw=0.9, ls="--", zorder=1)
         ax.set_xticks(ticks, [SHOWN["anchor"], *(SHOWN[m].replace(" ", "\n", 1) for m in METHODS)], fontsize=7)
@@ -321,15 +310,29 @@ def e1_draw(every: dict, pooled: dict, a_removal: np.ndarray) -> str:
         ax.tick_params(labelsize=7)
         ax.set_ylim(-0.02, 1.0)
         ax.set_xlim(-0.6, len(METHODS) + 0.6)
-        ax.plot([], [], "o", color=rule(), mfc="none", ms=4, label="any pooled fit")
-        ax.plot([], [], "o", color=rule(), ms=4, label="every slice")
-        ax.legend(fontsize=7, frameon=False, loc="lower left", ncols=2)
+        ax.plot([], [], "o", color=rule(), mfc="none", ms=4, label=labels[0])
+        ax.plot([], [], "o", color=rule(), ms=4, label=labels[1])
+        ax.legend(fontsize=7, frameon=False, loc="lower left", bbox_to_anchor=(0, 1.0), ncols=2)
         return fig
 
     return _plot()
 
 
-e1_draw(EVERY, POOLED, A_REMOVAL)
+removal_draw(
+    "fitter-transfer-e1",
+    POOLED,
+    EVERY,
+    ("any pooled fit", "every slice"),
+    A_REMOVAL,
+    f"""**Removal per run with the configuration chosen on the other seven runs**, on the test set of each run, net.
+    For each method the hollow column is the choice over every pooled fit (as in post-hoc-compare) and the filled
+    column the choice over the pooled fits that edit every slice. A small dot per run and the seed mean as the
+    marker; the anchor at full dose. The dashed line is a removal of {MISS}, under which a run misses.""",
+    "Removal per run for the anchor and five methods, each method with two columns. In the left column of each "
+    "fitter, any pooled fit, most runs sit near 0.8 to 0.95, with one run near 0.4 for the probe, LEACE, and INLP. "
+    "In the right column, every slice, the four standard fitters sit between 0.1 and 0.4 with a few runs higher; the "
+    "optimized direction sits near 0.84 in both columns, and the anchor near 0.88.",
+)
 
 # %%
 
@@ -368,9 +371,34 @@ _DOSE_HI = max(DOSE[m] for m in FITTERS)
 rf"""
 No standard fitter carries over at every slice. With the choice made on the other runs, each removes {num(_STD_LO)} to {num(_STD_HI)} of the way to the target null on average, and each misses on {_MISS_LO} or more of the eight runs. They also land past the spill criterion on several runs. For the probe and INLP, a point chosen at the line on other runs lands on either side of it on the run left out. Difference in means has no configuration at every slice that the other runs keep within the criterion, and LEACE has none for half of the runs. In those cases the rule takes the configuration that spills least, at a quarter of the component (the lowest dose in the grid). With room under the criterion, the probe and INLP land over it on fewer runs and remove a little less, and difference in means and LEACE take the least-spilling configuration for every run. The probe with mean ablation does best. It removes about half of what the anchor removes, and still misses on five runs.
 
-The chosen configurations explain this. On average they remove {num(_DOSE_LO)} to {num(_DOSE_HI)} of the fitted component (the probe the most), where the anchored edit removes all of it. Within the criterion there is no room for more, because at every slice a fitted direction costs the other ops more than the criterion allows. Seed 712, the run that missed in post-hoc-compare, is now the best run for every standard fitter. That fits with it holding the op a slice earlier than the rest.
+The chosen configurations explain this. On average they remove {num(_DOSE_LO)} to {num(_DOSE_HI)} of the fitted component (the probe the most), where the anchored edit removes all of it. Within the criterion there is no room for more, because at every slice a fitted direction costs the other ops more than the criterion allows. Seed 712, the run that missed in post-hoc-compare, is now the best run for every standard fitter (E2 says why).
 
 The optimized direction removes nearly as much as the anchor at every slice, and spills on no run. So an edit of this shape can remove the op from a control within the criterion, but the standard fitters do not find the direction that does it.
+
+Is the shortfall in the shape of the edit, or in carrying the choice to another run? The table chooses within the same scope on the tuning scores of each run itself.
+"""
+
+# %%
+
+
+def own_table() -> str:
+    rows = []
+    for m in METHODS:
+        o = EVERY_OWN[m]
+        rows.append([SHOWN[m], span(o["removal"]), f"{o['over']} of 8", f"{o['miss']} of 8"])
+    return table_html(
+        ["", "removal ↑", "over ↓", "misses ↓"],
+        rows,
+        """**Pooled fits at every slice, with the configuration chosen on the run itself**: removal on the test set
+        (seed mean and range, net), the runs over the spill criterion, and the runs that miss, out of eight.""",
+    )
+
+
+own_table()
+
+# %%
+
+rf"""Choosing on the run itself helps the probe and INLP by about the same amount, and helps difference in means and LEACE little or not at all. With the same scope and the choice made on the tuning scores of the run itself, the probe removes {num(EVERY_OWN["ridge"]["removal"].mean())} and the other fitters {num(max(EVERY_OWN[m]["removal"].mean() for m in ("dim", "leace", "inlp")))} or less, and each lands over the criterion on most runs. For difference in means and LEACE, nearly all of the shortfall comes from the shape of the edit, before anything is carried over. For the probe it splits about evenly between the shape and the carrying, and its gain from choosing on its own run is within the seed spread.
 """
 
 # %%
@@ -378,7 +406,7 @@ The optimized direction removes nearly as much as the anchor at every slice, and
 r"""
 ## Where the spill comes from (E2)
 
-A fitted edit at every slice costs the other ops a lot. Which slices bring that cost? And how much does the shape cost a fitter that chooses on its own run? The figure scores each slice edited alone at full dose, as seed means. It uses one form of each fitter: the binary target, no refit, rank 2 for INLP, and mean replacement (which nearly every choice of E1 used). The cost comes mostly from the embedding and slice 1.
+A fitted edit at every slice costs the other ops a lot. Which slices bring that cost? The figure scores each slice edited alone at full dose, as seed means. It uses one form of each fitter: the binary target, no refit, rank 2 for INLP, and mean replacement (which nearly every choice of E1 used). The cost comes mostly from the embedding and slice 1.
 """
 
 
@@ -462,25 +490,7 @@ So in a control, the direction a fitter finds for the op at the early slices see
 With zero replacement in place of the mean, the probe and INLP spill several times more at the early slices, so mean ablation is much of why those two do better than the other fitters here.
 
 That fits the miss on seed 712 in post-hoc-compare. That run holds the op at slice 1. A fitter spills at slice 1 on the other runs, so a rule chosen on them avoids it.
-
-Choosing on the run itself helps the probe and INLP by about the same amount, and helps difference in means and LEACE little or not at all. With the same scope and the choice made on the tuning scores of the run itself, the probe removes {num(EVERY_OWN["ridge"]["removal"].mean())} and the other fitters {num(max(EVERY_OWN[m]["removal"].mean() for m in ("dim", "leace", "inlp")))} or less, and each lands over the criterion on most runs. For difference in means and LEACE, nearly all of the shortfall comes from the shape of the edit, before anything is carried over. For the probe it splits about evenly between the shape and the carrying, and its gain from choosing on its own run is within the seed spread.
 """
-
-
-def e2_table() -> str:
-    rows = []
-    for m in METHODS:
-        o = EVERY_OWN[m]
-        rows.append([SHOWN[m], span(o["removal"]), f"{o['over']} of 8", f"{o['miss']} of 8"])
-    return table_html(
-        ["", "removal ↑", "over ↓", "misses ↓"],
-        rows,
-        """**Pooled fits at every slice, with the configuration chosen on the run itself**: removal on the test set
-        (seed mean and range, net), the runs over the spill criterion, and the runs that miss, out of eight.""",
-    )
-
-
-e2_table()
 
 # %%
 
@@ -511,11 +521,28 @@ e3_table()
 
 # %%
 
-_712 = [m for m in FITTERS if BLOCKS[m]["removal"].argmax() == 0]
-_BEST712 = "every fitter" if len(_712) == len(FITTERS) else " and ".join(SHOWN[m] for m in _712) or "no fitter"
+removal_draw(
+    "fitter-transfer-e3",
+    EVERY,
+    BLOCKS,
+    ("every slice", "slices 1 to 3"),
+    A_REMOVAL,
+    f"""**Removal per run with the configuration chosen on the other seven runs, at every slice and on slices 1 to
+    3**, on the test set of each run, net. For each method the hollow column is the choice over the pooled fits at
+    every slice (as in E1) and the filled column the choice over the pooled fits on slices 1 to 3, added after E1. A
+    small dot per run and the seed mean as the marker; the anchor at full dose. The dashed line is a removal of
+    {MISS}, under which a run misses.""",
+    "Removal per run, two columns per method. At every slice the four standard fitters sit between 0.1 and 0.4 with "
+    "a few runs higher. On slices 1 to 3 the probe rises to a mean near 0.7 with one run under 0.5, INLP to near "
+    "0.45, while LEACE and difference in means stay low. The optimized direction sits near 0.85 in both columns, "
+    "and the anchor near 0.88.",
+)
+
+# %%
+
 
 rf"""
-Leaving out the embedding helps the probe most, INLP some, and LEACE and difference in means little. The probe removes {num(BLOCKS["ridge"]["removal"].mean())} on average and misses on {BLOCKS["ridge"]["miss"]} run of eight, against {EVERY["ridge"]["miss"]} at every slice, though it lands over the criterion on {BLOCKS["ridge"]["over"]} runs, one of them by a wide margin. With room under the criterion its removal falls to {num(BLOCKS_MARGIN["ridge"]["removal"].mean())}. INLP gains too, and still misses on most runs. LEACE and difference in means stay about where they were, since slice 1 still costs them many times the criterion (E2). Seed 712 is again the best run for {_BEST712}.
+Leaving out the embedding helps the probe most, INLP some, and LEACE and difference in means little. The probe removes {num(BLOCKS["ridge"]["removal"].mean())} on average and misses on {BLOCKS["ridge"]["miss"]} run of eight, against {EVERY["ridge"]["miss"]} at every slice, though it lands over the criterion on {BLOCKS["ridge"]["over"]} runs, one of them by a wide margin. With room under the criterion its removal falls to {num(BLOCKS_MARGIN["ridge"]["removal"].mean())}. INLP gains too, and still misses on most runs. LEACE and difference in means stay about where they were, since slice 1 still costs them many times the criterion (E2).
 
 So one fixed recipe for the probe, chosen on other runs, does carry over on slices 1 to 3, at a lower removal than the anchor and with spill on some runs. For the other three fitters it does not.
 """
