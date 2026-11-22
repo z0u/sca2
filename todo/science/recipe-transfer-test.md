@@ -11,4 +11,4 @@ A sketch: train 16 fresh controls and 16 fresh anchored runs; fix each fitter at
 
 ## Notes
 
-- 2026-11-22: the third arm has a first look on the stored scores of 712 to 719 (the fitter-transfer report). A pooled fit at every slice, with a uniform dose chosen on the other seven runs, removes 0.14 to 0.42 of the op against 0.88 for the anchor, because the fitted edits at the embedding and slice 1 spill many times the criterion. So a dose per slice (or a slice choice per run) is what that arm would need; a uniform every-slice arm would mostly measure that spill.
+**2026-11-22, fitter-transfer** — the third arm has a first look on the stored scores of 712 to 719 (the fitter-transfer report). A pooled fit at every slice, with a uniform dose chosen on the other seven runs, removes 0.14 to 0.42 of the op against 0.88 for the anchor, because the fitted edits at the embedding and slice 1 spill many times the criterion. So a dose per slice (or a slice choice per run) is what that arm would need; a uniform every-slice arm would mostly measure that spill.
