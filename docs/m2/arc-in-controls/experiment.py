@@ -59,6 +59,9 @@ SAMPLE = 300
 DISC_REF = f"reports/m2/{NAME}/disc"  # the class-means plane at every slice (`measure_disc`)
 EVERY_SEED = 715  # the seed whose runs `measure_every` records in full, for the arc figure of the D2.2 post
 EVERY_REF = f"reports/m2/{NAME}/every/{{label}}"  # every example answer of one run (`measure_every`), an npz
+FITTERS_REF = (
+    f"reports/m2/{NAME}/fitters"  # the arc's direction against refitted post-hoc directions (`fitter_cosines`)
+)
 
 
 def runs() -> list[dict[str, Any]]:
@@ -263,6 +266,70 @@ def publish_every(arts: list, labels: list[str]) -> dict:
     return {"every": labels}
 
 
+def fitter_cosines(checkpoint, holdout, label: str, kind: str) -> dict:
+    """How the arc's direction (the fitting minus the non-fitting class mean at the example answers) lines up with
+    the directions the post-hoc comparison fits, refitted here on the held-out set (the comparison fitted on a
+    fresh set of its own and kept no directions): difference in means, the ridge probe, LEACE, and INLP, each with
+    the comparison's two targets (the generating op is the anchored op; the posterior on it) at two of its sites
+    (the example answers; every position, pooled). A one-direction fit gives |cos| with the arc; INLP's span gives
+    the length of the arc's projection onto it. Also the arc's cosine with e₁, at slices 1 to 3.
+    """
+    from mini import get_data_dir
+    from mini.store import get
+    from sca.posthoc import Moments, dim_fit, inlp_fit, leace_fit, ridge_fit
+
+    workdir = get_data_dir() / NAME / label
+    model, _, color_ids, tok2color = ex2216._load_run(checkpoint, workdir)
+    scorer = lr._Scorer(get(holdout, workdir / "holdout.npz"), tok2color, color_ids)
+    ho = scorer.ho
+    a_id = lr.OP_NAMES.index(lr.ANCHORED_OP)
+    n_colors = len(color_ids)
+    ans = list(lr.ANSWERS)
+    y = tok2color[ho.tokens[:, ans]]
+    a = tok2color[ho.tokens[:, [lr.UNIT * i for i in range(lr.K)]]]
+    b = tok2color[ho.tokens[:, [lr.UNIT * i + 2 for i in range(lr.K)]]]
+    fits = (scorer.table.lookup(a * n_colors + b, y)[a_id] > 0).ravel()
+    target = np.stack([ho.op_ids == a_id, ho.posterior[:, a_id]], axis=1).astype(np.float64)  # (contexts, 2)
+    st = lr._states(model, ho.tokens)
+
+    def one(d: np.ndarray, arc: np.ndarray) -> float:
+        return float(abs(d @ arc) / np.linalg.norm(d))
+
+    out: dict[str, Any] = {"label": label, "kind": kind, "slices": {}}
+    for s in (1, 2, 3):
+        x = st[s][:, ans].reshape(-1, st.shape[-1]).astype(np.float64)
+        arc = x[fits].mean(0) - x[~fits].mean(0)
+        arc /= np.linalg.norm(arc)
+        n_ctx, length = st.shape[1], st.shape[2]
+        sites = {
+            "answers": Moments.of(x, np.repeat(target, len(ans), axis=0)),
+            "pooled": Moments.of(st[s].reshape(-1, st.shape[-1]), np.repeat(target, length, axis=0)),
+        }
+        assert sites["pooled"].n == n_ctx * length
+        r: dict[str, Any] = {"e1": float(arc[0])}
+        for site, m in sites.items():
+            for j, tgt in enumerate(("binary", "graded")):
+                if tgt == "binary":
+                    r[f"dim/{site}/{tgt}"] = one(dim_fit(m, j).basis[0], arc)
+                r[f"ridge/{site}/{tgt}"] = one(ridge_fit(m, j).basis[0], arc)
+                r[f"leace/{site}/{tgt}"] = one(leace_fit(m, j).basis[0], arc)
+                if tgt == "binary":
+                    u = inlp_fit(m, j, rank=4).basis.astype(np.float64)
+                    r[f"inlp1/{site}/{tgt}"] = one(u[0], arc)
+                    r[f"inlp4/{site}/{tgt}"] = float(np.linalg.norm(u @ arc))
+        out["slices"][str(s)] = r
+    return out
+
+
+def publish_fitters(got: list[dict]) -> dict:
+    import json
+
+    from mini.store import put, set_ref
+
+    set_ref(FITTERS_REF, put(json.dumps({"runs": got}).encode(), name=f"{NAME}-fitters.json"))
+    return {"n": len(got)}
+
+
 def publish_disc(got: list[dict]) -> dict:
     import json
 
@@ -313,7 +380,16 @@ def main(ctx: Ctx) -> dict:
         [r["kind"] for r in pick],
         role="measure",
     )
-    return {**done, "disc": disc_done, **ctx.run(publish_every, every, [r["label"] for r in pick], role="prep")}
+    every_done = ctx.run(publish_every, every, [r["label"] for r in pick], role="prep")
+    cos = ctx.map(
+        fitter_cosines,
+        [res["artifacts"][r["checkpoint"]] for r in rows],
+        [res["holdout"]] * len(rows),
+        [r["label"] for r in rows],
+        [r["kind"] for r in rows],
+        role="measure",
+    )
+    return {**done, "disc": disc_done, **every_done, "fitters": ctx.run(publish_fitters, cos, role="prep")}
 
 
 experiment = Experiment(

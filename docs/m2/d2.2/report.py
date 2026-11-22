@@ -1026,6 +1026,64 @@ table_html(
 )
 
 r"""
+How the arc's direction (fitting minus non-fitting mean, at the example answers) lines up with the directions the
+post-hoc methods fit:
+"""
+
+ARC_FITTERS = fetch_json(aic.FITTERS_REF)["runs"]
+assert len(ARC_FITTERS) == 2 * len(SEEDS), len(ARC_FITTERS)
+FITTER_ROWS = (
+    ("difference in means, LEACE", "dim"),
+    ("ridge probe, INLP's first direction", "ridge"),
+    ("INLP, rank 4 (span)", "inlp4"),
+)
+# LEACE with one binary label removes along the difference in means, and INLP's first round is the ridge probe, so
+# each pair shares a row; the check below holds that on every run.
+assert all(
+    abs(r["slices"][s][f"{a}/{site}/binary"] - r["slices"][s][f"{b}/{site}/binary"]) < 1e-3
+    for r in ARC_FITTERS
+    for s in ("2", "3")
+    for site in ("answers", "pooled")
+    for a, b in (("dim", "leace"), ("ridge", "inlp1"))
+)
+
+
+def arc_fitter_rows() -> list[list[str]]:
+    def cell(kind: str, key: str, s: str) -> str:
+        v = np.array([r["slices"][s][key] for r in ARC_FITTERS if r["kind"] == kind])
+        return f"{np.median(v):.2f} ({v.min():.2f}–{v.max():.2f})"
+
+    rows = []
+    for site, where in (("answers", "example answers"), ("pooled", "every position")):
+        for name, m in FITTER_ROWS:
+            rows.append([f"{name}, {where}"] + [cell(k, f"{m}/{site}/binary", s) for k in ("control", "anchored") for s in ("3", "2")])  # fmt: skip
+    rows.append(["e₁"] + ["–", "–"] + [cell("anchored", "e1", s) for s in ("3", "2")])
+    return rows
+
+
+ARC_FITTER_ROWS = arc_fitter_rows()
+GRADED_GAP = max(
+    abs(r["slices"][s][f"{m}/{site}/binary"] - r["slices"][s][f"{m}/{site}/graded"])
+    for r in ARC_FITTERS
+    for s in ("2", "3")
+    for m in ("ridge", "leace")
+    for site in ("answers", "pooled")
+)
+table_html(
+    ["direction", "control, slice 3", "control, slice 2", "anchored, slice 3", "anchored, slice 2"],
+    ARC_FITTER_ROWS,
+    caption=f"""
+        **The arc's direction against the post-hoc directions.** |cos| between the arc's direction (the fitting
+        minus the non-fitting class mean at the example answers) and each direction the post-hoc comparison fits,
+        refitted on the held-out set with the comparison's code: at its example-answer site and pooled over every
+        position, with the binary label (the context's op is `difference`). For INLP's rank-4 span, the length of
+        the arc's projection onto it. Median over the eight runs of each kind at 712 to 719, with the range. The
+        graded label (the posterior on `difference`) changes no entry by more than {GRADED_GAP:.2f}. Last row: the
+        arc's cosine with e₁ in the anchored runs.
+    """,
+)
+
+r"""
 ## Training
 
 The training record of the same runs, with the schedules underneath on the same epoch axis.
