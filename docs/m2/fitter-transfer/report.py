@@ -1,5 +1,5 @@
 # ruff: noqa: B018
-# title: Fitted edits at every slice, carried to a run they were not chosen on
+# title: Fitters that edit every slice, with settings chosen on other runs
 
 # An exploratory re-analysis with no new runs and no new scoring: the tuning-set and test-set scores the
 # post-hoc-compare experiment stored for every configuration of its grid, restricted to the fits that need no role
@@ -226,11 +226,11 @@ def table_html(head: list[str], rows: list[list[str]], caption: str) -> str:
 _SEVEN = [POOLED[m]["removal"][1:].mean() for m in FITTERS]
 
 rf"""
-# Fitted edits at every slice, carried to a run they were not chosen on
+# Fitters that edit every slice, with settings chosen on other runs
 
 /// tip |
 <!-- lede -->
-A post-hoc fitter whose settings were chosen on other runs missed one run in eight, because it edited a single slice and that run holds the op a slice earlier. The anchored edit acts at every slice, so it cannot miss that way. We gave the fitters the same shape, a fit at every slice, and three of the four then removed only a small part of the op on nearly every run. Leaving out the embedding helps the probe, which then carries over on all but one run, with less removal than the anchor.
+In post-hoc-compare, each fitter's settings were chosen on seven runs and then used on the eighth. That worked on seven runs in eight. On seed 712 it missed, because the chosen edit acted at one slice and that run holds the op one slice earlier. The anchored edit acts at every slice, so it can't miss that way. Here we gave the fitters the same shape, an edit at every slice with a direction fitted at each, and three of the four then removed only a small part of the op on nearly every run. Leaving out the embedding helps the probe: it then carries over on all but one run, with less removal than the anchor.
 ///
 
 In the post-hoc-compare experiment, we chose a fitter configuration on seven runs and carried it to the eighth, refitting the direction on that run. Restricted to fits that need no role labels, it removed {num(min(_SEVEN))} to {num(max(_SEVEN))} of the way to the target null on seven runs (seed mean per fitter). On seed 712 it missed for LEACE, INLP, and the probe: the choice made on the other runs edited one slice, but that run holds the op a slice earlier. The anchored edit acts at every slice, so it cannot miss in that way. Does a fitter given the same shape of edit carry over as well as the anchor does? This report answers from the scores that experiment stored, with no new runs and no new scoring.
@@ -241,7 +241,7 @@ In the post-hoc-compare experiment, we chose a fitter configuration on seven run
 rf"""
 ## Observations
 
-- [Carried to the run left out (E1)](#carried-to-the-run-left-out-e1): at every slice, with the choice made on the other runs, the standard fitters remove {num(min(EVERY[m]["removal"].mean() for m in FITTERS))} to {num(max(EVERY[m]["removal"].mean() for m in FITTERS))} of the op against {num(A_REMOVAL.mean())} for the anchor, and miss on most runs. Choosing on the run itself recovers part of the gap for the probe and INLP, so most of the shortfall is in the shape of the edit. The optimized direction (a ceiling, fitted against the scoring itself) comes close to the anchor.
+- [Carried to the run left out (E1)](#carried-to-the-run-left-out-e1): at every slice, with the choice made on the other runs, the standard fitters remove {num(min(EVERY[m]["removal"].mean() for m in FITTERS))} to {num(max(EVERY[m]["removal"].mean() for m in FITTERS))} of the op against {num(A_REMOVAL.mean())} for the anchor, and miss on most runs. Choosing on the run itself recovers only part of the gap for the probe and INLP, so most of the shortfall is in the shape of the edit. The optimized direction (a ceiling, fitted against the scoring itself) comes close to the anchor.
 - [Where the spill comes from (E2)](#where-the-spill-comes-from-e2): the cost to the other ops comes from the edits at the embedding and at slice 1, which add little removal. Slice 2 alone, where the single-slice choices of post-hoc-compare edited, costs about nothing.
 - [Without the embedding (E3)](#without-the-embedding-e3): on slices 1 to 3, the probe carries over on all but one run, with less removal than the anchor and spill on two runs; the other three fitters still miss on most runs. This scope was added after the first results.
 
@@ -251,7 +251,7 @@ This is an exploratory re-analysis, with no preregistration and no gate. It foll
 
 The runs are those of post-hoc-compare: the eight controls of the anneal confirmation at seeds 712 to 719, where every fitter is fitted and scored, and the eight `τ_ℓ fixed` runs at the same seeds for the anchor, at full dose, as published.
 
-The fitters are difference in means, the ridge probe, LEACE, and INLP, with the optimized direction beside them as a ceiling. Each is restricted to the configurations that need no role labels and edit like the anchor. These are pooled fits: fitted on every position of a context, and editing every position at every slice (the embedding and each block output). The anchored edit acts at the same slices and positions. Within that scope, the grid still offers the target (binary or graded, where the fitter takes both), sequential refit (on or off), the replacement (zero or the mean), the rank of INLP, and the dose (a quarter, a half, three quarters, or all of the component).
+The fitters are difference in means, the ridge probe, LEACE, and INLP, with the optimized direction beside them as a ceiling. Each is restricted to the configurations that need no role labels and edit like the anchor. These are pooled fits: fitted on every position of a context, and editing every position at every slice (the embedding and each block output). The anchored edit acts at the same slices and positions. Within that scope, the grid still offers the target (binary labels, or graded by the posterior, where the fitter can use either), sequential refit (on or off), the replacement (zero or the mean), the rank of INLP, and the dose (a quarter, a half, three quarters, or all of the component).
 
 What crosses from one run to another is a configuration, never a direction. Every direction is fitted on the run it edits, from that run's own fit set; the other runs only decide which settings to fit it with. The figure lays out where the fits and the edits happen.
 """
@@ -340,12 +340,12 @@ method_draw()
 # %%
 
 rf"""
-The selection rule is that of post-hoc-compare, applied within the scope above. For each run *R* in turn:
+The selection rule is that of post-hoc-compare, applied within the scope above. Write $R$ for the eight runs. For each run $r \in R$ in turn, the run left out:
 
-1. On each of the other seven runs, score every configuration in scope on its tuning set: its removal and its spill, net of the axis baseline (below). Average each configuration over the seven runs.
+1. On each other run $s \in R$, $s \neq r$, score every configuration in scope on its tuning set: its removal and its spill, net of the axis baseline (below). Average each configuration over the seven runs.
 2. Keep the frontier: the configurations that no other configuration beats on both removal and spill.
 3. Find where the frontier crosses a spill of 0.02 (the spill criterion), and take the two configurations on either side of the crossing, with the interpolation weight that lands on 0.02. If no configuration is within 0.02, take the one with the least spill; if every one is, take the one with the most removal.
-4. On run *R*, fit both configurations from its own fit set, score each on its test set, and interpolate their scores with that weight.
+4. On run $r$, fit both configurations from its own fit set, score each on its test set, and interpolate their scores with that weight.
 
 Choice on the other seven runs
 :   The rule above. This is the main measurement.
@@ -354,7 +354,7 @@ Choice with a margin
 :   The same, with the point in step 3 taken at a spill of 0.01, half the spill criterion, as a practitioner might leave room.
 
 Choice on the run itself
-:   The same rule with step 1 scored on run *R* alone, within the same scope. This involves no transfer; it says how much the every-slice restriction costs before anything is carried over.
+:   The same rule with step 1 scored on run $r$ alone, within the same scope. This involves no transfer; it says how much the every-slice restriction costs before anything is carried over.
 
 Every score is net of the median drop along fifteen coordinate axes under the same operator form on the tuning set, as in the analysis this follows. The published anchored scores are net of the median over all 63 other axes. Against the same fifteen axes, the anchor removes {num(A_REMOVAL_15.mean())} and spills on no run, so the choice of baseline does not change the comparison. The permuted-label baseline was scored only at the configurations post-hoc-compare chose, so it is not available here. As a check on the code, the same rule over every pooled fit reproduces the numbers of post-hoc-compare, including the 0.36 to 0.43 that LEACE, INLP, and the probe keep on seed 712.
 
@@ -528,8 +528,10 @@ def frontier_draw(left_out: int) -> str:
         caption=f"""**The frontier the rule chose on, for seed {left_out} left out**: removal against spill of every
         pooled configuration at every slice (dots), averaged over the tuning sets of the other seven runs, net. The
         dark line is the frontier in this scope, and the marker the point chosen at the spill criterion (dotted). The
-        grey line is the frontier over pooled fits on any slices, the scope of post-hoc-compare. The spill axis is
-        cut at 0.2.""",
+        grey line is the frontier over pooled fits on any slices, the scope of post-hoc-compare. Each line is one
+        average over seven runs, so it is smoother than the per-run frontiers of post-hoc-compare (one line per run,
+        on the test set), and a configuration that suits some runs but not others sits lower in the average. The
+        spill axis is cut at 0.2.""",
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(1, 4, figsize=(6.6, 2.2), sharey=True, layout="constrained")
@@ -564,6 +566,8 @@ frontier_draw(712)
 
 rf"""
 The frontier at every slice climbs slowly. By the time it reaches the spill criterion it has removed a small part of the op, where the frontier on any slices is already near the top. The probe is the exception in shape: its frontier rises steeply just past the spill criterion, so its result depends on where that line sits. Chosen at a spill of {LOOSE} on the other runs, it would remove {num(PROBE_LOOSE["removal"].mean())} and miss on {PROBE_LOOSE["miss"]} of the eight runs, while landing over the spill criterion on {PROBE_LOOSE["over"]} of them. We added this check after the first results. The configurations chosen are mostly at a quarter or a half of the component, with mean replacement, and they change little from one run left out to the next.
+
+LEACE looks worst here, which may be a surprise for the eraser that matched the anchor in post-hoc-compare. It is the same code, and on its own it works: over pooled fits on any slices, one LEACE configuration removes about 0.9 with almost no spill (the grey point at the top of its panel), and at slice 2 alone it removes about as much as the other fitters (E2). What changes is where it edits. At the embedding and slice 1 its edit costs the other ops 0.2 or more at full dose, against under 0.1 for the probe and INLP (E2), so the rule turns it down to a quarter of the component, which removes little anywhere. At the embedding a state holds only its token and position, so any direction that tells `difference` contexts apart there is a feature of the tokens, which every op reads. Why LEACE costs more there than the probe and INLP is a question this re-analysis does not settle.
 
 The optimized direction removes nearly as much as the anchor at every slice, and spills on no run. So an edit of this shape *can* remove the op from a control within the spill criterion, but the standard fitters do not find the direction that does it.
 
@@ -751,7 +755,7 @@ The anchored edit needs no such choice. Training put the op on e₁ at every sli
 
 Is the every-slice shape a fair thing to ask of a fitter? It is the shape the anchor was trained for, so it is not where a fitter is at its best. A practitioner using a steering direction or an eraser usually sweeps the layer and the strength on held-out data for each model, which is what the per-run choice of post-hoc-compare did, and there the fitters matched the anchor. But editing every layer is also a published procedure: concept scrubbing, in the paper that introduced LEACE ([Belrose et al., 2023](https://arxiv.org/abs/2306.03819)), fits LEACE at each layer in turn on the states as they arrive after the erasures before it, which is our every-slice scope with sequential refit. So E1 tests that procedure, carried to a new run, and E3 is closer to what a practitioner tuning one model would do.
 
-When would carrying a recipe over matter, in place of tuning each model? When the same removal has to be applied to many models (checkpoints of one run, fine-tunes, a family of sizes); when the model can't be scored for spill before it is used, because the labelled data or the scoring isn't at hand; and when a model is retrained and the concept has to come out again. With one model and a budget to tune on it, a fitter chosen per model does as well as the anchor here. Gradient routing ([Cloud et al., 2024](https://arxiv.org/abs/2410.04332)) makes the same case for its own training-time placement: a concept routed to known parameters during training can be removed later without searching for it.
+When would carrying a recipe over matter, in place of tuning each model? When the same removal has to be applied to many models (checkpoints of one run, fine-tunes, a family of sizes); when the model can't be scored for spill before it is used, because the labelled data or the scoring isn't at hand; and when a model is retrained and the concept has to come out again. The placement also travels with the weights. A model trained with an anchor could say in its model card that `difference` is on e₁, where a fitted direction would have to be published beside the weights as an arbitrary vector, and refitted for each new model. With one model and a budget to tune on it, a fitter chosen per model does as well as the anchor here. Gradient routing ([Cloud et al., 2024](https://arxiv.org/abs/2410.04332)) makes the same case for its own training-time placement: a concept or a behaviour routed to known parameters during training can be removed or overseen later without searching for it. Its examples include removing a capability from a language model and overseeing a reinforcement learner by localizing the modules responsible for its behaviours.
 
 The optimized direction shows that an edit of this shape exists in each control. It searches against the target null, which no real pipeline has, so it says what a rank-1 edit at every slice could do.
 
