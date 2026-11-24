@@ -863,7 +863,7 @@ def arc_every() -> dict:
             art = arts.get(ref)
             assert art is not None, f"not published: {ref}"
             z = np.load(store.get(art, Path(tmp) / f"{k}.npz"))
-            out[k] = {"alone": z["alone"].round(3).tolist(), "dist": z["dist"].tolist()} | {
+            out[k] = {"alone": z["alone"].round(3).tolist(), "dist": z["dist"].tolist(), "fits": z["fits"].tolist()} | {
                 s: z[f"points/{s}"].round(4).tolist() for s in ("2", "3")
             }
     return out
@@ -912,6 +912,11 @@ def arc_panel(ax: plt.Axes, m: dict, anchored: bool) -> None:
     for v in np.unique(t):
         k = t == v
         ax.scatter(pts[k, 0], pts[k, 1], s=22, marker=(2, 0, round(-90 * (1 - v))), color=fit_ink(v), alpha=0.2, lw=0.6, zorder=2 + v)  # fmt: skip
+    # The two class means (in this plane, the mean of each class's points), as white rings on top.
+    fits = np.asarray(m["fits"], bool)
+    for k in (fits, ~fits):
+        c = pts[k].mean(0)
+        ax.scatter([c[0]], [c[1]], s=16, facecolor="none", edgecolor=light_dark("#fff", "#111"), lw=1.1, zorder=12)
     ax.set_aspect("equal")
     ax.set_xlim(np.cos(np.radians(t1)) - 0.05, 1.45)
     ax.set_ylim(np.sin(np.radians(t0)) - 0.05, 1.22)
@@ -944,15 +949,20 @@ ARC_CAPTION = """
     Every example answer ({n:,} per panel) of one run of each kind at seed {seed}, in the plane of the two class
     means: the non-fitting mean points right, and up is the part of the fitting mean at right angles to it, which in
     an anchored run is e₁ (▼). Each tick is turned and colored by how well its example fits `difference` (the
-    posterior on `difference` given that example alone), from flat and grey to upright and red. The ticks on the rim
-    mark the class means, and the arc the angle between them. **Columns:** control, anchored. **Rows:** slices 3 and
+    posterior on `difference` given that example alone), from flat and grey to upright and red. The rings mark the
+    two class means (fitting and non-fitting), the ticks on the rim their directions, and the arc the angle between
+    them. **Columns:** control, anchored. **Rows:** slices 3 and
     2.
 """
 
 
 def arcs_figure() -> str:
     def panel(k: str, s: str) -> dict:
-        return ARC["panels"][k][s] | {"points": ARC_EVERY[k][s], "alone": ARC_EVERY[k]["alone"]}
+        return ARC["panels"][k][s] | {
+            "points": ARC_EVERY[k][s],
+            "alone": ARC_EVERY[k]["alone"],
+            "fits": ARC_EVERY[k]["fits"],
+        }
 
     data = {"panels": {k: {s: panel(k, s) for s in ("3", "2")} for k in ARC["panels"]}, "seed": ARC_SEED}  # fmt: skip
     return arcs_draw(data, arcs_alt())
