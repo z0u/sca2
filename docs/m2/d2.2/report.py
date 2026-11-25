@@ -1218,10 +1218,12 @@ def methods_figure(table: str) -> str:
     alt = f"""
         Two strip charts side by side, one row per method ({", ".join(med)}), for
         {METHOD_TABLES[table]}. Left: removal in percent, from 0 to 100. Right: spill in points of expected exact
-        match, with a hairline at the criterion of 2. Each row has a dot at the median over eight runs, a thin line for
+        match, with a dashed line at the criterion of 2. Each row has a dot at the median over eight runs, a thin line for
         the range, and a faint tick per run. Medians (removal, spill): {"; ".join(f"{n} {r:.0f}%, {sp:.1f}" for n, (r, sp) in med.items())}.
     """
-    return methods_draw({"table": table, "rows": rows}, alt)
+    every = [x for t in METHOD_TABLES for m in METHOD_NUMBERS[t].values() for x in m["spill"]]  # one span for all four
+    span = (min(-3, min(every) - 0.5), max(10, max(every) * 1.15))
+    return methods_draw({"table": table, "rows": rows, "spill_span": span}, alt)
 
 
 METHOD_INKS = {
@@ -1293,10 +1295,9 @@ def methods_draw(data: dict, alt_text: str) -> str:
         ax_r.set_xlim(0, 100)
         ax_r.set_xticks([0, 50, 100])
         ax_r.set_xlabel("removal (%)", fontsize=7.5)
-        top = max(max(r["spill"]) for r in rows)
         ax_s.set_xscale("symlog", linthresh=2, linscale=1.2)
-        ax_s.set_xlim(min(-3, min(min(r["spill"]) for r in rows) - 0.5), max(10, top * 1.15))
-        ticks = [t for t in (-2, 0, 2, 5, 10, 20, 40) if t <= max(10, top * 1.15)]
+        ax_s.set_xlim(*data["spill_span"])
+        ticks = [t for t in (-2, 0, 2, 5, 10, 20, 40) if t <= data["spill_span"][1]]
         ax_s.set_xticks(ticks, [str(t) for t in ticks])
         ax_s.xaxis.set_minor_locator(plt.NullLocator())
         ax_s.axvline(2, color=light_dark("#d0d0d0", "#484848"), lw=0.6, ls=(0, (4, 3)), zorder=1)
