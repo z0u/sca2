@@ -41,7 +41,12 @@ RUNS = [(w, s) for w in ex.WALKS for s in ex.SEEDS]
 
 
 def load() -> tuple[dict[str, np.ndarray], dict[tuple[str, int], dict[str, np.ndarray]]] | None:
-    refs = [ex.OPERANDS_REF.format(scale=SCALE)] + [ex.ANSWERS_REF.format(scale=SCALE, walk=w, seed=s) for w, s in RUNS]
+    refs = (
+        [ex.OPERANDS_REF.format(scale=SCALE)]
+        + [ex.ANSWERS_REF.format(scale=SCALE, walk=w, seed=s) for w, s in RUNS]
+        + [ex.RETRAINED_REF.format(scale=SCALE, walk=ex.REFERENCE_WALK, seed=s) for s in ex.SEEDS]
+        + [ex.IDEAL_REF.format(scale=SCALE, walk=ex.REFERENCE_WALK)]
+    )
     with tempfile.TemporaryDirectory() as tmp:
         files = fetch(refs, Path(tmp))
         if any(f is None for f in files.values()):
@@ -52,7 +57,18 @@ def load() -> tuple[dict[str, np.ndarray], dict[tuple[str, int], dict[str, np.nd
             assert f is not None
             with np.load(f) as z:
                 out.append({k: z[k] for k in z.files})
-    return out[0], dict(zip(RUNS, out[1:], strict=True))
+    # The references join the in-step answers of their seed under the keys `answer` reads: `retrained/<pick>`
+    # beside `clean/<pick>` and `full edit/<pick>`, and `bayes/<pick>` and `null/<pick>` for the ideal predictors.
+    runs = dict(zip(RUNS, out[1 : 1 + len(RUNS)], strict=True))
+    for s, z in zip(ex.SEEDS, out[1 + len(RUNS) : -1], strict=True):
+        runs[ex.REFERENCE_WALK, s] |= {retrained_key(k): v for k, v in z.items()} | out[-1]
+    return out[0], runs
+
+
+def retrained_key(key: str) -> str:
+    """`<render>/<b>/<op>/<pick>` of the retrained answers as `<render>/<b>/<op>/retrained/<pick>`."""
+    head, pick = key.rsplit("/", 1)
+    return f"{head}/retrained/{pick}"
 
 
 loaded = load()
@@ -369,6 +385,103 @@ With random examples the edit takes the `difference` picture from {_diff[RANDOM,
 
 # %%
 
+REFERENCE_COLUMNS = (
+    ("truth", "true answer"),
+    ("bayes/argmax", "ideal₇"),
+    ("clean/argmax", "unedited"),
+    ("null/argmax", "ideal₆"),
+    ("retrained/argmax", "retrained"),
+    ("full edit/argmax", "edited"),
+)
+
+
+def draw_references(seed: int, render: str, op: str) -> plt.Figure:
+    gap = 0.25
+    groups = (REFERENCE_COLUMNS[:3], REFERENCE_COLUMNS[3:])
+    widths = [PANEL_IN, PANEL_IN] + [w for g in groups for w in [gap] + [PANEL_IN] * len(g)]
+    fig = plt.figure(figsize=(sum(widths) + 0.2, len(ex.QUERIES) * (ROW_IN + 0.1) + 0.3))
+    gs = fig.add_gridspec(len(ex.QUERIES), len(widths), width_ratios=widths, wspace=0.04, hspace=0.08)
+    for r, query in enumerate(ex.QUERIES):
+        cells: list[tuple[np.ndarray, str] | None] = [
+            (operands[f"{render}/{query[0]}"], "a"),
+            (operands[f"{render}/{query[1]}"], "b"),
+        ]
+        for g in groups:
+            cells += [None] + [(answer(IN_SYNC, seed, render, query, op, col), title) for col, title in g]
+        for c, cell in enumerate(cells):
+            ax = fig.add_subplot(gs[r, c])
+            if cell is None:
+                ax.axis("off")
+                continue
+            show(ax, cell[0])
+            if r == 0:
+                ax.set_title(cell[1], fontsize=9)
+    return fig
+
+
+@memo
+def references_figure(seed: int, render: str, op: str) -> str:
+    alt = (
+        f"Two rows of pictures, one per query: the operands a and b, then the {op} of them six ways, each at the most "
+        "likely color: the true answer, ideal₇ (the ideal predictor) and the unedited model; then ideal₆ (the ideal predictor without "
+        "difference), the model retrained without difference and the edited model."
+    )
+    return themed(draw_references, name=f"references-{render}-{op}", alt_text=alt)(seed, render, op)
+
+
+AGREE_PAIRS = (
+    ("clean/argmax", "bayes/argmax"),
+    ("full edit/argmax", "null/argmax"),
+    ("retrained/argmax", "null/argmax"),
+)
+
+
+def agreement(seed: int, query: tuple[str, str], op: str, col: str, ref: str) -> float:
+    """The share of pixels where two argmax pictures (posterized, examples in step) name the same color."""
+    pic = answer(IN_SYNC, seed, "posterized", query, op, col)
+    return float((pic == answer(IN_SYNC, seed, "posterized", query, op, ref)).mean())
+
+
+def agreement_cell(query: tuple[str, str], op: str, col: str, ref: str) -> tuple[float, float, float]:
+    v = np.array([agreement(s, query, op, col, ref) for s in ex.SEEDS])
+    return float(v.mean()), float(v.min()), float(v.max())
+
+
+AGREE = {(q[1], op, col): agreement_cell(q, op, col, ref) for q in ex.QUERIES for op in OPS for col, ref in AGREE_PAIRS}
+_agree_lines = "\n".join(
+    f"| `{op}` | " + " | ".join(fmt(AGREE[q[1], op, col]) for q in ex.QUERIES for col, _ in AGREE_PAIRS) + " |"
+    for op in OPS
+)
+_ramp, _hue = (q[1] for q in ex.QUERIES)
+
+r"""
+## Beside the ideal and the retrained model (E6)
+
+How close do the edited pictures come to what a model that never knew `difference` should paint? Two references answer the same contexts, with the examples in step.
+
+Ideal predictors
+:   Ideal₇ is the Bayes predictive over all seven ops: the posterior over ops given a pixel's three examples, under the corpus noise model, weighting each op's answer distribution on the query pair. Ideal₆ takes `difference` out of the posterior and renormalizes the other six (the target null), which is what an edited model should aim at.
+
+Retrained model
+:   The model trained without `difference` in the filtered-corpus experiment: the same recipe with its loss masked on `difference` contexts, at the same seed.
+
+Every picture below is the most likely color at each pixel (T = 0), so the ideal pictures are as clean as the models' and differences come from the answers rather than the draw.
+"""
+
+references_figure(SEED, "posterized", A)
+
+rf"""
+The table gives the share of pixels where two of these pictures name the same color, as the mean over the eight seeds with the seed range in parentheses, posterized, for the ramp query and then the hue and lightness query.
+
+| op | unedited ~ ideal₇ | edited ~ ideal₆ | retrained ~ ideal₆ | unedited ~ ideal₇ | edited ~ ideal₆ | retrained ~ ideal₆ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+{_agree_lines}
+
+On `difference`, the edited model names the same color as ideal₆ on {AGREE[_ramp, A, "full edit/argmax"][0]:.0%} of the ramp pixels and the retrained model on {AGREE[_ramp, A, "retrained/argmax"][0]:.0%}; on the hue and lightness query, {AGREE[_hue, A, "full edit/argmax"][0]:.0%} and {AGREE[_hue, A, "retrained/argmax"][0]:.0%}. These shares are low for every model because ideal₆ is often close to a tie: once `difference` is out, several ops explain a pixel's examples about equally, and a small shift in probability moves the most likely color from one op's answer to another's. The retrained model, which never knew `difference`, sets the level a model can reach here, and the edited model sits about five hundredths below it on both queries. In the pictures, all three paint the same kind of patchwork of the other ops.
+"""
+
+# %%
+
 MANIFEST: dict[str, str] = {}
 
 
@@ -380,6 +493,29 @@ def png(idx: np.ndarray) -> bytes:
     buf = io.BytesIO()
     Image.fromarray((PALETTE[idx] * 255).round().astype(np.uint8)).save(buf, format="PNG")
     return buf.getvalue()
+
+
+# The reference pictures as panels. Ideal₆ (without `difference`) takes the name `ideal`, the comparison the
+# widget offers beside the edited and retrained models; the full-task ideal is `bayes`.
+REFERENCE_PANELS = (("retrained", "retrained"), ("null", "ideal"), ("bayes", "bayes"))
+
+
+def query_panels(seed: int, render: str, query: tuple[str, str], op: str) -> list[tuple[str, np.ndarray]]:
+    """The panels of one query under one op, named: the true answer, the model answers, and the references."""
+    out = [(f"truth-{render}-{query[1]}-{op}", truth(render, query, op))]
+    for walk in ex.WALKS:
+        for col, _ in COLUMNS[1:] + EDITED:
+            out.append(
+                (
+                    f"answer-{slug(walk)}-{render}-{query[1]}-{op}-{slug(col)}",
+                    answer(walk, seed, render, query, op, col),
+                )
+            )
+    for ref, label in REFERENCE_PANELS:
+        for pick in ("argmax", "sample"):
+            key = f"answer-{slug(ex.REFERENCE_WALK)}-{render}-{query[1]}-{op}-{label}-{pick}"
+            out.append((key, answer(ex.REFERENCE_WALK, seed, render, query, op, f"{ref}/{pick}")))
+    return out
 
 
 def write_panels(seed: int) -> str | None:
@@ -398,13 +534,8 @@ def write_panels(seed: int) -> str | None:
                 key = f"example-{render}-{pair[0]}-{pair[1]}-{op}"
                 MANIFEST[key] = pub.asset_url(png(example_answer(render, pair, op)), name=f"{key}.png")
             for query in ex.QUERIES:
-                key = f"truth-{render}-{query[1]}-{op}"
-                MANIFEST[key] = pub.asset_url(png(truth(render, query, op)), name=f"{key}.png")
-                for walk in ex.WALKS:
-                    for col, _ in COLUMNS[1:] + EDITED:
-                        key = f"answer-{slug(walk)}-{render}-{query[1]}-{op}-{slug(col)}"
-                        img = answer(walk, seed, render, query, op, col)
-                        MANIFEST[key] = pub.asset_url(png(img), name=f"{key}.png")
+                for key, img in query_panels(seed, render, query, op):
+                    MANIFEST[key] = pub.asset_url(png(img), name=f"{key}.png")
     MANIFEST["manifest"] = pub.asset_url(json.dumps(MANIFEST, indent=1).encode(), name="panels.json")
     body = (Path(__file__).parent / "widget.html").read_text()
     page = (
@@ -421,9 +552,12 @@ WIDGET = write_panels(SEED)
 rf"""
 ## The panels as files
 
-Every panel of seed {SEED} is also a PNG at its native size ({W} × {H}, one pixel per grid color), named in [panels.json]({MANIFEST.get("manifest", "_assets/panels.json")}). A [small page]({WIDGET or "_assets/widget.html"}) shows them as one context at a time, with the examples walked in step, and a choice of op, colors, second image, temperature and answer, for embedding in a post.
+Every panel of seed {SEED} is also a PNG at its native size ({W} × {H}, one pixel per grid color), named in [panels.json]({MANIFEST.get("manifest", "_assets/panels.json")}). A [small page]({WIDGET or "_assets/widget.html"}) shows them as one context at a time, with the examples walked in step, and a choice of op, colors, second image, temperature and answer (the unedited, edited and retrained models, the ideal predictors ideal₇ and ideal₆, and the true answer), for embedding in a post.
 
 ## References
+
+filtered-corpus
+:   [A model trained without `difference`](../filtered-corpus/report.py): the `sans-diff` reference, the same recipe with its loss masked on `difference` contexts, at seeds 712 to 719.
 
 fixed-confirm
 :   [Fixed confirmation](../fixed-confirm/report.py): `τ_ℓ fixed` kept the anchor on all eight fresh seeds, 712 to 719, and became the recipe of record.

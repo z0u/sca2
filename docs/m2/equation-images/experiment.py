@@ -43,6 +43,7 @@ def _load_sibling(name: str, alias: str):
 
 fc = _load_sibling("fixed-confirm", "equation_images_fc")
 ex2216 = fc.ex2222.ex2216
+ex2222 = fc.ex2222
 
 OP_NAMES: tuple[str, ...] = tuple(fc.OP_NAMES)
 ANCHORED_OP: str = fc.ANCHORED_OP
@@ -72,9 +73,18 @@ QUERIES = (("parrots", "ramp"), ("parrots", "huelight"))
 EDITS = ("clean", "full edit")
 DRAW_SEED = 2026_11_05  # the example draws and the T = 1 samples; shared by every run, so runs pair pixel by pixel
 
+RETRAINED = "sans-diff"
+"""The reference model trained without `difference` (filtered-corpus): its loss masked on `difference` contexts, the
+same seeds as the `τ_ℓ fixed` runs."""
+RETRAINED_CHECKPOINT_REF = "reports/m2/filtered-corpus/checkpoints/{name}-s{seed}"
+REFERENCE_WALK = "in sync"
+"""The example walk the references (the retrained model and the ideal predictors) are drawn under."""
+
 PREFIX = "reports/m2/equation-images"
 OPERANDS_REF = PREFIX + "/operands/x{scale}"
 ANSWERS_REF = PREFIX + "/answers/x{scale}/{walk}/s{seed}"
+RETRAINED_REF = PREFIX + "/retrained/x{scale}/{walk}/s{seed}"
+IDEAL_REF = PREFIX + "/ideal/x{scale}/{walk}"
 
 
 def size_of(scale: int) -> tuple[int, int]:
@@ -281,6 +291,84 @@ def answers_one(checkpoint, operand_art, scale: int, seed: int, walk: str) -> di
     }
 
 
+def answers_retrained(checkpoint, operand_art, scale: int, seed: int, walk: str) -> dict:
+    """The answer pictures of the model trained without `difference`, on the clean pass only: per op, query pair
+    and render, the argmax color and one draw at T = 1 at each pixel, with the same contexts and the same uniforms as
+    `answers_one`, so the pictures pair with the anchored run's pixel by pixel.
+    """
+    from mini.store import get, put
+    from sca.intervention import Subspace, logits_at, projection
+
+    workdir = get_data_dir() / "equation-images" / f"retrained-x{scale}-{walk.replace(' ', '-')}-s{seed}"
+    model, tokenizer, color_ids, _ = ex2216._load_run(checkpoint, workdir)
+    with np.load(get(operand_art, workdir / "operands.npz")) as z:
+        imgs = {k: z[k] for k in z.files}
+    ops = op_tables()
+    w, h = size_of(scale)
+    clean = projection(Subspace.axis(model.transformer.wte.shape[1]), 0.0)
+    out: dict[str, np.ndarray] = {}
+    for r, render in enumerate(RENDERS):
+        for qi, query in enumerate(QUERIES):
+            for o, op in enumerate(OP_NAMES):
+                rng = np.random.default_rng([DRAW_SEED, r, qi, o])
+                ex, q = contexts(ops, imgs, render, query, o, walk, rng)
+                u = rng.random(len(q))
+                p = ex2216._color_probs(
+                    logits_at(model, tokens_of(ex, q, color_ids, tokenizer.stoi), clean, (), EQ), color_ids
+                )
+                key = f"{render}/{query[1]}/{op}"
+                out[f"{key}/argmax"], out[f"{key}/sample"] = pick_colors(p, u, h, w)
+                out[f"{key}/p_truth"] = p[np.arange(len(q)), ops[o, q[:, 0], q[:, 1]]].astype(np.float16).reshape(h, w)
+    name = f"equation-images-retrained-x{scale}-{walk.replace(' ', '-')}-s{seed}.npz"
+    return {"scale": scale, "seed": seed, "walk": walk, "answers": put(ex2216._npz(**out), name=name)}
+
+
+def pick_colors(p: np.ndarray, u: np.ndarray, h: int, w: int) -> tuple[np.ndarray, np.ndarray]:
+    """The most likely color and one draw at T = 1 (by the uniforms *u*) of each row of *p* `(N, 216)`, as pictures."""
+    cdf = np.cumsum(p / p.sum(1, keepdims=True), axis=1)
+    draw = (cdf < u[:, None]).sum(1).clip(0, p.shape[1] - 1)
+    return p.argmax(1).astype(np.uint8).reshape(h, w), draw.astype(np.uint8).reshape(h, w)
+
+
+def ideal(operand_art, scale: int, walk: str) -> dict:
+    """The answer pictures of two ideal predictors on the same contexts as `answers_one`: the Bayes predictive of the
+    full task (`bayes`), and the target null (`null`), the predictive with `difference` taken out of the posterior and
+    the rest renormalized, which is what a model that no longer knows `difference` should answer. The posterior over
+    ops comes from each pixel's three examples under the corpus noise model; the answers' stochastic rounding is
+    part of the predictive. Per op, query pair and render: the argmax color and one draw at T = 1 at each pixel, with
+    the uniforms `answers_one` uses.
+    """
+    from mini.store import get, put
+
+    workdir = get_data_dir() / "equation-images" / f"ideal-x{scale}-{walk.replace(' ', '-')}"
+    with np.load(get(operand_art, workdir / "operands.npz")) as z:
+        imgs = {k: z[k] for k in z.files}
+    ops = op_tables()
+    P = ex2216._get_posterior()
+    table = P.build_table(ex2222.ex2218.table_of(OP_NAMES))
+    removed = OP_NAMES.index(ANCHORED_OP)
+    n_colors = ops.shape[1]
+    w, h = size_of(scale)
+    out: dict[str, np.ndarray] = {}
+    for r, render in enumerate(RENDERS):
+        for qi, query in enumerate(QUERIES):
+            for o, op in enumerate(OP_NAMES):
+                rng = np.random.default_rng([DRAW_SEED, r, qi, o])
+                ex, q = contexts(ops, imgs, render, query, o, walk, rng)
+                u = rng.random(len(q))
+                ctx = P.Contexts(
+                    np.full(len(q), o), ex[:, :, 0] * n_colors + ex[:, :, 1], ex[:, :, 2], q[:, 0] * n_colors + q[:, 1]
+                )
+                post = P.posterior(table, ctx, ex2222.RHO, ex2222.CUBE_RATE)
+                key = f"{render}/{query[1]}/{op}"
+                for name, weights in (("bayes", post), ("null", ex2216._target_null(P, table, ctx, post, removed))):
+                    pred = P.predictive(table, ctx, weights)
+                    out[f"{key}/{name}/argmax"], out[f"{key}/{name}/sample"] = pick_colors(pred, u, h, w)
+                    out[f"{key}/{name}/p_op"] = weights[:, o].astype(np.float16).reshape(h, w)
+    name = f"equation-images-ideal-x{scale}-{walk.replace(' ', '-')}.npz"
+    return {"scale": scale, "walk": walk, "answers": put(ex2216._npz(**out), name=name)}
+
+
 # =============================================================================================
 # The DAG
 # =============================================================================================
@@ -295,6 +383,27 @@ def resolve() -> dict:
     missing = [r for s, r in refs.items() if checkpoints[s] is None]
     assert not missing, f"not published: {missing}"
     return checkpoints
+
+
+def resolve_retrained() -> dict:
+    """The checkpoint of each run of the model trained without `difference`."""
+    from mini.store import get_ref
+
+    refs = {s: RETRAINED_CHECKPOINT_REF.format(name=RETRAINED, seed=s) for s in SEEDS}
+    checkpoints = {s: get_ref(r) for s, r in refs.items()}
+    missing = [r for s, r in refs.items() if checkpoints[s] is None]
+    assert not missing, f"not published: {missing}"
+    return checkpoints
+
+
+def publish_references(retrained: list[dict], ideals: list[dict]) -> dict:
+    from mini.store import set_ref
+
+    for a in retrained:
+        set_ref(RETRAINED_REF.format(scale=a["scale"], walk=a["walk"], seed=a["seed"]), a["answers"])
+    for a in ideals:
+        set_ref(IDEAL_REF.format(scale=a["scale"], walk=a["walk"]), a["answers"])
+    return {"retrained": len(retrained), "ideal": len(ideals)}
 
 
 def publish(made: list[dict], answered: list[dict]) -> dict:
@@ -320,7 +429,23 @@ def main(ctx: Ctx) -> dict:
         [w for _, _, w in jobs],
         role="answer",
     )
-    return ctx.run(publish, made, answered, role="prep")
+    published = ctx.run(publish, made, answered, role="prep")
+
+    retrained_checkpoints = ctx.run(resolve_retrained, role="prep")
+    refs = [(m, s) for m in made for s in SEEDS]
+    retrained = ctx.map(
+        answers_retrained,
+        [retrained_checkpoints[s] for _, s in refs],
+        [m["operands"] for m, _ in refs],
+        [m["scale"] for m, _ in refs],
+        [s for _, s in refs],
+        [REFERENCE_WALK] * len(refs),
+        role="answer",
+    )
+    ideals = ctx.map(
+        ideal, [m["operands"] for m in made], [m["scale"] for m in made], [REFERENCE_WALK] * len(made), role="answer"
+    )
+    return published | ctx.run(publish_references, retrained, ideals, role="prep")
 
 
 def design() -> dict[str, Any]:
