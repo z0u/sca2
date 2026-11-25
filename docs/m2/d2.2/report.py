@@ -1194,7 +1194,7 @@ METHOD_NUMBERS = method_numbers()
 METHOD_ROWS = (
     ("anchor", "SCA"),
     ("dim", "difference in means"),
-    ("ridge", "probe"),
+    ("ridge", "ridge probe"),
     ("leace", "LEACE"),
     ("inlp", "INLP"),
 )
@@ -1240,40 +1240,71 @@ def methods_draw(data: dict, alt_text: str) -> str:
         alt_text=alt_text,
         caption=f"""
             **Removal and spill by method**, {METHOD_TABLES[data["table"]]}. The dot is the median over the eight runs
-            at 712 to 719, the line the range, and each faint tick one run. Spill is in points of expected exact match;
-            the hairline marks the criterion of 2. SCA is the same in every table.
+            at 712 to 719, the line the range, and each tick one run. Spill is in points of expected exact match, and
+            the dashed line marks the criterion of 2. SCA is the same in every table; the dotted line marks its median.
         """,
     )
     def _plot() -> plt.Figure:
+        from matplotlib.layout_engine import ConstrainedLayoutEngine
+
         rows = data["rows"]
         y = {r["key"]: i + (0.35 if i else 0) for i, r in enumerate(rows)}  # a little room under the SCA row
-        fig, (ax_r, ax_s) = plt.subplots(1, 2, figsize=(6.4, 1.9), sharey=True, layout="constrained", gridspec_kw={"width_ratios": [1, 1]})  # fmt: skip
+        fig, (ax_r, ax_s) = plt.subplots(1, 2, figsize=(6.4, 1.9), sharey=True, layout=ConstrainedLayoutEngine(wspace=0.12), gridspec_kw={"width_ratios": [1, 1]})  # fmt: skip
         faint = light_dark("#ccc", "#444")
+        hairline = 72 / 192  # one PNG pixel (192 dpi), one device pixel on a 2× screen
         for ax, field in ((ax_r, "removal"), (ax_s, "spill")):
             for r in rows:
-                v, yy = np.asarray(r[field]), y[r["key"]]
+                v, yy = np.sort(np.asarray(r[field])), y[r["key"]]
                 ink = light_dark(*METHOD_INKS[r["key"]])
-                ax.plot([v.min(), v.max()], [yy, yy], color=ink, lw=1, alpha=0.6, solid_capstyle="round", zorder=2)
-                ax.scatter(v, np.full(len(v), yy), marker="|", s=28, color=ink, alpha=0.35, lw=0.8, zorder=3)
-                ax.scatter([np.median(v)], [yy], s=22, color=ink, edgecolor=light_dark("#fff", "#111"), lw=0.6, zorder=4, marker="o" if r["key"] != "anchor" else "D")  # fmt: skip
+                ref = r["key"] == "anchor"
+                if ref:  # the main comparison point, behind the other ink
+                    ax.axvline(np.median(v), color=ink, lw=hairline, ls=(0, (1, 3)), alpha=0.8, antialiased=False, snap=True, zorder=1)  # fmt: skip
+                ax.plot([v[0], v[-1]], [yy, yy], color=ink, lw=hairline, ls=(0, (6, 4)) if ref else "-", antialiased=False, snap=True, zorder=2)  # fmt: skip
+                ax.scatter(
+                    v[1:-1],
+                    np.full(len(v) - 2, yy),
+                    marker="|",
+                    s=9,
+                    color=ink,
+                    alpha=0.65,
+                    lw=hairline,
+                    antialiased=False,
+                    snap=True,
+                    zorder=3,
+                )
+                ax.scatter(
+                    v[[0, -1]],
+                    [yy, yy],
+                    marker="|",
+                    s=28,
+                    color=ink,
+                    alpha=0.85,
+                    lw=2 * hairline,
+                    antialiased=False,
+                    snap=True,
+                    zorder=3,
+                )
+                bg = light_dark("#fff", "#111")
+                ax.scatter([np.median(v)], [yy], s=13 if ref else 22, marker="D" if ref else "o", zorder=4, **({"facecolor": bg, "edgecolor": ink, "lw": 0.8} if ref else {"color": ink, "edgecolor": bg, "lw": 0.6}))  # fmt: skip
             ax.spines[["top", "right", "left"]].set_visible(False)
             ax.spines["bottom"].set(color=faint, lw=0.6)
-            ax.tick_params(axis="y", length=0)
+            ax.tick_params(axis="y", length=0, pad=16)
             ax.tick_params(axis="x", labelsize=7, color=faint, length=3)
         ax_r.set_xlim(0, 100)
         ax_r.set_xticks([0, 50, 100])
-        ax_r.set_xlabel("removal (%) ↑", fontsize=7.5)
+        ax_r.set_xlabel("removal (%)", fontsize=7.5)
         top = max(max(r["spill"]) for r in rows)
         ax_s.set_xscale("symlog", linthresh=2, linscale=1.2)
         ax_s.set_xlim(min(-3, min(min(r["spill"]) for r in rows) - 0.5), max(10, top * 1.15))
         ticks = [t for t in (-2, 0, 2, 5, 10, 20, 40) if t <= max(10, top * 1.15)]
         ax_s.set_xticks(ticks, [str(t) for t in ticks])
         ax_s.xaxis.set_minor_locator(plt.NullLocator())
-        ax_s.axvline(2, color=light_dark("#999", "#777"), lw=0.5, zorder=1)
+        ax_s.axvline(2, color=light_dark("#d0d0d0", "#484848"), lw=0.6, ls=(0, (4, 3)), zorder=1)
+        ax_s.axvspan(2, ax_s.get_xlim()[1], facecolor="none", edgecolor=light_dark("#eee", "#242424"), hatch="///", lw=0, zorder=0)  # fmt: skip
         ax_s.axvline(0, color=faint, lw=0.5, zorder=1)
-        ax_s.set_xlabel("spill (points) ↓", fontsize=7.5)
+        ax_s.set_xlabel("spill (points)", fontsize=7.5)
         ax_r.set_yticks([y[r["key"]] for r in rows], [r["name"] for r in rows], fontsize=7.5)
-        ax_r.get_yticklabels()[0].set_fontstyle("italic")
+        ax_r.get_yticklabels()[0].set(fontstyle="italic", color=light_dark("#666", "#aaa"))
         ax_r.set_ylim(max(y.values()) + 0.6, -0.6)
         return fig
 
