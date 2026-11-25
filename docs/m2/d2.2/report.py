@@ -1133,3 +1133,173 @@ The same with the two post-hoc erasers that removed the op best without role lab
 """
 
 confusion_figure("post-hoc")
+
+
+r"""
+## Removal and spill by method
+
+One figure above each result table of the post: removal and spill per method, the median over the eight runs with
+the range and each run.
+"""
+
+# --- Removal and spill per method, for the result tables of the post ---------------------------------------------
+# The numbers are computed in the post-hoc comparison and fitter-transfer reports, so those report modules are loaded
+# (once, memoized) for their per-run arrays.
+
+
+def _load_report(name: str, alias: str):
+    """A report module by path, loaded with no publisher, so that the figures it draws as it loads stay out of this
+    page's assets.
+    """
+    from mini.reports import use_publisher
+
+    path = Path(__file__).resolve().parent.parent / name / "report.py"
+    spec = importlib.util.spec_from_file_location(alias, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    before = current_publisher()
+    use_publisher(None)
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        del sys.modules[spec.name]
+        use_publisher(before)
+    return module
+
+
+@memo
+def method_numbers() -> dict:
+    """Per table and method, the eight per-run removals (share) and spills (points of expected exact match): the
+    post-hoc comparison (pooled fits, and fits keyed to the example answers: removal at the spill criterion, spill at
+    matched removal) and fitter transfer (slices 1 to 3 and every slice, chosen on the other seven runs).
+    """
+    phc = _load_report("post-hoc-compare", "d22_figures_phc_report")
+    ft = _load_report("fitter-transfer", "d22_figures_ft_report")
+    fitters = ("dim", "ridge", "leace", "inlp")
+
+    def arr(v) -> list[float]:
+        return [float(x) for x in np.asarray(v, float)]
+
+    out: dict[str, Any] = {"anchor": {"removal": arr(phc.A_REMOVAL), "spill": arr(100 * phc.A_SPILL)}}
+    for table, src in (("pooled", phc.M_POOLED), ("roles", phc.M_CONTROL)):
+        out[table] = {m: {"removal": arr(src[m]["removal"]), "spill": arr(100 * src[m]["spill"])} for m in fitters}
+    for table, src in (("blocks", ft.BLOCKS), ("every", ft.EVERY)):
+        out[table] = {m: {"removal": arr(src[m]["removal"]), "spill": arr(100 * src[m]["spill"])} for m in fitters}
+    return out
+
+
+METHOD_NUMBERS = method_numbers()
+
+METHOD_ROWS = (
+    ("anchor", "SCA"),
+    ("dim", "difference in means"),
+    ("ridge", "probe"),
+    ("leace", "LEACE"),
+    ("inlp", "INLP"),
+)
+METHOD_TABLES = {
+    "pooled": "pooled fits: removal at the spill criterion, spill at matched removal",
+    "roles": "fits keyed to the example answers: removal at the spill criterion, spill at matched removal",
+    "blocks": "slices 1 to 3, chosen on the other seven runs",
+    "every": "every slice, chosen on the other seven runs",
+}
+
+
+def methods_figure(table: str) -> str:
+    rows: list[dict[str, Any]] = []
+    for key, name in METHOD_ROWS:
+        v = METHOD_NUMBERS["anchor"] if key == "anchor" else METHOD_NUMBERS[table][key]
+        rows.append({"key": key, "name": name, "removal": [100 * x for x in v["removal"]], "spill": v["spill"]})
+    med = {
+        str(r["name"]): (float(np.median(np.asarray(r["removal"]))), float(np.median(np.asarray(r["spill"]))))
+        for r in rows
+    }
+    alt = f"""
+        Two strip charts side by side, one row per method ({", ".join(med)}), for
+        {METHOD_TABLES[table]}. Left: removal in percent, from 0 to 100. Right: spill in points of expected exact
+        match, with a hairline at the criterion of 2. Each row has a dot at the median over eight runs, a thin line for
+        the range, and a faint tick per run. Medians (removal, spill): {"; ".join(f"{n} {r:.0f}%, {sp:.1f}" for n, (r, sp) in med.items())}.
+    """
+    return methods_draw({"table": table, "rows": rows}, alt)
+
+
+METHOD_INKS = {
+    "anchor": ("#d9731a", "#f0a05a"),  # the anchored orange of the confusion grids
+    "dim": ("#a07a1f", "#d8b25a"),
+    "ridge": ("#8d5a3b", "#c9926f"),
+    "leace": ("#3a8f4f", "#6cc184"),
+    "inlp": ("#b8435a", "#e57a8e"),
+}
+
+
+@memo
+def methods_draw(data: dict, alt_text: str) -> str:
+    @themed(
+        name=f"d22-methods-{data['table']}",
+        alt_text=alt_text,
+        caption=f"""
+            **Removal and spill by method**, {METHOD_TABLES[data["table"]]}. The dot is the median over the eight runs
+            at 712 to 719, the line the range, and each faint tick one run. Spill is in points of expected exact match;
+            the hairline marks the criterion of 2. SCA is the same in every table.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        rows = data["rows"]
+        y = {r["key"]: i + (0.35 if i else 0) for i, r in enumerate(rows)}  # a little room under the SCA row
+        fig, (ax_r, ax_s) = plt.subplots(1, 2, figsize=(6.4, 1.9), sharey=True, layout="constrained", gridspec_kw={"width_ratios": [1, 1]})  # fmt: skip
+        faint = light_dark("#ccc", "#444")
+        for ax, field in ((ax_r, "removal"), (ax_s, "spill")):
+            for r in rows:
+                v, yy = np.asarray(r[field]), y[r["key"]]
+                ink = light_dark(*METHOD_INKS[r["key"]])
+                ax.plot([v.min(), v.max()], [yy, yy], color=ink, lw=1, alpha=0.6, solid_capstyle="round", zorder=2)
+                ax.scatter(v, np.full(len(v), yy), marker="|", s=28, color=ink, alpha=0.35, lw=0.8, zorder=3)
+                ax.scatter([np.median(v)], [yy], s=22, color=ink, edgecolor=light_dark("#fff", "#111"), lw=0.6, zorder=4, marker="o" if r["key"] != "anchor" else "D")  # fmt: skip
+            ax.spines[["top", "right", "left"]].set_visible(False)
+            ax.spines["bottom"].set(color=faint, lw=0.6)
+            ax.tick_params(axis="y", length=0)
+            ax.tick_params(axis="x", labelsize=7, color=faint, length=3)
+        ax_r.set_xlim(0, 100)
+        ax_r.set_xticks([0, 50, 100])
+        ax_r.set_xlabel("removal (%) ↑", fontsize=7.5)
+        top = max(max(r["spill"]) for r in rows)
+        ax_s.set_xscale("symlog", linthresh=2, linscale=1.2)
+        ax_s.set_xlim(min(-3, min(min(r["spill"]) for r in rows) - 0.5), max(10, top * 1.15))
+        ticks = [t for t in (-2, 0, 2, 5, 10, 20, 40) if t <= max(10, top * 1.15)]
+        ax_s.set_xticks(ticks, [str(t) for t in ticks])
+        ax_s.xaxis.set_minor_locator(plt.NullLocator())
+        ax_s.axvline(2, color=light_dark("#999", "#777"), lw=0.5, zorder=1)
+        ax_s.axvline(0, color=faint, lw=0.5, zorder=1)
+        ax_s.set_xlabel("spill (points) ↓", fontsize=7.5)
+        ax_r.set_yticks([y[r["key"]] for r in rows], [r["name"] for r in rows], fontsize=7.5)
+        ax_r.get_yticklabels()[0].set_fontstyle("italic")
+        ax_r.set_ylim(max(y.values()) + 0.6, -0.6)
+        return fig
+
+    return _plot()
+
+
+r"""
+Pooled fits:
+"""
+
+methods_figure("pooled")
+
+r"""
+Fits keyed to the example answers:
+"""
+
+methods_figure("roles")
+
+r"""
+Slices 1 to 3, chosen on the other seven runs:
+"""
+
+methods_figure("blocks")
+
+r"""
+Every slice, chosen on the other seven runs:
+"""
+
+methods_figure("every")
