@@ -113,9 +113,11 @@ With settings chosen on the other seven runs, a single-slice edit missed one run
 
 ## Future work
 
-These are leads, roughly in the order we would take them up. The first four are the ones the post names: the next deliverable (D2.3) will likely need a designed circuit, and these are its pieces.
+These are leads, roughly in the order we would take them up. The first six are the ones the post names. The next deliverable (D2.3) adds a verification task, which draws on the same evidence the edit removes, so it will likely need a designed circuit, and the first three are its pieces.
 
 - Reader affinity for e₁: routing the learning of the reader on labelled contexts through the weights that read e₁ ([backlog](/todo/science/route-the-readers-learning-through-e1.md)).
+- A verification reader that takes the evidence from somewhere the edit leaves alone, such as the other end of the arc.
+- An edit to the weights of the completion reader where they read e₁, in place of the edit to the stream, which would leave the evidence in place for the verifier.
 - A second, softer anchor for the other end of the arc, so that the anchored edit can clear the whole evidence for the op, as LEACE does ([backlog](/todo/science/anchor-the-not-difference-end-of-the-arc.md)).
 - A preregistered test of how often a post-hoc configuration fails to carry over to fresh seeds ([backlog](/todo/science/recipe-transfer-test.md)).
 - Harder tasks for the linear erasers: a concept correlated with another in the data, or held nonlinearly.
