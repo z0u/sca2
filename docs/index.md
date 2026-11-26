@@ -10,6 +10,24 @@ The first milestone (M1) established the method in autoencoders: [paper](https:/
 
 <!-- toc -->
 
+## Where to start
+
+Each deliverable ends in a post, which tells the story and links the reports it draws on.
+
+- D2.1: [Anchoring one concept in a transformer](https://www.lesswrong.com/posts/AeReJZqtWd8jCjKpX/anchoring-one-concept-in-a-transformer), with its figures in the [D2.1 figures](./m2/d2.1/report.py) page.
+- D2.2: the [design doc](./m2/d2.2/design.md) has the recipe, the claims, and what comes next, and the post figures are in the [D2.2 figures](./m2/d2.2/report.py) page.
+<!-- Add the D2.2 post link to the line above once it is published. -->
+
+The reports the D2.2 post draws on most:
+
+- [Directions found after training, beside the anchor](./m2/post-hoc-compare/report.py): the preregistered comparison with the linear erasers.
+- [Fitters that edit every slice, with settings chosen on other runs](./m2/fitter-transfer/report.py): whether the erasers carry over to a new run.
+- [A model trained without `difference`](./m2/filtered-corpus/report.py): the reference model that never learns the op.
+- [What the edit changes at every position](./m2/edit-by-role/report.py): where in the context the edit acts.
+- [Why editing block 1 alone removes the op](./m2/block1-edit/report.py): which blocks write the evidence for the op, and which read it.
+- [What the edit misses in the low runs](./m2/low-runs/report.py): the evidence the model also keeps off the anchored axis.
+- [Fixed confirmation](./m2/fixed-confirm/report.py): the recipe of record, confirmed at eight fresh seeds.
+
 ## Experiments
 
 Each report is a literate script.[^lit] Each entry has searchable tags and a strip of the report's figures, in reading order.
@@ -70,7 +88,7 @@ These experiments were preparation for the main work: exercising the infrastruct
 
 D2.1 asked whether SCA works in a transformer at all. We designed a task where a small transformer learns the geometry of color on its own, then anchored _red_ to a chosen direction in its residual stream. With a repulsive term, a schedule for it, and a pull that finds the red operand by itself, _red_ landed where we put it, graded by how red each color is, at no measurable cost to the task.
 
-<details markdown="1" open="true"><summary>Reports</summary>
+<details markdown="1"><summary>Reports</summary>
 
 - [2.1.1. Un-anchored color-mixing transformer](./m2/ex-2.1.1/report.py)
 
@@ -180,13 +198,13 @@ D2.1 asked whether SCA works in a transformer at all. We designed a task where a
 
 ## D2.2: anchoring an operation
 
-D2.2 anchors an operation rather than a color. Since the [pivot](./m2/d2.2/pivot.md), the model infers which op a line uses from a few solved examples, so the op has no word of its own, like the abstract concepts we care about in language models. The anchor lands at little cost to the task, and removing the anchor direction takes the op out gradually. Under the edit, the model moves its answers onto the other ops about as much as an ideal predictor would, though context by context it doesn't always pick the same ones. On the recipe of record, which pools the pull over blocks 1 to 3, the anchor held on every run at fresh seeds, the edit removes most of the op, and the other ops stay within the selectivity criterion on every seed. A model trained without the op lands only a little closer to the target null than the edited model, so most of the distance left is what a model of this size does on contexts like these. The [design doc](./m2/d2.2/design.md) has the recipe, the claims, and what comes next.
+D2.2 anchors an operation rather than a color. Since the [pivot](./m2/d2.2/pivot.md), the model infers which op a context uses from a few solved examples, so the op has no word of its own, like the abstract concepts we care about in language models. On the recipe of record the anchor held on every run at fresh seeds, at little cost to the task. Zeroing the anchored axis removes most of `difference`, more where a context needed it more, and the other ops barely move. What the anchor holds turned out to be the evidence for the op at the example answers, which a later block reads to answer the query. Linear erasers fitted after training on models without the anchor, and tuned per run, remove about as much about as cleanly; with settings chosen on other runs, they carry over less well than the anchor. The [design doc](./m2/d2.2/design.md) has the recipe, the claims, and what comes next. The plan of the comparison is in the [post-hoc comparison](./m2/d2.2/post-hoc-comparison.md) page, and the plan of the post in the [post outline](./m2/d2.2/post-outline.md).
 
 ### Removing *red*
 
 D2.1 anchored *red* but never removed it, so D2.2 began by removing it. Projecting out the anchor direction took *red* out, and took out more where the line was redder, at a small cost to lines with no red. Of the edits we tried, the plain projection stayed the best choice.
 
-<details markdown="1" open="true"><summary>Reports</summary>
+<details markdown="1"><summary>Reports</summary>
 
 - [2.2.1. Suppressing _red_ in the anchored transformer](./m2/ex-2.2.1/report.py)
 
@@ -226,7 +244,7 @@ D2.1 anchored *red* but never removed it, so D2.2 began by removing it. Projecti
 
 Before we could anchor an op, the grammar needed more than one, so it grew from one op to eleven. We anchored *red* again at each step, and the recipe held. Removal was clean on every op but one, where the model kept about a quarter of the answers that needed red.
 
-<details markdown="1" open="true"><summary>Reports</summary>
+<details markdown="1"><summary>Reports</summary>
 
 - [2.2.3. The multi-op grammar, with _red_ anchored again](./m2/ex-2.2.3/report.py)
 
@@ -330,7 +348,7 @@ Before we could anchor an op, the grammar needed more than one, so it grew from 
 
 Ex-2.2.14 anchored the op `difference`, and it landed, but almost entirely on the *word* `difference`, so removing it would be hard to tell apart from deleting the word. The concepts we care about in language models mostly have no word of their own, so we took the op words out: each line now shows a few solved examples and a query, and the model has to infer the op.
 
-<details markdown="1" open="true"><summary>Reports</summary>
+<details markdown="1"><summary>Reports</summary>
 
 - [2.2.14. Anchoring an operation](./m2/ex-2.2.14/report.py)
 
@@ -358,7 +376,7 @@ Ex-2.2.14 anchored the op `difference`, and it landed, but almost entirely on th
 
 Once the op had no word, the first question was whether an un-anchored model could learn the task at all. At first it got a little under halfway from guessing to the best possible score. Changes to training and a smaller set of ops brought it to about nine tenths of the way.
 
-<details markdown="1" open="true"><summary>Reports</summary>
+<details markdown="1"><summary>Reports</summary>
 
 - [2.2.16. The in-context grammar pilot](./m2/ex-2.2.16/report.py)
 
@@ -406,7 +424,7 @@ Once the op had no word, the first question was whether an un-anchored model cou
 
 With the control near its best, we anchored `difference` on the new grammar. The anchor settles on the example answers, where the context shows the most about the op. Removing the anchor direction everywhere takes `difference` out gradually. At first the edit spilled onto the other ops on most fully trained runs. The spill came from a stand-in for the op in the color embedding table, where there is no context yet to infer it from. With the pull kept off the first two slices and the anti-subspace weight held high there, the edit removes `difference` and leaves the other ops within the criterion on every fresh seed. That recipe, `falloff`, was the recipe of record until late October.
 
-<details markdown="1" open="true"><summary>Reports</summary>
+<details markdown="1"><summary>Reports</summary>
 
 - [2.2.21. The in-context grammar pilot, on the reworked recipe](./m2/ex-2.2.21/report.py)
 
@@ -502,7 +520,7 @@ With the control near its best, we anchored `difference` on the new grammar. The
 
 With `falloff` in hand, we looked at what the edit does beyond removal and spill, and at the baseline the edit is measured against. The edit stays within the bound the geometry sets, and lands about half of the way to the target null. The anchor does not rely on e₁ being a coordinate axis, but the comparison with the control did, so the baseline is now the median over the other axes of the run.
 
-<details markdown="1" open="true"><summary>Reports</summary>
+<details markdown="1"><summary>Reports</summary>
 
 - [What the edit does on the recipe of record](./m2/edit-effects/report.py)
 
@@ -636,7 +654,7 @@ With `falloff` in hand, we looked at what the edit does beyond removal and spill
 
 ### The recipe of record, scored for the post
 
-With `τ_ℓ fixed` adopted, we gave it the full set of measurements and a reference model trained without the op. The edit does on `τ_ℓ fixed` what it did on `falloff`, and a model that never learned `difference` lands only a little closer to the target null than the edited model. The last piece before the post is a comparison with directions found after training, planned in the [post-hoc comparison](./m2/d2.2/post-hoc-comparison.md) page.
+With `τ_ℓ fixed` adopted, we gave it the full set of measurements, a reference model trained without the op, and a few checks on its settings. The edit does on `τ_ℓ fixed` what it did on `falloff`, and changes the loss almost only at the answers of `difference` contexts. A model that never learned `difference` lands only a little closer to the target null than the edited model. Holding one label draw for the whole run leaves a few runs low, by chance as far as we can tell. The depth falloff of the anti weight stays, and the end anneal was dropped.
 
 <details markdown="1" open="true"><summary>Reports</summary>
 
@@ -664,6 +682,22 @@ With `τ_ℓ fixed` adopted, we gave it the full set of measurements and a refer
 
     <!-- mini:figures ./m2/filtered-corpus/report.py -->
 
+- [What the edit changes at every position](./m2/edit-by-role/report.py)
+
+    The edit scored at every position of the context. Beyond the query, it changes the loss almost only at the answers of `difference` contexts, and from the second example on it takes those answers most of the way to the model trained without `difference`. Before any example, the guess the model makes about `difference` stays mostly in place.
+
+    <span class="tags">`reanalysis` `in-context` `intervention`</span>
+
+    <!-- mini:figures ./m2/edit-by-role/report.py -->
+
+- [Fixed labels](./m2/fixed-labels/report.py)
+
+    One label draw held fixed for the whole run, as a real labelled set would be, in place of a fresh draw on each visit to a context. The anchor holds at every rate we tried, but a few runs end with much less removal, and which runs those are looks like chance.
+
+    <span class="tags">`in-context` `anchoring` `labeller` `seed-sensitivity`</span>
+
+    <!-- mini:figures ./m2/fixed-labels/report.py -->
+
 - [What the edit misses in the low runs](./m2/low-runs/report.py)
 
     A few runs trained with one label draw held for the run end with the edit removing much less of `difference`, and a twin trained again from the same labels, seed, and batches matches each in loss and alignment and still removes the op well. A re-analysis of 48 stored checkpoints: every run also writes, off the anchored axis, whether each example fits the op, and in a low run the reader blocks take part of that judgement from copies the edit never touches, at the answers or at the other example positions. The low runs peak lower and give back more while the anti weight anneals.
@@ -680,6 +714,22 @@ With `τ_ℓ fixed` adopted, we gave it the full set of measurements and a refer
 
     <!-- mini:figures ./m2/paired-runs/report.py -->
 
+- [Flat anti weight](./m2/flat-anti/report.py)
+
+    The anti-subspace weight held the same at every slice, in place of the falloff with depth. A weight of 0.17 did about as well as the recipe, a higher one cost removal on some seeds, and lower ones spilled on one run in eight. A flat weight works only in a narrow band, so the falloff stays.
+
+    <span class="tags">`in-context` `anchoring` `schedules`</span>
+
+    <!-- mini:figures ./m2/flat-anti/report.py -->
+
+- [Cooldown](./m2/cooldown/report.py)
+
+    Eight runs branched at the start of the end anneal, one branch with it and one without. The two ended the same on every measurement we take, so the end anneal was dropped from the recipe.
+
+    <span class="tags">`in-context` `schedules`</span>
+
+    <!-- mini:figures ./m2/cooldown/report.py -->
+
 - [D2.2 figures for the post](./m2/d2.2/report.py)
 
     Figures for the post on D2.2, drawn from the reports above. It starts with the pooling diagram of ex-2.1.9, redrawn with the pool over slices added.
@@ -687,5 +737,29 @@ With `τ_ℓ fixed` adopted, we gave it the full set of measurements and a refer
     <span class="tags">`figures` `blog-post`</span>
 
     <!-- mini:figures ./m2/d2.2/report.py -->
+
+</details>
+
+### Directions found after training
+
+The last question before the post was whether the anchor was needed. We fitted linear erasers (the difference in means, a ridge probe, LEACE, and INLP) on the controls, which were trained without the anchor, and scored their edits the same way as the anchored edit. Tuned per run, the best of them removed about as much of the op as the anchor, about as cleanly on most runs. With settings chosen on other runs they carried over less well: an edit at one slice can miss the slice where a run holds the op, and an edit at every slice spills at the early slices.
+
+<details markdown="1" open="true"><summary>Reports</summary>
+
+- [Directions found after training, beside the anchor](./m2/post-hoc-compare/report.py)
+
+    The preregistered comparison of the anchored edit with edits along directions fitted on the controls, each tuned per run and scored the same way as the anchor. Given role labels, the fitters remove more than the anchored edit within the same spill limit, mostly by editing the example answers, a role a real corpus does not label. Without role labels, the best of them removes about as much as the anchor and spills past the criterion on a few more runs.
+
+    <span class="tags">`preregistered` `post-hoc` `intervention` `baselines`</span>
+
+    <!-- mini:figures ./m2/post-hoc-compare/report.py -->
+
+- [Fitters that edit every slice, with settings chosen on other runs](./m2/fitter-transfer/report.py)
+
+    With settings chosen on seven runs, a fitter that edits one slice missed the eighth, which holds the op a slice earlier. Given the shape of the anchored edit, a direction fitted and edited at every slice, three of the four fitters removed only a small part of the op on nearly every run, because the edits at the early slices spill. Leaving out the embedding lets the probe carry over on all but one run, with less removal than the anchor.
+
+    <span class="tags">`reanalysis` `post-hoc` `intervention` `seed-sensitivity`</span>
+
+    <!-- mini:figures ./m2/fitter-transfer/report.py -->
 
 </details>
