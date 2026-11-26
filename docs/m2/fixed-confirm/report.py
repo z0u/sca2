@@ -724,7 +724,7 @@ r"""
 <!-- lede -->
 The pool over slices 1 to 3, with its slice temperature held fixed, keeps the anchor on all eight runs at fresh seeds, and on all forty runs of a count that calls each run at epoch 64. Paired seed by seed with the annealed version of the recipe, it removes about as much, with no late rise in spill.
 
-But some seeds that did well under one recipe did poorly under the other, and the two runs of a seed parted ways early, while the two recipes were still nearly the same. So the variation between runs seems to come largely from how sensitive a run is to small changes, rather than from either recipe.
+Seeds that did well under one recipe sometimes did poorly under the other, and the two runs of a seed parted early, so the variation between runs seems to come largely from how sensitive a run is to small changes.
 ///
 
 The [anneal confirmation](/docs/m2/anneal-confirm/report.py) ran the pool over slices 1 to 3 with its slice temperature $\tau_\ell$ annealing from 0.1 to 0.025, at eight fresh seeds (712 to 719).[^tau] Every run kept the anchor, but removal varied across seeds more than under the recipe it grew from: `τ_ℓ fixed` from the [soft pool scout](/docs/m2/soft-pool-scout/report.py), which holds $\tau_\ell$ at 0.1.

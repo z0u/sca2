@@ -573,8 +573,7 @@ rf"""
 
 /// tip |
 <!-- tl;dr -->
-We looked for the shortest training run on the seven-op set that keeps most of the skill of the 400-epoch recipe. A scout at one seed picked a length, and three fresh seeds checked it.
-Half the length keeps most of the skill, though it falls a little short of the gate we set; we adopt it. Runs of 50 and 100 epochs do not keep enough of the skill. The seven-op set also stays closer to its ceiling than the full set at every paired seed, so its narrower gap was not seed variation.
+We looked for the shortest training run on the seven-op set that keeps most of the skill of the 400-epoch recipe. Half the length keeps most of it, a little short of the gate we set, and we adopt it; 50 and 100 epochs keep too little. The seven-op set also stays closer to its ceiling than the full set at every paired seed, so its narrower gap was not seed variation.
 ///
 
 ## Findings

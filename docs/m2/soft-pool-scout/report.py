@@ -1259,9 +1259,7 @@ rf"""
 
 /// tip |
 <!-- lede -->
-A sharper pool over slices stopped the early spill of `pool 1–3, soft τ`. Of sixteen schedules of the pooled pull screened at epoch {STOP}, those with the slice temperature ending at 0.1 had no run spill early, however soon or late the temperatures sharpened.
-
-We carried two of these conditions on to epoch {ex.EPOCHS}. Both stay within the spill criterion on every seed, and both remove a little more than the recipe of record at no cost to the task. Holding the slice temperature at 0.1 from the start is simpler and cleaner, and a candidate for the recipe of record.
+Of sixteen schedules of the pooled pull screened at epoch {STOP}, those whose slice temperature ended at 0.1 had no run spill early, however soon or late the temperatures sharpened. Carried on to epoch {ex.EPOCHS}, two of them stay within the spill criterion on every seed and remove a little more than the recipe of record at no cost to the task. Holding the slice temperature at 0.1 from the start is the simpler of the two, and a candidate for the recipe of record.
 ///
 
 [Recipe-compare](/docs/m2/recipe-compare/report.py) left one thing between `pool 1–3, soft τ` and the recipe of record: two of its eight runs go over the spill criterion, and the spill enters at block 1, the one slice the pool pulls and the step leaves alone. [Spill-timing](/docs/m2/spill-timing/report.py) found that both of those runs spill early, while the pool sharpens, and that this early kind already shows at epoch {STOP}. So a schedule that keeps block 1 closed should show it at epoch {STOP}, at a sixth of the cost of a full run.

@@ -1405,13 +1405,7 @@ r"""
 
 /// tip |
 <!-- tl;dr -->
-Ex-2.2.9 enabled every change from the scouting round at once, and we did not adopt the result. Two gates missed. One was removal, on the three ops that take one HSV attribute from their second operand. The other was a single seed that held the anchor a little less well by the end. Ex-2.2.10 traced both misses to how we were measuring.
-
-This is the same experiment at fresh seeds, with three measurements fixed in advance:
-removal lines picked by hue,
-retention measured across the anneal,
-and the op1 alignment reported beside its references rather than gated.
-*Red* lands, stays through the anneal, and comes out cleanly on ten of the eleven ops. On `hue-hsv` it does not come out far enough, so the handover is not adopted as it stands.
+Ex-2.2.9 missed two gates, and ex-2.2.10 traced both misses to how we were measuring. This is the same experiment at fresh seeds, with three measurements fixed in advance: removal lines picked by hue, retention measured across the anneal, and the op1 alignment reported beside its references rather than gated. *Red* lands, stays through the anneal, and comes out cleanly on ten of the eleven ops. On `hue-hsv` it does not come out far enough, so the handover is not adopted as it stands.
 ///
 
 """

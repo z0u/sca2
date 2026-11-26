@@ -273,7 +273,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-The write tolerance of ex-2.2.1, which we call the relative tolerance here, counts a site as over when the write is more than a quarter over the bound. So where the bound is a fraction of a degree, a tiny turn counts. We looked for an absolute tolerance in degrees that the data could set, and found one in how much the bound varies from run to run: about a degree. With that absolute tolerance, every site at a symbol or separator drops out. What stays are the operands at the first slice or two, chiefly on `pool 1–3, soft τ`.
+The relative tolerance of ex-2.2.1 counts a site as over the write bound when the write passes it by a quarter, so where the bound is a fraction of a degree, a tiny turn counts. How much the bound varies from run to run gives an absolute tolerance of about a degree. With it, every site at a symbol or separator drops out, and what stays are the operands at the first slice or two, chiefly on `pool 1–3, soft τ`.
 ///
 
 The paper review of the [recipe-compare report](/docs/m2/recipe-compare/report.py) asked whether the tolerance should ignore small shifts. In that report and the [fixed-effects report](/docs/m2/fixed-effects/report.py), every site over the relative tolerance has a bound of a few degrees or less, so a ratio over 1.25 can be a turn of a fraction of a degree. With an absolute tolerance, a site would count only when the write is past both the ratio and the bound plus some number of degrees. The backlog item behind this report asked for that number to come from the measurement rather than be picked by eye.

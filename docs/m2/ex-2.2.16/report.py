@@ -722,7 +722,7 @@ rf"""
 
 /// tip |
 <!-- tl;dr -->
-The first experiment on the grammar from the [D2.2 pivot](/docs/m2/d2.2/pivot.md): the model infers the op from a few solved examples, with no word to name it. We trained the control at three conditions of example count and replacement rate, and anchored `{ex.ANCHORED_OP}` under the whole-line label and its variants. Every control got a little under halfway from the floor to the Bayes ceiling (skill scores {SKILL_RANGE[0]:.2f} to {SKILL_RANGE[1]:.2f}), well short of the pass line, and so did the {ex.LARGE_MODEL} control. So the pilot stops at its first rule: the grammar and recipe are reworked before anything is anchored, and the other rules are not scored. [Ex-2.2.17](/docs/m2/ex-2.2.17/report.py) takes up the rework.
+The first experiment on the grammar from the [D2.2 pivot](/docs/m2/d2.2/pivot.md), where the model infers the op from a few solved examples. Every control, at three conditions of example count and replacement rate, got a little under halfway from the floor to the Bayes ceiling (skill scores {SKILL_RANGE[0]:.2f} to {SKILL_RANGE[1]:.2f}), well short of the pass line, and so did the {ex.LARGE_MODEL} control. So the pilot stops at its first rule, and [ex-2.2.17](/docs/m2/ex-2.2.17/report.py) reworks the grammar and recipe before anything is anchored.
 ///
 
 This is round 2 of the [quick route](/docs/m2/d2.2/design.md#quick-route). The method section folds in the [posterior scouting report](/todo/science/scout-posterior-in-context-grammar.md): it computes the posterior over ops and the Bayes ceiling from the op table, with no training, and uses them to pick the three corpus conditions for the control.

@@ -468,7 +468,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-We compare the anchored edit with edits along directions found after training: four standard fitters, and one direction optimized against the scoring itself. Each is fitted on a control model with every label, tuned per run on data it is never scored on, and scored the same way as the anchor. Given role labels and a per-run grid, the fitters remove more of the op than the anchored edit within the same spill limit, mostly by editing the example answers, a role that a real corpus does not label. Restricted to fits that need no role labels, the best of them removes about as much as the anchor and spills past the criterion on a few more runs.
+We compared the anchored edit with edits along directions found after training: four standard fitters and one direction optimized against the scoring, each fitted on a control model, tuned per run, and scored the same way as the anchor. Without role labels, the best of them removes about as much as the anchor and spills past the criterion on a few more runs. With role labels they remove more, mostly by editing the example answers, a role a real corpus does not label.
 ///
 
 Placing a concept during training needs an extra training term, and it lowers the task score somewhat. This report asks whether that placement does better than searching for the concept afterwards, on the same model and with the same scoring.

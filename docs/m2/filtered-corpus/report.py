@@ -967,7 +967,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-We trained the control with no loss on `difference` contexts, so that it never learns the op, and compared it to the edited model of the recipe of record. On `difference` contexts it comes a little closer to the target null than the edited model, but still falls well short of it. It misses in the same kind of way: the mass goes to the other ops, but it is shared among them differently from the target null on each context, and differently again at each seed.
+A control trained with no loss on `difference` contexts never learns the op. It comes a little closer to the target null than the edited model of the recipe of record, but still falls well short, and misses in the same way: the mass goes to the other ops, but it is shared among them differently from the target null on each context, and differently again at each seed.
 ///
 
 The edit-effects experiment found that the edited model sends the mass to the right ops overall, but shares it among them differently from the target null context by context. Its Discussion offers two explanations:

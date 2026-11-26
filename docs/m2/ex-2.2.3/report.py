@@ -783,7 +783,7 @@ rf"""
 
 /// tip |
 <!-- tl;dr -->
-The grammar grows from one operation to six: `mix` (`+`), `add`, `screen`, `multiply`, `lighten`, `darken`. We retrain on the new grammar to check the recipes: the un-anchored control, the ex-2.1.10 recipe, and three proposals from the ex-2.1.11 survey. The recipe carried over as it was. The proposals place *red* with a wider margin, and the frozen rule adopted one of them, but they put the axis on the syntax embeddings, so projecting it out breaks most non-red lines too; a post hoc read with the gates the rule left out narrows the choice to the recipe, and D2.2 builds on its short arm, which grades better for half the compute. Removal reads as partial on the saturating ops because their answers mostly do not depend on how red the red operand is.
+The grammar grows from one op to six (`mix`, `add`, `screen`, `multiply`, `lighten`, `darken`), and we retrain the control, the ex-2.1.10 recipe, and three proposals from the ex-2.1.11 survey. The recipe carried over as it was. The proposals place *red* with a wider margin but put the axis on the syntax embeddings, so projecting it out breaks most lines with no red; the frozen rule adopted one, but a look with the gates the rule left out kept the recipe. Removal looks partial on the saturating ops, because their answers mostly do not depend on how red the red operand is.
 ///
 
 ## Findings

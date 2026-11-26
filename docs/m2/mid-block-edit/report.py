@@ -278,7 +278,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-Inside each block, the attention writes to the stream and the MLP of the same block reads it before the edit acts again. Editing that mid-block state as well gains nothing on the recipe of record: the between-block edit already takes out nearly all of the op, and the extra sites cost selectivity, because the MLPs seem to use e₁ for the other ops too. The anchor and anti terms act only between blocks, so nothing in training keeps e₁ clear at the mid-block states.
+Editing the states inside each block, between the attention and the MLP, as well as between blocks gains nothing on the recipe of record. The between-block edit already takes out nearly all of the op, and the extra sites cost selectivity, because the MLPs seem to use e₁ for the other ops too. Nothing in training keeps e₁ clear there, since the anchor and anti terms act only between blocks.
 ///
 
 The edit of record acts between blocks, at the same slices the anchor pulls. But each block adds to the residual stream twice, first with its attention and then with its MLP, and nothing touches the state in between. So a block could, in principle, write the op onto e₁ with its attention and use it in its own MLP before any edit sees it. The [block1-edit](/docs/m2/block1-edit/report.py) account says the op travels between positions, from the example answers to the query `=`, and every such move goes through attention, which takes in an edited slice. That route is covered. The route this report asks about stays within one position and one block.

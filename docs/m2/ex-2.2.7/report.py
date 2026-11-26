@@ -262,11 +262,7 @@ rf"""
 
 /// tip |
 <!-- tl;dr -->
-A scouting run into why the embeddings of the op words and `=` hold part of the anchor axis, which is what a full-position projection pays for on the non-red lines.
-
-The readout puts it there, to predict `=` after a red operand, and the tied table passes it to the embedding. Given a readout table of its own, the model keeps the component on that table and the syntax embeddings come mostly clean. Leaving the embeddings unanchored does not clean them.
-
-Untying costs nothing on task or placement, and brings the non-red cost of the projection down toward the cost of the operand-only edit. The pilot proposes it for the handover, since it needs nothing from the grammar. Under the whole-line labeller a few seeds lose selectivity, so that labeller should go in with a check rather than by default.
+A scouting run into why the embeddings of the op words and `=` hold part of the anchor axis, which is what a full-position projection costs on lines with no red. The readout puts it there, to predict `=` after a red operand, and the tied table passes it to the embedding. Given a readout table of its own, the model keeps the component there and the syntax embeddings come mostly clean, at no cost to the task or placement, so the pilot proposes untying for the handover. Under the whole-line labeller a few seeds lose selectivity.
 ///
 
 /// note | A later finding

@@ -1781,7 +1781,7 @@ rf"""
 
 /// tip |
 <!-- lede -->
-A scout. We retrain the anchored `{ex.ANCHORED_OP}` condition with the pull kept off the embedding or readout, with the hinge cap raised, and on contexts whose numbers of examples vary. None of the three changes improved the recipe: leaving slices out made the edit spill onto other ops, the cap made no steady difference, and varying the number of examples cost a little skill. Pooled over contexts, the edited model answers about as an ideal predictor that had lost `{ex.ANCHORED_OP}` would, though context by context it gets less than half of the way there.
+A scout: the anchored `{ex.ANCHORED_OP}` condition retrained with the pull kept off the embedding or readout, with the hinge cap raised, and on contexts whose numbers of examples vary. None of the three improved the recipe: leaving slices out made the edit spill onto other ops, the cap made no steady difference, and varying the examples cost a little skill. Pooled over contexts, the edited model answers about as an ideal predictor that had lost `{ex.ANCHORED_OP}` would, though context by context it gets less than half of the way there.
 ///
 
 Ex-2.2.21 found that an edit applied at every position can take `{ex.ANCHORED_OP}` out of an anchored model gradually while the other ops stay as they were, at least when the pull is capped. This scout trains {len(ex.CONDITIONS)} new conditions at {ex.SEEDS} seeds each, and reuses ex-2.2.21's runs as references, paired by model seed.

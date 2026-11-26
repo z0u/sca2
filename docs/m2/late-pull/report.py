@@ -212,7 +212,7 @@ rf"""
 
 /// tip |
 <!-- lede -->
-Pulling only blocks 2 to 4 cut the lean of the color embedding table to about a quarter. Holding the table off e₁ by a hard constraint went further: the spill of the full edit fell to about the selectivity criterion, with removal and the task as before. In both new arms, block 1, which nothing pulls, came to hold part of the concept, and most of the remaining spill comes from there. Holding the anti-subspace weight high late in training, rather than annealing it, kept the table and block 1 nearly off e₁ on the other ops and brought every `deep` run within the criterion, though removal fell somewhat.
+Pulling only blocks 2 to 4 cut the lean of the color embedding table to about a quarter, and holding the table off e₁ by a hard constraint brought the spill of the full edit to about the selectivity criterion, with removal and the task as before. Block 1, which nothing pulls, came to hold part of the concept, and most of the remaining spill comes from there. Holding the anti-subspace weight high late in training brought every `deep` run within the criterion, though removal fell somewhat.
 <!-- REVIEW: lede trimmed to drop the hold values (0.2 against the recipe hold), which E4 and the Observations give; the claims are unchanged. -->
 ///
 

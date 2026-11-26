@@ -231,9 +231,7 @@ rf"""
 
 /// tip |
 <!-- tl;dr -->
-A scouting run, with no gates. The labeller in ex-2.2.3 reads only the operands, and pulls only the prompt span. So on a line whose answer is the reddest thing in it, that answer never draws a label and nothing ever pulls its position. We retrained the adopted point under labellers that also read the answer, or also pull the whole line, or both.
-
-Pulling the whole line puts between a tenth and a quarter of the pull on the answer, and doubles the alignment the redder lines have there, at no cost to the task or to placement. Reading the answer changes nothing visible. Neither change makes the answers on those lines depend on the axis, because the answer is read out at `=`, one position before the pull lands.
+The labeller of ex-2.2.3 reads only the operands and pulls only the prompt, so on a line whose answer is the reddest thing in it, nothing pulls the answer position. We retrained under labellers that also read the answer, also pull the whole line, or both. Pulling the whole line doubles the alignment at the answers of the redder lines, at no cost to the task or placement, and reading the answer changes nothing visible. Neither makes the answers depend on the axis, because the answer is read out at `=`, one position before the pull lands.
 ///
 
 ## Observations

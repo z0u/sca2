@@ -207,7 +207,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-Adam scales each coordinate of the residual stream separately, so the coordinate axes are a privileged basis: they are directions the optimizer makes cheap to hold, and e₁, the direction the anchor targets, is one of them. We trained the recipe of record and its control again with Adam's scaling applied in a random rotation of the coordinates, so that e₁ is an ordinary direction. The anchor held on every seed, and the edit removed the anchored op (`difference`) and spilled as little as before. What changed is the control. On some seeds e₁ now overlaps the direction where the un-anchored model puts its syntax tokens, so the edit costs the control something too, and the removal net of the control is low there.
+Adam scales each coordinate of the residual stream separately, so the coordinate axes, e₁ among them, are a privileged basis. We trained the recipe of record and its control again with that scaling applied in a random rotation, so that e₁ is an ordinary direction. The anchor held on every seed, and the edit removed `difference` and spilled as little as before. Only the control changed: on some seeds e₁ now overlaps where it puts its syntax tokens, so the edit costs the control something too, and the removal net of the control is low there.
 ///
 
 On stored checkpoints, we found that every run parks its separators (`?`, `,` and ⏎) one-hot on a coordinate of their own and `=` on a second, and that a coordinate axis is cheaper to project out than a random direction. In short training runs, Adam built this basis, and Adam in a rotated basis built the same thing on the rotated axes.

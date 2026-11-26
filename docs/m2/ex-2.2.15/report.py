@@ -1276,11 +1276,7 @@ rf"""
 
 /// tip |
 <!-- tl;dr -->
-The anchor pulls on whole lines, but each training window cuts off the lines at its edges. On a cut line, the anchor asks the visible part to carry the whole label, even when that part cannot see the op word.
-
-We retrain the anchored model under a few policies for which cut lines to pull, and track each one over training. We do this on the current grammar, before the in-context grammar makes the problem larger.
-
-The cut lines carry the lean, and skipping them removes it. The pilot starts from the policy that pulls whole lines only.
+Each training window cuts off the lines at its edges, and on a cut line the anchor asks the visible part to carry the whole label, even when that part cannot see the op word. We retrained the anchored model under a few policies for which cut lines to pull. The cut lines carry the lean, and skipping them removes it, so the pilot starts from the policy that pulls whole lines only.
 ///
 
 This is a scouting run of {ex.N_RUNS} fresh training runs, with a few predictions and one rule that proposes which crop policy the [in-context grammar pilot](../d2.2/design.md#the-pilot) starts from.

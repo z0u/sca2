@@ -1777,9 +1777,7 @@ r"""
 
 /// tip |
 <!-- tl;dr -->
-The last four experiments each changed one thing about the setup we anchor *red* in: more operations, answers drawn stochastically rather than rounded, a label that covers the whole line, and a readout table separate from the embeddings. Each looked fine on its own. This experiment turns all four on at once and asks whether *red* still lands where we put it and still comes out cleanly, with two reference conditions that each switch one change back.
-
-*Red* lands. Removal is clean on eight of the eleven ops and misses the gate on the three that take one HSV attribute from their second operand, so the handover is not adopted as it stands. The whole-line label and the separate readout cost nothing the gates can resolve. One seed in twenty holds the anchor a little less well by the end of training, which the anneal schedule may explain.
+The last four experiments each changed one thing about the setup we anchor *red* in: more ops, answers rounded at random, a label over the whole line, and a separate readout table. This one turns all four on at once. *Red* lands, and removal is clean on eight of the eleven ops but misses the gate on the three that take one HSV attribute from their second operand, so the handover is not adopted as it stands. One seed in twenty holds the anchor a little less well by the end of training.
 ///
 """
 
