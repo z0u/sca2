@@ -1,5 +1,6 @@
 ---
-status: partial
+status: done
+closed: 2026-11-26
 tags: [D2.2, task-grammar, metrics]
 opened: 2026-09-09
 ---
@@ -18,3 +19,5 @@ What it would buy, and what a grammar variant would have to settle: (a) the ceil
 **2026-09-11, Fable, after the review of ex-2.2.4** — leaning the other way from the pilot's recommendation, on a different criterion: comparability with M3, where the target is a distribution and exact match is never the statistic. The pilot found the corpus costs nothing on the anchoring side and named the reads to use instead. Ex-2.2.4 adds a grid read: the E8 one-level dependence under stochastic rounding (total variation of the answer distribution) is within 0.09 of the nearest-rounded rule on every op and removes the probe-set artifact on `mix` (0.50 on both sets). The next prereg is where this gets decided, as a handover with the old rounding as an arm.
 
 **2026-09-11, Opus** — the pilot has been re-run on production as `ex-2.2.5` (the dev-store run described above was an engineering-sandbox artefact of how the pilot was first launched). Same seeds, same code; every number in the note above reproduced to the digits printed, so the readings stand as written.
+
+**2026-11-26, D2.2 wrap-up** — Closed: stochastic rounding has been part of the grammar since the pilot, and every D2.2 run since the pivot scores the model on the probability it puts on the right answer (the [D2.2 design](/docs/m2/d2.2/design.md), Task).
