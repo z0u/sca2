@@ -1,7 +1,7 @@
 name: Site
 
 # Builds the whole site — production from `main`, plus a preview of every open PR
-# under pr-preview/pr-<n>/ — and deploys it to gh-pages as a single commit. Every
+# under pr-preview/pr-<n>/ and a snapshot of every tag under v/<tag>/ — and deploys it to gh-pages as a single commit. Every
 # run rebuilds everything from current state, which is what lets one concurrency
 # group serve every trigger: a run that gets displaced or cancelled loses nothing,
 # because the one that replaces it reads the same state, later. Nothing is torn
@@ -19,6 +19,8 @@ name: Site
 on:
   push:
     branches: [main]
+    # A new tag's snapshot appears within a few minutes rather than at the next merge.
+    tags: ["*"]
   pull_request:
     types: [opened, reopened, synchronize, closed]
   schedule:
@@ -26,6 +28,11 @@ on:
     # seven leaked previews). Any other event rebuilds sooner.
     - cron: "17 4 * * *"
   workflow_dispatch:
+    inputs:
+      rebuild_snapshots:
+        description: Build every tag snapshot afresh (normally each is built once and kept)
+        type: boolean
+        default: false
 
 concurrency:
   group: site
@@ -47,8 +54,13 @@ jobs:
     steps:
       - name: Checkout
         # Only the script runs from this checkout. It fetches `main` and each PR head
-        # itself, into worktrees, so the trigger's ref doesn't matter here.
+        # itself, into worktrees, so the trigger's ref doesn't matter here — except on a
+        # tag push, whose ref may be an old commit with an old deploy script that knows
+        # nothing of snapshots and would deploy a site without them. So a tag push runs
+        # main's script. (A PR event checks out the PR merged into main, which is fine.)
         uses: actions/checkout@v7
+        with:
+          ref: ${{ startsWith(github.ref, 'refs/tags/') && 'main' || '' }}
 
       - name: Install uv
         # Full-version pin, not a floating major — see lint-check.yml for why, and
@@ -88,4 +100,4 @@ jobs:
           MINI_STORE_BUCKET: ${{ vars.MINI_STORE_BUCKET }}
         # Standard library only, so it runs on uv's bare interpreter; each checkout it
         # builds syncs its own environment from its own lockfile.
-        run: uv run --no-project scripts/deploy_site.py
+        run: uv run --no-project scripts/deploy_site.py ${{ inputs.rebuild_snapshots && '--rebuild-snapshots' || '' }}

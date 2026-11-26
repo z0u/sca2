@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 """Build the whole site and deploy it as one commit.
 
-The site is a function of two things: `main`, which production is built from, and the set of open PRs, each of which gets a preview under `pr-preview/pr-<n>/`. So every run builds all of it from scratch and force-pushes the result to `gh-pages` as a single parentless commit. Nothing on the branch carries over from one run to the next, and nothing has to be torn down: a closed PR is absent from the next build, whatever event (or none) its close produced.
+The site is a function of three things: `main`, which production is built from; the set of open PRs, each of which gets a preview under `pr-preview/pr-<n>/`; and the repository's tags, each of which gets a snapshot under `v/<tag>/`. So every run builds all of it from scratch and force-pushes the result to `gh-pages` as a single parentless commit. Nothing on the branch carries over from one run to the next, and nothing has to be torn down: a closed PR is absent from the next build, whatever event (or none) its close produced.
 
 **Why reconcile rather than react.** The arrangement this replaced had three writers of `gh-pages` — a production deploy on push to `main`, a preview deploy per PR event, and a teardown on close — each writing one slice of the branch and leaving the rest alone. Every guard it grew was about the other writers: a lease on the history prune, `force: false` on the deploy, `clean-exclude` on the umbrella directory, and finally a sweep for the previews whose teardown had been overwritten by an in-flight build or never scheduled at all (seven of them by 2026-08-31, two thirds of what the site served). A run that rebuilds everything from current state has no other writers to guard against, and it makes the workflow's single concurrency group safe: a pending run displaced by a newer arrival loses nothing, because the newer run reads the same state, later. `eng/publishing.md` has the longer form.
 
 **What the previous deploy is for.** Each build prints its reports' PDFs (`build_site.PdfMemo`), and the one thing a from-scratch rebuild would waste is those prints: a few seconds each, for every report of every preview, when almost none of them changed. So the run fetches what `gh-pages` serves now and hands each build the matching part of it (the root to production, `pr-preview/pr-<n>/` to that PR, and the root again for a PR to borrow from) as a memo: a manifest beside the PDFs says what each was printed from, and a report whose page and tooling are unchanged keeps its file, or takes production's. The branch stays one commit deep and is still rewritten whole; it is read before it is replaced.
+
+**Snapshots are the one part that carries over.** A tag marks a deliverable, and its snapshot is the site as it stood then: a permalink a post can cite, which stays put while `main` moves on. Its inputs are frozen (the tag names a commit, and that commit's `docs/publish.lock` names an immutable revision of each bundle), so rebuilding it on every run would spend a minute to reproduce the same tree, and would put the snapshot at the mercy of every later run's network and of whether an old lockfile still resolves. So each snapshot records the commit it was built from (`v/<tag>/.snapshot`), and a run copies it forward from the previous deploy when the tag still names that commit. A new tag, or one moved to another commit, is built; one that fails to build keeps its previous copy if it has one, with a warning; a deleted tag is absent from the next deploy. `--rebuild-snapshots` builds them all afresh, for when the build tooling changed in a way an old snapshot should pick up. Only tags whose names are plain path segments get a snapshot.
 
 **What it costs** is rebuilding every preview on every event, at about 30 s each. This repository has a handful of PRs open at a time, so a run is a minute or two. A preview that fails to build is reported (a warning, and a failed status on the PR head) and skipped, so a broken branch never holds back production.
 
@@ -35,6 +37,15 @@ ROOT = Path(__file__).parent.parent.resolve()
 UMBRELLA = "pr-preview"
 """Where the previews live on the branch: `pr-preview/pr-<n>/` under the production site."""
 
+SNAPSHOTS = "v"
+"""Where the tag snapshots live on the branch: `v/<tag>/` under the production site."""
+
+STAMP = ".snapshot"
+"""The file in each snapshot that names the commit it was built from, so a later run can tell whether its tag still points there."""
+
+TAG_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+"""The tag names that get a snapshot: one plain path segment, so a name can't reach outside `v/` or collide with a nested one."""
+
 CONTEXT = "preview"
 """The status context of the whole preview; each report's link is `preview: <key>`."""
 
@@ -60,6 +71,13 @@ Builder = Callable[[Path, str | None, tuple[Path, ...]], Path]
 class PullRequest:
     number: int
     sha: str
+
+
+@dataclass(frozen=True)
+class Tag:
+    name: str
+    sha: str
+    """The commit the tag names (peeled, for an annotated tag)."""
 
 
 def git(*args: str, cwd: Path, env: dict[str, str] | None = None) -> str:
@@ -125,10 +143,35 @@ def repinned(api: GitHub, number: int) -> list[str]:
     return sorted(set(PIN.findall((lock or {}).get("patch") or "")))
 
 
+def snapshot_tags(repo: Path, remote: str) -> list[Tag]:
+    """The remote's tags that get a snapshot, in name order, each with the commit it names. A listing that fails raises, so the run stops rather than deploying a site with no snapshots."""
+    listing = git("ls-remote", "--tags", remote, cwd=repo)
+    shas: dict[str, str] = {}
+    for line in listing.splitlines():
+        sha, ref = line.split("\t", 1)
+        name = ref.removeprefix("refs/tags/")
+        if name.endswith("^{}"):  # the peeled commit of an annotated tag, which wins over the tag object
+            shas[name.removesuffix("^{}")] = sha
+        else:
+            shas.setdefault(name, sha)
+    for name in sorted(shas):
+        if not TAG_NAME.match(name):
+            print(f"::warning::tag {name!r} isn't a plain path segment, so it gets no snapshot")
+    return [Tag(name, shas[name]) for name in sorted(shas) if TAG_NAME.match(name)]
+
+
+def carried(previous: Path | None, tag: Tag) -> Path | None:
+    """The previous deploy's snapshot of `tag`, if it was built from the commit the tag names now."""
+    if previous is None:
+        return None
+    stamp = previous / SNAPSHOTS / tag.name / STAMP
+    return stamp.parent if stamp.is_file() and stamp.read_text().strip() == tag.sha else None
+
+
 def checkout(repo: Path, remote: str, ref: str, dest: Path) -> str:
-    """A detached worktree at the remote's `ref`, fetched at depth 1 since a build needs the tree and nothing behind it. Returns the sha."""
+    """A detached worktree at the remote's `ref`, fetched at depth 1 since a build needs the tree and nothing behind it. Returns the commit's sha (peeled, for an annotated tag)."""
     git("fetch", "--quiet", "--depth=1", remote, ref, cwd=repo)
-    sha = git("rev-parse", "FETCH_HEAD", cwd=repo)
+    sha = git("rev-parse", "FETCH_HEAD^{commit}", cwd=repo)
     git("worktree", "add", "--quiet", "--detach", str(dest), sha, cwd=repo)
     return sha
 
@@ -136,7 +179,7 @@ def checkout(repo: Path, remote: str, ref: str, dest: Path) -> str:
 def build_with_uv(worktree: Path, site_url: str | None, memos: tuple[Path, ...]) -> Path:
     """The real builder: the checkout's own `./go site`, in an environment synced from its own lockfile.
 
-    `--locked` because this doesn't go through `install.sh`, which turns it on under `$CI`: a bare sync would rewrite `uv.lock` to match a `pyproject.toml` that outgrew it, and build against a resolution nobody reviewed. `MINI_SITE_URL` is what keeps a preview's inter-report links and its "← Index" banner inside the preview rather than jumping to production; production leaves it unset and `build_site` derives the URL from the repository. `MINI_PDF_MEMO` hands the build the PDFs its predecessor printed, then production's for a preview to borrow from (`build_site.PdfMemo`), so it prints only the reports that changed. The checkout's own Playwright fetches its Chromium build if the workflow's cache holds a different one; with the system libraries installed once by the workflow, that is a download and nothing more.
+    `--locked` because this doesn't go through `install.sh`, which turns it on under `$CI`: a bare sync would rewrite `uv.lock` to match a `pyproject.toml` that outgrew it, and build against a resolution nobody reviewed. `MINI_SITE_URL` is what keeps a preview's inter-report links and its "← Index" banner inside the preview rather than jumping to production; production leaves it unset and `build_site` derives the URL from the repository. `MINI_PDF_MEMO` hands the build the PDFs its predecessor printed, then production's for a preview to borrow from (`build_site.PdfMemo`), so it prints only the reports that changed. The checkout's own Playwright fetches its Chromium build if the workflow's cache holds a different one; with the system libraries installed once by the workflow, that is a download and nothing more. A checkout from before the build printed PDFs (the d2.1 tag, say) has no Playwright to run, so the install is skipped when its lockfile doesn't list it.
     """
     env = {key: value for key, value in os.environ.items() if key not in ("MINI_SITE_URL", "MINI_PDF_MEMO")}
     if site_url:
@@ -144,7 +187,8 @@ def build_with_uv(worktree: Path, site_url: str | None, memos: tuple[Path, ...])
     if memos:
         env["MINI_PDF_MEMO"] = os.pathsep.join(str(memo) for memo in memos)
     subprocess.run(["uv", "sync", "--locked"], cwd=worktree, check=True, env=env)
-    subprocess.run(["uv", "run", "playwright", "install", "chromium"], cwd=worktree, check=True, env=env)
+    if 'name = "playwright"' in (worktree / "uv.lock").read_text():
+        subprocess.run(["uv", "run", "playwright", "install", "chromium"], cwd=worktree, check=True, env=env)
     subprocess.run(["./go", "site"], cwd=worktree, check=True, env=env)
     return worktree / "_site"
 
@@ -267,6 +311,57 @@ def post_statuses(api: GitHub, sha: str, statuses: dict[str, dict[str, str]]) ->
         api.request("POST", f"/statuses/{sha}", {"context": context, **body})
 
 
+def place_snapshot(
+    repo: Path,
+    remote: str,
+    tag: Tag,
+    workspace: Path,
+    site: Path,
+    builder: Builder,
+    site_url: str,
+    previous: Path | None,
+    *,
+    rebuild: bool = False,
+) -> str | None:
+    """Put `tag`'s snapshot at `v/<tag>/` in `site`: the previous deploy's copy if it was built from the commit the tag names now, else a fresh build, else (when that fails) whatever copy the previous deploy had. Returns how it got there ("kept", "built", "kept stale"), or `None` when there is no snapshot to show."""
+    dest = site / SNAPSHOTS / tag.name
+    if kept := None if rebuild else carried(previous, tag):
+        shutil.copytree(kept, dest)
+        return "kept"
+    old = previous / SNAPSHOTS / tag.name if previous else None
+    try:
+        sha = build_into(
+            repo,
+            remote,
+            f"refs/tags/{tag.name}",
+            workspace / f"tag-{tag.name}",
+            dest,
+            builder,
+            f"{site_url}{SNAPSHOTS}/{tag.name}/",
+            (old, previous) if old and previous else (),
+        )
+    except Exception as error:  # a snapshot never holds back production, and an old copy beats none
+        print(f"::warning::the snapshot of {tag.name} failed to build: {error}")
+        shutil.rmtree(dest, ignore_errors=True)
+        if old and old.is_dir():
+            shutil.copytree(old, dest)
+            return "kept stale"
+        return None
+    (dest / STAMP).write_text(f"{sha}\n")
+    print(f"{tag.name}@{sha[:7]}: built")
+    return "built"
+
+
+def deploy_message(main: str, previews: list[int], snapshots: list[str]) -> str:
+    """The deploy commit message: what main was, and which previews and snapshots ride along."""
+    message = f"Deploy site from main@{main[:7]}"
+    if previews:
+        message += " with previews " + " ".join(f"#{n}" for n in previews)
+    if snapshots:
+        message += " and snapshots " + " ".join(sorted(snapshots))
+    return message
+
+
 def reconcile(
     repo: Path = ROOT,
     remote: str = "origin",
@@ -277,20 +372,24 @@ def reconcile(
     builder: Builder = build_with_uv,
     api: GitHub | None = None,
     dry_run: bool = False,
+    rebuild_snapshots: bool = False,
 ) -> int:
-    """Build production and every open PR's preview, and deploy the lot. Returns the process exit code."""
+    """Build production, every open PR's preview, and each tag's snapshot (or carry it forward), and deploy the lot. Returns the process exit code."""
     slug = slug or repo_slug(repo, remote)
     owner, name = slug.split("/", 1)
     site_url = site_url or f"https://{owner}.github.io/{name}/"
     api = api or GitHub(slug, os.environ.get("GITHUB_TOKEN"))
     pulls = previewable(api.paged("/pulls?state=open"), slug)
     publishes = {pull.number: repinned(api, pull.number) for pull in pulls}
+    tags = snapshot_tags(repo, remote)
 
     workspace = Path(tempfile.mkdtemp(prefix="deploy-site-"))
     site = workspace / "site"
     built: dict[int, str] = {}
     reports: dict[int, list[Report]] = {}
     failed: dict[int, str] = {}
+    snapshots: dict[str, str] = {}
+    """Each tag deployed, and how: "built", "kept" (carried forward), or "kept stale" (its build failed)."""
     previous: Path | None = None
     try:
         # What the branch serves now, so each build can reuse the PDFs its predecessor
@@ -320,8 +419,14 @@ def reconcile(
                 failed[pull.number] = pull.sha
                 print(f"::warning::the preview for #{pull.number} failed to build: {error}")
 
-        listed = " ".join(f"#{n}" for n in built)
-        message = f"Deploy site from main@{main[:7]}" + (f" with previews {listed}" if built else "")
+        for tag in tags:
+            outcome = place_snapshot(
+                repo, remote, tag, workspace, site, builder, site_url, previous, rebuild=rebuild_snapshots
+            )
+            if outcome:
+                snapshots[tag.name] = outcome
+
+        message = deploy_message(main, list(built), list(snapshots))
         if dry_run:
             print(f"Dry run — nothing pushed. Would deploy: {message}")
             return 0
@@ -340,6 +445,13 @@ def reconcile(
     if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(summary, "a") as out:
             out.write(f"{message}\n" + "".join(f"\n- ⚠️ #{n}: preview failed to build" for n in failed))
+            out.write(
+                "".join(
+                    f"\n- ⚠️ {t.name}: snapshot failed to build"
+                    for t in tags
+                    if snapshots.get(t.name) not in ("built", "kept")
+                )
+            )
     return 0
 
 
@@ -350,8 +462,20 @@ def main() -> int:
     parser.add_argument("--branch", default="gh-pages")
     parser.add_argument("--site-url", help="where the site is served (default: <owner>.github.io/<name>/)")
     parser.add_argument("--dry-run", action="store_true", help="build everything and push nothing")
+    parser.add_argument(
+        "--rebuild-snapshots",
+        action="store_true",
+        help="build every tag's snapshot afresh rather than keep the deployed copy",
+    )
     args = parser.parse_args()
-    return reconcile(args.repo, args.remote, args.branch, site_url=args.site_url, dry_run=args.dry_run)
+    return reconcile(
+        args.repo,
+        args.remote,
+        args.branch,
+        site_url=args.site_url,
+        dry_run=args.dry_run,
+        rebuild_snapshots=args.rebuild_snapshots,
+    )
 
 
 if __name__ == "__main__":

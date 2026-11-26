@@ -253,3 +253,74 @@ def test_the_statuses_link_the_reports_the_pr_publishes(clone: Path, remote: Pat
     assert "with its PDF" in posted["preview: m2/ex-a"]["description"]
     assert "no PDF" in posted["preview: m2/ex-b"]["description"]
     assert list(deploy_site.preview_statuses(preview)) == ["preview"]
+
+
+def tag(remote: Path, tmp_path: Path, name: str, who: str, *, annotated: bool = True) -> str:
+    """Push a tag named `name` at a new commit whose build names itself `who`. Returns the commit."""
+    work = tmp_path / f"tagger-{name}-{who}"
+    git("clone", "-q", f"file://{remote}", str(work), cwd=tmp_path)
+    (work / "WHO").write_text(who)
+    commit(work, f"release {who}")
+    flags = ["-a", "-m", f"release {who}"] if annotated else []
+    git("-c", "user.name=dev", "-c", "user.email=dev@example.invalid", "tag", "-f", *flags, name, cwd=work)
+    git("push", "-q", "--force", "origin", f"refs/tags/{name}", cwd=work)
+    return git("rev-parse", "HEAD", cwd=work)
+
+
+def built_by(memos: list[tuple[str, tuple[str | None, ...]]]) -> list[str]:
+    return [who for who, _ in memos]
+
+
+def test_each_tag_gets_a_snapshot_with_its_own_links(clone: Path, remote: Path, tmp_path: Path):
+    """An annotated tag is built under `v/<tag>/`, linked within its own subtree, and stamped with the commit it names (the peeled one, not the tag object)."""
+    sha = tag(remote, tmp_path, "d2.1", "d2.1")
+    tag(remote, tmp_path, "not/a-segment", "nested", annotated=False)
+    assert deploy_site.reconcile(clone, slug=SLUG, builder=build, api=FakeGitHub()) == 0
+
+    site = served(remote)
+    assert "<h1>d2.1</h1>" in site["v/d2.1/index.html"]
+    assert "https://z0u.github.io/sca2/v/d2.1/" in site["v/d2.1/index.html"], "the snapshot links outside itself"
+    assert site["v/d2.1/.snapshot"].strip() == sha
+    assert site["index.html"].startswith("<h1>main</h1>")
+    assert not [path for path in site if path.startswith("v/not")], "a tag with a slash got a snapshot"
+
+
+def test_a_snapshot_is_built_once_and_kept(clone: Path, remote: Path, tmp_path: Path):
+    """The second run copies the snapshot forward without building it; moving the tag builds it again; `--rebuild-snapshots` builds it regardless; deleting the tag drops it."""
+    tag(remote, tmp_path, "d2.1", "d2.1")
+    deploy_site.reconcile(clone, slug=SLUG, builder=build, api=FakeGitHub())
+
+    MEMOS.clear()
+    tip = git("rev-parse", "gh-pages", cwd=remote)
+    deploy_site.reconcile(clone, slug=SLUG, builder=build, api=FakeGitHub())
+    assert "d2.1" not in built_by(MEMOS), "an unchanged tag was rebuilt"
+    assert git("rev-parse", "gh-pages", cwd=remote) == tip, "carrying the snapshot forward changed the tree"
+
+    MEMOS.clear()
+    moved = tag(remote, tmp_path, "d2.1", "d2.1-again")
+    deploy_site.reconcile(clone, slug=SLUG, builder=build, api=FakeGitHub())
+    assert "d2.1-again" in built_by(MEMOS)
+    assert served(remote)["v/d2.1/.snapshot"].strip() == moved
+
+    MEMOS.clear()
+    deploy_site.reconcile(clone, slug=SLUG, builder=build, api=FakeGitHub(), rebuild_snapshots=True)
+    assert "d2.1-again" in built_by(MEMOS)
+
+    git("tag", "-d", "d2.1", cwd=remote)
+    deploy_site.reconcile(clone, slug=SLUG, builder=build, api=FakeGitHub())
+    assert not [path for path in served(remote) if path.startswith("v/")], "a deleted tag kept its snapshot"
+    assert len(git("worktree", "list", cwd=clone).splitlines()) == 1, "a tag's worktree was left behind"
+
+
+def test_a_snapshot_that_fails_to_rebuild_keeps_its_old_copy(clone: Path, remote: Path, tmp_path: Path):
+    """A moved tag whose new commit doesn't build keeps the snapshot it had, and production deploys anyway. A new tag that doesn't build gets none."""
+    tag(remote, tmp_path, "d2.1", "d2.1")
+    deploy_site.reconcile(clone, slug=SLUG, builder=build, api=FakeGitHub())
+    tag(remote, tmp_path, "d2.1", "pr-34")  # the stand-in builder refuses this one
+    tag(remote, tmp_path, "d2.2", "pr-34")
+    assert deploy_site.reconcile(clone, slug=SLUG, builder=build, api=FakeGitHub()) == 0
+
+    site = served(remote)
+    assert "<h1>d2.1</h1>" in site["v/d2.1/index.html"]
+    assert not [path for path in site if path.startswith("v/d2.2/")]
+    assert site["index.html"].startswith("<h1>main</h1>")

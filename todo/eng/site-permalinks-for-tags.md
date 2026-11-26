@@ -1,7 +1,8 @@
 ---
-status: open
+status: done
 tags: [ci, publishing]
 opened: 2026-08-30
+closed: 2026-11-26
 ---
 # A tag should be a permalink to the site as it stood
 
@@ -18,3 +19,5 @@ Open questions worth settling before building it: whether the trigger is `on: pu
 ## Notes
 
 **2026-09-02** — The deploy is now a whole-site rebuild by one writer (`scripts/deploy_site.py`), so there is no `clean-exclude` to add and no prune to survive. A snapshot would instead be one more checkout in that script's loop: build `main` and each open PR as now, plus each tag under `v/<tag>/` with `MINI_SITE_URL` pointed there. Tags are few and the build is read-only, so the cost stays a CI minute each.
+
+**2026-11-26** — Built as the note above says, with two departures. A snapshot is built once and copied forward from the previous deploy while its tag names the same commit, since its inputs are frozen and a rebuild every run would only add ways to lose it; `eng/publishing.md` has the reasoning. And the open questions settled as: both triggers (a tag push runs the deploy, and dispatch has a `rebuild_snapshots` input), and no listing at the site root, so the release notes or a post carry the link. d2.1 builds from its own checkout unchanged (no Playwright, so no PDFs), and the first deploy after merge back-fills it.
