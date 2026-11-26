@@ -4,11 +4,11 @@ D2.2 asks whether Sparse Concept Anchoring works for a concept that is never wri
 
 The [pivot](pivot.md) explains why we took the op words out of the grammar, and the [index](/docs/index.md#d22-anchoring-an-operation) lists every experiment along the way.
 
-## Where it stands
+## Outcome
 
-The recipe of record keeps the anchor on every run we have trained, at little cost to the task. The full edit removes most of `difference`, in proportion to how much each context needed it, and the other ops stay within the selectivity criterion on every run. The edited model sends the mass to the other ops in about the right overall proportions, but context by context it gets only about half of the way to where an ideal predictor would. A model trained without `difference` gets only a little further, so most of that shortfall is in what a model of this size does on such contexts, and the anchor and the edit add a smaller part.
+D2.2 is done, and its results are in the D2.2 post. The recipe of record keeps the anchor on every run we have trained, at little cost to the task. Zeroing e₁ removes most of `difference`, in proportion to how much each context needed it, and the other ops stay within the selectivity criterion on every run. The edited model sends the mass to the other ops in about the right overall proportions, and a model trained without `difference` gets only a little closer to the target null.
 
-The reference model and the full set of measurements on the recipe of record are done. One piece of work remains before the blog post: a comparison with directions found after training. Everything else is future work.
+Two findings changed what the claims mean. What the anchor holds is the evidence for the op at the example answers, which a later block reads at the query `=` ([block1-edit](/docs/m2/block1-edit/report.py)). And linear erasers fitted after training on the controls, tuned per run, remove about as much about as cleanly ([post-hoc-compare](/docs/m2/post-hoc-compare/report.py)), so graded, selective removal is what linear erasure does in these models, anchored or not. What the anchor adds is a location fixed before training: one edit, at every slice, carries over to fresh seeds unchanged, where the fitters with settings chosen on other runs carry over less well ([fitter-transfer](/docs/m2/fitter-transfer/report.py)).
 
 ## The recipe of record
 
@@ -67,7 +67,7 @@ For the narrow domain of color mixing, we want to be able to say five things.
 
 ### (a) An inferred op can be anchored on every run, without costing the task
 
-The anchor sits on the example answers, where the context shows the most about its op, and its alignment there rises with the posterior on `difference`. That fits an anchor that holds the inferred op, though it follows the evidence of each example on its own more than the evidence of the whole context.
+The anchor sits on the example answers, where the context shows the most about its op, and its alignment there rises with the posterior on `difference`. It follows the evidence of each example on its own more than the evidence of the whole context, and block1-edit later showed why: what lands on e₁ is that evidence, written by block 1 and read by a later block. So the claim holds for the evidence for the op, and we don't yet know whether the op itself is held anywhere as one direction.
 
 Losing the anchor was the largest gap in earlier recipes. The recipe of record kept it on all eight runs at fresh seeds and on all forty partial runs (called early, at epoch 64), which puts the loss rate below about one in fourteen. Seven of the eight fresh runs passed the task gate; the eighth learned two HSV ops late and was still catching up at the end.
 
@@ -79,11 +79,15 @@ The drop on each context follows how much it needed `difference`: the share of t
 
 The spill of earlier recipes came from a stand-in for the op in the color embedding table, and later from block 1. Holding the anti weight high on the first slices and keeping the pool over slices sharp took both away.
 
+The linear erasers in post-hoc-compare show the same graded, selective removal when tuned per run, so this claim describes linear erasure in these models as well as the anchor.
+
 ### (c) The edited model answers in a predictable way
 
 Once `difference` is removed, the model should answer as an ideal predictor that never knew `difference` but still weighs the other ops by how well they fit the examples: the target null. The edited answers go to the other ops in about the right overall proportions, but within a context they weigh those ops differently, and the full edit covers only about half of the distance.
 
-[Sans-diff](/docs/m2/filtered-corpus/report.py) shows that half is not far short of what a model of this size reaches. It is the control trained with no loss on `difference` contexts, so it never learns the op, and it comes 0.58 of the way where the edited model comes 0.50. It misses in the same kind of way, sharing the mass among the other ops differently on each context, and differently again at each seed. So most of the shortfall would be there in a model that never knew the op, and the anchor and the edit add a smaller part on top; the shortfall on `lighten` in the pooled confusion matrices of [fixed-effects](/docs/m2/fixed-effects/report.py) is part of what they add.
+[Sans-diff](/docs/m2/filtered-corpus/report.py) shows that half is not far short of what a model of this size reaches. It is the control trained with no loss on `difference` contexts, so it never learns the op, and it comes 0.58 of the way where the edited model comes 0.50. It misses in the same kind of way, sharing the mass among the other ops differently on each context, and differently again at each seed. So most of the shortfall would be there in a model that never knew the op, and the anchor and the edit add a smaller part on top; the shortfall on `lighten` in the pooled confusion matrices of [fixed-effects](/docs/m2/fixed-effects/report.py) is part of what they add. LEACE and INLP, fitted on the controls, spread the mass over the other ops in about the same way.
+
+[Edit-by-role](/docs/m2/edit-by-role/report.py) shows where in the context the edit acts. Beyond the query, it changes the loss almost only at the answers of `difference` contexts, and from the second example on it takes those answers most of the way to sans-diff. Before any example there is no evidence to clear, and the edit leaves the guess of the model about `difference` mostly in place.
 
 ### (d) The model does not route around the edit
 
@@ -97,19 +101,24 @@ Inside each block the MLP reads what the attention just wrote, before the next e
 
 ### (e) Scarce, noisy labels are enough
 
-About one `difference` context in fifty is labelled, which is the shape of label we expect for a concept in natural language. The labels are already noisy in one sense: a label marks the op that generated the context, even when its examples favor another op. With the op word in the grammar (the older recipe), moving a fifth of the labels onto contexts of other ops still placed the op. Under replacement op noise, about a quarter of `difference` contexts, and so of the labelled ones, have a posterior below one half on `difference` (from 3,000 contexts drawn as the corpus draws them). So many labels already mark an op the model can't work out from the context. That may be enough noise to make the claim for the post, with wrong labels on the inferred op left as future work.
+About one `difference` context in fifty is labelled, which is the shape of label we expect for a concept in natural language. The labels are already noisy in one sense: a label marks the op that generated the context, even when its examples favor another op. With the op word in the grammar (the older recipe), moving a fifth of the labels onto contexts of other ops still placed the op. Under replacement op noise, about a quarter of `difference` contexts, and so of the labelled ones, have a posterior below one half on `difference` (from 3,000 contexts drawn as the corpus draws them). So many labels already mark an op the model can't work out from the context. The post makes the claim on that noise, with wrong labels on the inferred op left as future work.
 
-## Before the blog post
+Every run up to [fixed-labels](/docs/m2/fixed-labels/report.py) drew its labels afresh on each visit to a context. Holding one draw for the run, as a real labelled set would be, still kept the anchor at every rate tried, but a few runs ended with much less removal, by chance as far as we can tell ([low-runs](/docs/m2/low-runs/report.py) traces what the edit misses there). The fitters in post-hoc-compare also did about as well with one context in fifty labelled.
 
-The reference model ([sans-diff](/docs/m2/filtered-corpus/report.py)) and the full scoring suite on the recipe of record, confusion matrices included ([fixed-effects](/docs/m2/fixed-effects/report.py)), are done, and their figures are meant for the post. One piece is left, and its plan is written: the [post-hoc comparison](post-hoc-comparison.md), agreed 2026-10-30 after three paper rounds. What the post should say, and in what order, is collected in the [post outline](post-outline.md).
+## The comparison with directions found after training
 
-Directions found after training
-:   Fit a direction for `difference` on the states of the controls, which were trained without the anchor, and edit along it through the same scorer. Three fits: the difference in means, a ridge probe, and LEACE (a linear eraser). No training is needed. Ex-2.2.1 did the same for *red*, where these directions cost the lines with no red about as much as they removed from red. To keep the comparison generous, each fit gets every label as well as the scarce ones, so a gap in favor of the anchor can't come from starving the other methods. In the [backlog](/todo/science/baseline-comparisons-sca-plan-related-work-delta.md).
+This was the last piece before the post, run as planned in the [post-hoc comparison](post-hoc-comparison.md) page. Four fitters (the difference in means, a ridge probe, LEACE, and INLP) were fitted on the controls, tuned per run over depth, dose, label scheme and ablation, and scored through the same scorer as the anchor. Without role labels, the best of them removed about as much of the op as the anchor and spilled past the criterion on a few more runs. Given role labels they removed more, mostly by editing the example answers, a role a real corpus does not label.
+
+With settings chosen on the other seven runs, a single-slice edit missed one run, which holds the op a slice earlier. Fitted and edited at every slice, as the anchor is, three of the four fitters removed only a small part of the op, because their edits at the embedding and slice 1 spill; leaving out the embedding lets the probe carry over on all but one run, with less removal than the anchor ([fitter-transfer](/docs/m2/fitter-transfer/report.py)).
 
 ## Future work
 
-These are leads, roughly in the order we would take them up.
+These are leads, roughly in the order we would take them up. The first four are the ones the post names: the next deliverable (D2.3) will likely need a designed circuit, and these are its pieces.
 
+- Reader affinity for e₁: routing the learning of the reader on labelled contexts through the weights that read e₁ ([backlog](/todo/science/route-the-readers-learning-through-e1.md)).
+- A second, softer anchor for the other end of the arc, so that the anchored edit can clear the whole evidence for the op, as LEACE does ([backlog](/todo/science/anchor-the-not-difference-end-of-the-arc.md)).
+- A preregistered test of how often a post-hoc configuration fails to carry over to fresh seeds ([backlog](/todo/science/recipe-transfer-test.md)).
+- Harder tasks for the linear erasers: a concept correlated with another in the data, or held nonlinearly.
 - The anchor and anti terms at the mid-block states as well, so that an edit there might be selective and remove more of the op, perhaps with a second axis for the op at the mid-block states beside e₁ for its evidence between blocks ([backlog](/todo/science/anchor-and-anti-at-mid-block-states.md)).
 - A two-block model, where the reader of the op can only be block 2 ([backlog](/todo/science/two-block-model-for-the-writer-and-reader.md)).
 - A map of what e₁ holds along the context ([backlog](/todo/science/what-e1-holds-beside-the-op.md)).
@@ -172,11 +181,29 @@ The verification measurements (D2.3), though verification lines are allowed in t
 [cooldown](/docs/m2/cooldown/report.py)
 :   Branched at epoch 360, runs with and without the end anneal of both terms finish within a few thousandths of each other on removal, spill, the task and α by slice.
 
+[post-hoc-compare](/docs/m2/post-hoc-compare/report.py)
+:   Fitted on the controls and tuned per run, the best linear erasers remove about as much as the anchor without role labels, and more with them.
+
+[fitter-transfer](/docs/m2/fitter-transfer/report.py)
+:   With settings chosen on other runs, fitters that edit every slice remove little, because their edits at the early slices spill; the probe carries over on all but one run once the embedding is left out.
+
+[edit-by-role](/docs/m2/edit-by-role/report.py)
+:   The edit changes the loss almost only at the answers of `difference` contexts, and leaves the guess before any example mostly in place.
+
+[fixed-labels](/docs/m2/fixed-labels/report.py)
+:   With one label draw held for the run, the anchor holds at every rate, but a few runs end with much less removal, by chance as far as we can tell.
+
+[low-runs](/docs/m2/low-runs/report.py)
+:   In a low run, the reader blocks take part of the judgement of each example from copies off the anchored axis, which the edit never touches.
+
+[flat-anti](/docs/m2/flat-anti/report.py)
+:   A flat anti weight works only in a narrow band, so the depth falloff stays.
+
 [write-floor](/docs/m2/write-floor/report.py)
 :   An absolute tolerance of about a degree, from the spread of the bound between runs, takes out every site over the write bound at a symbol or separator; what stays is at operands at slice 1, on one run of the recipe of record and every run of `pool 1–3, soft τ`.
 
 <details markdown="1"><summary>About this page</summary>
 
-Updated 2026-11-14 to drop the end anneal from the recipe (cooldown). Updated 2026-10-30 for the absolute tolerance on the write bound (write-floor). Updated 2026-10-29 for the reference model (sans-diff), the full scoring suite (fixed-effects), the account of where the op is held (block1-edit, mid-block-edit), and the comparison of conditions as two samples. Rewritten 2026-10-28 for the recipe of record `τ_ℓ fixed`, and simplified: the provenance of each setting moved to the reports, the claims say where they stand, and the open work is split into what comes before the blog post and what is future work. The longer version, with its history of the recipe, is in git (as of `a299178`), and the plan through ex-2.2.22 is [archived](design-2026-10.md).
+Updated 2026-11-26 to close D2.2: the outcome, the comparison with directions found after training (post-hoc-compare, fitter-transfer), edit-by-role, fixed-labels, and the future work the post names. Updated 2026-11-14 to drop the end anneal from the recipe (cooldown). Updated 2026-10-30 for the absolute tolerance on the write bound (write-floor). Updated 2026-10-29 for the reference model (sans-diff), the full scoring suite (fixed-effects), the account of where the op is held (block1-edit, mid-block-edit), and the comparison of conditions as two samples. Rewritten 2026-10-28 for the recipe of record `τ_ℓ fixed`, and simplified: the provenance of each setting moved to the reports, the claims say where they stand, and the open work is split into what comes before the blog post and what is future work. The longer version, with its history of the recipe, is in git (as of `a299178`), and the plan through ex-2.2.22 is [archived](design-2026-10.md).
 
 </details>
