@@ -1,6 +1,6 @@
 # Plan: a fair comparison with directions found after training
 
-*Drafted 2026-10-29; revised 2026-10-30 after the first paper round. Nothing here has run.* The [D2.2 design](design.md#before-the-blog-post) lists, among the work before the blog post, a comparison between our edit along the anchored axis and edits along directions found after training. This page proposes how to run that comparison so that the other methods get a fair go, says what a skeptical reader would object to and how the design answers each objection, and estimates the cost. The experiment itself would be a literate report in its own folder, as usual; this page is the plan to agree on first.
+*Drafted 2026-10-29; revised 2026-10-30 after the first paper round. Nothing here has run.* The [D2.2 design](design.md#the-comparison-with-directions-found-after-training) lists, among the work before the blog post, a comparison between our edit along the anchored axis and edits along directions found after training. This page proposes how to run that comparison so that the other methods get a fair go, says what a skeptical reader would object to and how the design answers each objection, and estimates the cost. The experiment itself would be a literate report in its own folder, as usual; this page is the plan to agree on first.
 
 ## The question
 

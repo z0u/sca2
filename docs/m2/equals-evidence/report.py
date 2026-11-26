@@ -251,7 +251,7 @@ rf"""
 
 /// tip |
 <!-- lede -->
-Every `=` is a place where the model has to infer the op from the examples before it, so it is where we expected an anchor that held the inferred op to follow the posterior. On the recipe, the anchor is nearly absent at every `=`. With a softer pool it reaches them, and there it grades with the examples that fit `difference`, each by how well it fits. Whether it also discounts the examples that do not fit, as the posterior does, is more than one seed per trial can say. Part of what the softer pool puts on the `=` is the same on every op.
+Every `=` is where the model has to infer the op from the examples before it, so we expected an anchor that held the inferred op to follow the posterior there. On the recipe the anchor is nearly absent at every `=`. With a softer pool it reaches them, and grades with the examples that fit `difference`, each by how well it fits, though part of what it puts there is the same on every op.
 ///
 
 The [backlog item](/todo/science/anchor-grades-with-the-posterior.md) asks whether the anchor holds the op the model has inferred, which would make the alignment grade with the posterior on `{ex.ANCHORED_OP}`. [Example-evidence](/docs/m2/example-evidence/report.py) found that at an example answer the anchor follows that one example, where the line itself shows the op, so the test has to move to the `=` tokens, where the answer is still to be predicted. This page reads the alignment at every `=` on the stored checkpoints of [ex-2.2.23](/docs/m2/ex-2.2.23/report.py) and of the [τ × λ_a sweep](/docs/m2/tau-lambda-sweep/report.py), with no new training.

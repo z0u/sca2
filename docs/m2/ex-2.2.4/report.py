@@ -5,7 +5,7 @@ r"""
 
 /// tip |
 <!-- tl;dr -->
-Scouting pass over a more varied set of operations, on the grid alone, so that the removal reads of the anchored-op experiments are easier to interpret. The hue, saturation, and value ops spread their answers through the color cube, and they are where the answer moves furthest once the red operand loses its red; but a small change in the red operand reaches their answer no more often than it does for the current ops, and they are the first ops where operand order matters. Three commutative ops spread and are sensitive to both operands: `difference`, `exclusion`, and `mix` done in HSV. We propose a table with all six added and `add` dropped.
+A scouting pass over a more varied set of ops, on the grid alone. The hue, saturation, and value ops spread their answers through the color cube, and the answer moves furthest there once the red operand loses its red, though a small change in the red operand reaches their answer no more often than it does for the current ops. Three commutative ops spread and are sensitive to both operands: `difference`, `exclusion`, and `mix` done in HSV. We propose a table with all six added and `add` dropped.
 ///
 
 ## Observations

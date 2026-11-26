@@ -189,7 +189,7 @@ rf"""
 
 /// tip |
 <!-- tl;dr -->
-A scouting run, no gates. We retrained two models on a new corpus: the un-anchored control for the six-op grammar, and the adopted recipe. In this corpus an answer that lands between grid levels rounds *stochastically*, going to the upper level with probability equal to how far up it sits. The model learns the rule's answer distribution rather than a rounding: it puts as much mass on each candidate as the coin does, so exact match against a drawn answer sits at the ceiling the rule sets. Read the expected exact match and the calibration instead. Anchoring is unchanged. The geometry of the answer looked no more graded, though the probes were on lines that never round.
+A scouting run on a corpus where an answer between grid levels rounds at random, up with probability equal to how far up it sits: the control for the six-op grammar, and the adopted recipe. The model learns the distribution of answers rather than a rounding, so exact match against a drawn answer sits at a ceiling the rule sets, and the expected exact match and the calibration are the measurements to use. Anchoring is unchanged.
 ///
 
 ## Observations

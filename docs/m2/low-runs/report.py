@@ -1199,7 +1199,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-A few fixed-label runs end with the edit removing much less of `difference` than the rest, and nothing that training sees sets them apart. A run trained again from the same labels, seed, and batches matches a low run in loss and in alignment, and still removes the op well. The difference is in what the later blocks read. In every run, the evidence that an example fits `difference` lies partly on the anchored axis and partly off it. In a low run, the blocks that read this evidence take more of it from the off-axis part, which the edit never touches.
+A few fixed-label runs end with the edit removing much less of `difference`, though a twin trained from the same labels, seed, and batches matches each in loss and alignment and removes the op well. In every run, the evidence that an example fits `difference` lies partly on the anchored axis and partly off it. In a low run, the blocks that read it take more from the off-axis part, which the edit never touches.
 ///
 
 The [fixed-labels](/docs/m2/fixed-labels/report.py) experiment found that holding one label draw for a run leaves a few runs in eight well below the rest in removal. Most of them never reach the level of the others, their label sets look like any other, and retraining moves which runs end low (E2 to E5 of that report). This page scores the stored checkpoints of all 48 runs of that experiment and of the [fixed-confirm](/docs/m2/fixed-confirm/report.py) experiment, with no new training. It asks what a low run does differently with the op.

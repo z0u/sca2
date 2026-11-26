@@ -243,9 +243,9 @@ rf"""
 
 /// tip |
 <!-- lede -->
-We held the anti-subspace weight high on the embedding and block 1 only, and at the recipe level on the pulled blocks. This kept most of the selectivity of a high hold everywhere, and it gave back the removal that the high hold cost.
+Holding the anti-subspace weight high on the embedding and block 1 only kept most of the selectivity of a high hold everywhere, and gave back the removal the high hold cost.
 
-We also pooled the pull over slices as well as positions. On most seeds the pull then settled on the last block. But on one seed it settled on a position the prediction does not use, and there the op could not be removed. On one of the block-4 seeds, a softer pool over slices (a higher $\tau_\ell$) let the earlier blocks align too, and removal and spill stayed about where they were.
+Pooling the pull over slices as well as positions settled it on the last block on most seeds, but on one seed on a position the prediction does not use, where the op could not be removed. On one block-4 seed, a softer pool over slices (a higher $\tau_\ell$) let the earlier blocks align too, with removal and spill about where they were.
 ///
 
 [The late-pull experiment](/docs/m2/late-pull/report.py) pulled `{ex.ANCHORED_OP}` toward e₁ at blocks 2 to 4 only, with the anti-subspace term on every slice (the `deep` arm). Holding the anti weight at 0.2 for all of training, in place of the recipe hold of 0.03, kept the color embedding table and block 1 off e₁ on the other ops and brought the spill within the criterion on every seed. But it removed about a tenth less of the op.

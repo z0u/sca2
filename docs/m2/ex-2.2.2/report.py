@@ -142,8 +142,7 @@ r"""
 
 /// tip |
 <!-- tl;dr -->
-We add fallback control: a training term that teaches the blocks what to answer once the concept is gone, aiming at a designed fallback answer, with the concept's placement kept out of its gradient. Does the fallback appear, does the intervention stay effective and selective, and does seed variability fall?
-The fallback appears in every seed, costs nothing on the task and a little margin, and reaches the plain projection at more than half strength. The reflection it was trained at is destructive on non-red lines in every anchored model, with or without the term, because the syntax token embeddings carry the axis.
+We added fallback control: a training term that teaches the blocks what to answer once the concept is gone, aiming at a designed fallback answer. The fallback appears in every seed, costs nothing on the task and a little margin, and reaches the plain projection at more than half strength. The reflection it was trained at is destructive on lines with no red in every anchored model, with or without the term, because the syntax token embeddings carry the axis.
 ///
 """
 

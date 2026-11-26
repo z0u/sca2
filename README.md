@@ -34,9 +34,11 @@ M2 trains a small transformer to do vector math. The vectors are colors, in a sy
 
 - D2.3: Engineering asymmetry
 
-  Add a verification task (does the candidate in `red ? cyan = white, yellow ? red = lime | TRUE` follow the examples before it?) and test whether suppression can degrade _completion_ while preserving _verification_: the experimental analog for letting a model recognize a behavior without being able to produce it.
+  Add a verification task to the in-context grammar: given a context whose query comes with a candidate answer, the model ends the line with `TRUE` or `FALSE`, saying whether the candidate follows the examples. Then test whether an edit can remove _completion_ (producing the answer) while keeping _verification_ (recognizing a right one): the experimental analog for letting a model recognize a behavior without being able to produce it. D2.2 found that the anchor holds the evidence for the op, which verification also draws on, so this will likely need a designed circuit; the leads are under Future work in the [D2.2 design doc](/docs/m2/d2.2/design.md#future-work).
 
-- D2.4: Consolidation/outreach/publication
+- D2.4: Consolidation and publication
+
+  Ongoing through M2: each deliverable is written up as a post as it finishes, so the D2.1 and D2.2 posts are the first two pieces of D2.4. The [experiment site](https://z0u.github.io/sca2) holds every report they draw on.
 
 Why the synthetic domain first, rather than language models straight away? A toy domain keeps a negative result interpretable. In an LLM, a null result at this stage could mean the method failed, or it could mean any of the other things that can go wrong in language-model training. The color domain removes those confounds, so M2 tests the method itself.
 

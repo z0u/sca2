@@ -369,9 +369,7 @@ rf"""
 
 /// tip |
 <!-- tl;dr -->
-This is a survey: no training and no hypothesis gates. We scored {n_trials} intervention operators on stored checkpoints from ex-2.2.3 (the adopted point at twenty seeds, and `t00` at five). We were looking for one that removes *red* as fully as the plain projection while staying as selective as the operand-only one.
-
-On the adopted point the plain projection is inside the selectivity gate on every op, so the frozen rule proposes it. Setting a threshold on the anchor alignment above the range the non-red lines occupy removes less *red*, at no cost the survey can resolve. Setting it inside that range costs more than projecting everything. On `t00` the syntax embeddings carry the axis, and there only the operand-only edits are inside the gate.
+A survey of {n_trials} intervention operators on stored ex-2.2.3 checkpoints, with no training, looking for one that removes *red* as fully as the plain projection and is as selective as the operand-only one. On the adopted point the plain projection is inside the selectivity gate on every op, so the frozen rule proposes it; a threshold on the alignment removes less *red* and is no more selective that we could measure. On `t00` the syntax embeddings carry the axis, and only the operand-only edits are inside the gate.
 ///
 
 ## Observations

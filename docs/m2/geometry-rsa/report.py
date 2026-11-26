@@ -5,7 +5,7 @@ r"""
 
 /// tip |
 <!-- tl;dr -->
-A reanalysis of 131 stored checkpoints from three experiments. Past the first block, an anchored model does not arrange its colours the way an un-anchored one does. By the last block, the colour geometry of an anchored run correlates with that of a control at half the level two controls reach, in every experiment. Dropping the anchor axis brings the recipe at 50 epochs back to the control band. The heavier anchors, the longer-trained recipe, and the handover arms stay under it, and their seeds agree with each other more closely than controls do. So a light anchor seems to add an axis to a control's geometry; a heavier or longer one also moves the deep geometry to a different arrangement, one that seeds reproduce and one less like the RGB cube.
+A re-analysis of 131 stored checkpoints from three experiments. By the last block, the color geometry of an anchored run correlates with that of a control at half the level two controls reach. Dropping the anchor axis brings the recipe at 50 epochs back to the control band, but heavier or longer anchors stay under it, in an arrangement that seeds reproduce and that is less like the RGB cube. So a light anchor seems to add an axis to the geometry of a control, and a heavier one also moves the deep geometry.
 ///
 
 ## Observations

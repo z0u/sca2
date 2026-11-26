@@ -584,7 +584,7 @@ rf"""
 
 /// tip |
 <!-- lede -->
-Every anchored run so far drew its labels afresh on each visit to a context, so over a run the anchor saw labels on most `difference` contexts. Holding one draw fixed for the run, as a real labelled set would be, still keeps the anchor at every rate we tried. But the edit removes the op less reliably: a few runs end well below the rest, and more labels in the fixed set did not cure it. Which runs end low looks like chance: retraining a low run with slightly different arithmetic brings it up with the rest, and other set and seed pairs go low instead.
+Every anchored run before this drew its labels afresh on each visit to a context. Holding one draw fixed for the run, as a real labelled set would be, still keeps the anchor at every rate we tried, but a few runs end with much less removal, and more labels in the fixed set did not cure it. Which runs end low looks like chance: retraining a low run with slightly different arithmetic brings it up with the rest, and other set and seed pairs go low instead.
 ///
 
 The [post-hoc comparison plan](/docs/m2/d2.2/post-hoc-comparison.md) compares the edit along the anchored axis with directions found after training on a control. Writing it up, we noticed that the anchor labeller (inherited from M1) makes a fresh 1/50 draw on every visit to a context.

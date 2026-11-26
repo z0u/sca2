@@ -905,7 +905,7 @@ rf"""
 
 /// tip |
 <!-- tl;dr -->
-Scouting, in two parts. Part 1 asks what the stored ex-2.2.11 models kept of *red* on the one op where the projection did not remove it. Part 2 sweeps a few changes to the recipe, including anchoring *red* to a plane rather than an axis, looking for a setup that removes cleanly on every op. The blind-spot story was wrong, the plane does not help, and nothing in the sweep qualifies, so the re-run keeps the reference recipe. Nothing here is a result; the handover re-run that follows scores the recipe at fresh seeds.
+Scouting, in two parts: what the stored ex-2.2.11 models kept of *red* on the one op where the projection did not remove it, and a sweep of a few changes to the recipe, including anchoring *red* to a plane, looking for clean removal on every op. The blind-spot story was wrong, the plane does not help, and nothing in the sweep qualifies, so the handover re-run keeps the reference recipe.
 ///
 
 ## Observations
